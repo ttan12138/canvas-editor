@@ -48,7 +48,8 @@ function pickText(elementList: IElement[]): string {
     } else if (element.type === ElementType.LATEX) {
       text += element.value
     } else if (element.controlId) {
-      if (!element.control?.hide) {
+      const control = element.control
+      if (!control || !control.hide) {
         const controlId = element.controlId
         const valueList: IElement[] = []
         while (e < elementList.length) {
@@ -67,7 +68,7 @@ function pickText(elementList: IElement[]): string {
       }
     } else if (
       (!element.type || element.type === ElementType.TEXT) &&
-      !element.area?.hide
+      (!element.area || !element.area.hide)
     ) {
       text += element.value
     }

@@ -1,3 +1,5 @@
+import 'core-js/stable'
+import 'regenerator-runtime/runtime'
 import { commentList, data, options } from './mock'
 import './style.css'
 import prism from 'prismjs'

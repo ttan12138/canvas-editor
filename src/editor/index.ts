@@ -1,3 +1,6 @@
+import 'core-js/stable'
+import 'regenerator-runtime/runtime'
+import 'intersection-observer'
 import './assets/css/index.css'
 import { version } from '../../package.json'
 import { IEditorData, IEditorOption, IEditorResult } from './interface/Editor'

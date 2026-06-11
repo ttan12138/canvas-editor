@@ -124,7 +124,8 @@ export class ContextMenu {
   private _handleSideEffect = (evt: MouseEvent) => {
     if (this.contextMenuContainerList.length) {
       // 点击非右键菜单内
-      const target = <Element>(evt?.composedPath()[0] || evt.target)
+      const composedPath = evt.composedPath ? evt.composedPath() : []
+      const target = <Element>(composedPath[0] || evt.target)
       const contextMenuDom = findParent(
         target,
         (node: Node & Element) =>

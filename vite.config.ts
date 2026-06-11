@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import typescript from '@rollup/plugin-typescript'
 import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
+import legacy from '@vitejs/plugin-legacy'
 import * as path from 'path'
 import { fileURLToPath } from 'node:url'
 
@@ -44,21 +45,24 @@ export default defineConfig(({ mode }) => {
         {
           ...typescript({
             tsconfig: './tsconfig.json',
-            include: ['./src/editor/**']
+            include: ['./src/editor/**'],
+            outDir: 'lib'
           }),
           apply: 'build',
           declaration: true,
-          declarationDir: 'types/',
+          declarationDir: 'lib/types/',
           rootDir: '/'
         }
       ],
       build: {
+        outDir: 'lib',
         lib: {
           name,
           fileName: name,
           entry: path.resolve(__dirname, 'src/editor/index.ts')
         },
-        sourcemap: true
+        sourcemap: true,
+        target: 'es2015'
       }
     }
   }
@@ -69,6 +73,21 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 3000
+    },
+    plugins: [
+      legacy({
+        targets: ['ie >= 11', 'chrome 52', 'Android 4.1', 'iOS 7.1'],
+        renderModernChunks: true,
+        additionalLegacyPolyfills: [
+          'regenerator-runtime/runtime',
+          'core-js/stable'
+        ]
+      })
+    ],
+    build: {
+      outDir: 'build',
+      target: ['es2015', 'chrome52'],
+      minify: 'terser'
     }
   }
 })

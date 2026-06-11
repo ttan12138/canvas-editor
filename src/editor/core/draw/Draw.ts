@@ -1122,7 +1122,7 @@ export class Draw {
   }
 
   public getPagePixelRatio(): number {
-    return this.pagePixelRatio || window.devicePixelRatio
+    return this.pagePixelRatio || window.devicePixelRatio || 1
   }
 
   public setPagePixelRatio(payload: number | null) {

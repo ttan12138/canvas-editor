@@ -76,7 +76,8 @@ export class GlobalEvent {
   public clearSideEffect = (evt: Event) => {
     if (!this.cursor) return
     // 编辑器内部dom
-    const target = <Element>(evt?.composedPath()[0] || evt.target)
+    const composedPath = evt.composedPath ? evt.composedPath() : []
+    const target = <Element>(composedPath[0] || evt.target)
     const pageList = this.draw.getPageList()
     const innerEditorDom = findParent(
       target,

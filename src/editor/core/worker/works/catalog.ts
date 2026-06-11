@@ -119,7 +119,8 @@ function getCatalog(payload: IGetCatalogPayload): ICatalog | null {
           if (value.length > 1) {
             let index = 1
             while (index < value.length) {
-              if (value[index]?.titleId) {
+              const el = value[index]
+              if (el && el.titleId) {
                 const { titleElement, position } = getElementInfo(
                   value[index],
                   value,
@@ -144,7 +145,9 @@ function getCatalog(payload: IGetCatalogPayload): ICatalog | null {
   ) => {
     const subCatalogItem =
       catalogItem.subCatalog[catalogItem.subCatalog.length - 1]
-    const catalogItemLevel = titleOrderNumberMapping[subCatalogItem?.level]
+    const catalogItemLevel = subCatalogItem
+      ? titleOrderNumberMapping[subCatalogItem.level]
+      : 0
     const titleLevel = titleOrderNumberMapping[title.level!]
     if (subCatalogItem && titleLevel > catalogItemLevel) {
       recursiveInsert(title, subCatalogItem)
@@ -165,7 +168,9 @@ function getCatalog(payload: IGetCatalogPayload): ICatalog | null {
   for (let e = 0; e < titleElementList.length; e++) {
     const title = titleElementList[e]
     const catalogItem = catalog[catalog.length - 1]
-    const catalogItemLevel = titleOrderNumberMapping[catalogItem?.level]
+    const catalogItemLevel = catalogItem
+      ? titleOrderNumberMapping[catalogItem.level]
+      : 0
     const titleLevel = titleOrderNumberMapping[title.level!]
     if (catalogItem && titleLevel > catalogItemLevel) {
       recursiveInsert(title, catalogItem)
