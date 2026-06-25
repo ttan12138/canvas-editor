@@ -59,6 +59,9 @@ import { SelectControl } from './select/SelectControl'
 import { TextControl } from './text/TextControl'
 import { DateControl } from './date/DateControl'
 import { NumberControl } from './number/NumberControl'
+import { NumberFlagControl } from './number/NumberFlagControl'
+import { CustomSelectControl } from './customSelect/CustomSelectControl'
+
 import { MoveDirection } from '../../../dataset/enum/Observer'
 import {
   CONTROL_CONTEXT_ATTR,
@@ -497,7 +500,8 @@ export class Control {
       if (
         this.activeControl instanceof SelectControl ||
         this.activeControl instanceof DateControl ||
-        this.activeControl instanceof NumberControl
+        this.activeControl instanceof NumberControl ||
+        this.activeControl instanceof CustomSelectControl
       ) {
         if (element.controlComponent === ControlComponent.POSTFIX) {
           this.activeControl.destroy()
@@ -549,6 +553,14 @@ export class Control {
       const numberControl = new NumberControl(element, this)
       this.activeControl = numberControl
       numberControl.awake()
+    } else if (control.type === ControlType.NUMBER_FLAG) {
+      const numberFlagControl = new NumberFlagControl(element, this)
+      this.activeControl = numberFlagControl
+      numberFlagControl.awake()
+    } else if (control.type === ControlType.CUSTOM_SELECT) {
+      const customSelectControl = new CustomSelectControl(element, this)
+      this.activeControl = customSelectControl
+      customSelectControl.awake()
     }
     // 缓存控件数据
     this.updateActiveControlValue()
@@ -567,7 +579,9 @@ export class Control {
     if (
       this.activeControl instanceof SelectControl ||
       this.activeControl instanceof DateControl ||
-      this.activeControl instanceof NumberControl
+      this.activeControl instanceof NumberControl ||
+      this.activeControl instanceof NumberFlagControl ||
+      this.activeControl instanceof CustomSelectControl
     ) {
       this.activeControl.destroy()
     }
@@ -657,7 +671,8 @@ export class Control {
     if (
       (this.activeControl instanceof DateControl ||
         this.activeControl instanceof SelectControl ||
-        this.activeControl instanceof NumberControl) &&
+        this.activeControl instanceof NumberControl ||
+        this.activeControl instanceof NumberFlagControl) &&
       this.activeControl.getIsPopup()
     ) {
       this.activeControl.destroy()
@@ -1013,7 +1028,8 @@ export class Control {
           if (
             (type === ControlType.TEXT ||
               type === ControlType.DATE ||
-              type === ControlType.NUMBER) &&
+              type === ControlType.NUMBER ||
+              type === ControlType.NUMBER_FLAG) &&
             nextElement.controlComponent === ControlComponent.VALUE
           ) {
             textControlValue += nextElement.value
@@ -1026,7 +1042,8 @@ export class Control {
         if (
           type === ControlType.TEXT ||
           type === ControlType.DATE ||
-          type === ControlType.NUMBER
+          type === ControlType.NUMBER ||
+          type === ControlType.NUMBER_FLAG
         ) {
           result.push({
             ...element.control,
@@ -1038,7 +1055,8 @@ export class Control {
         } else if (
           type === ControlType.SELECT ||
           type === ControlType.CHECKBOX ||
-          type === ControlType.RADIO
+          type === ControlType.RADIO ||
+          type === ControlType.CUSTOM_SELECT
         ) {
           const innerText = code
             ?.split(',')
@@ -1164,6 +1182,15 @@ export class Control {
           } else {
             select.clearSelect(controlContext, controlRule)
           }
+        } else if (type === ControlType.CUSTOM_SELECT) {
+          if (Array.isArray(value)) continue
+          const customSelect = new CustomSelectControl(element, this)
+          this.activeControl = customSelect
+          if (value) {
+            customSelect.setSelect(value, controlContext, controlRule)
+          } else {
+            customSelect.clearSelect(controlContext, controlRule)
+          }
         } else if (type === ControlType.CHECKBOX) {
           if (Array.isArray(value)) continue
           const checkbox = new CheckboxControl(element, this)
@@ -1210,6 +1237,25 @@ export class Control {
             text.setValue(formatValue, controlContext, controlRule)
           } else {
             text.clearValue(controlContext, controlRule)
+          }
+        } else if (type === ControlType.NUMBER_FLAG) {
+          const formatValue = Array.isArray(value)
+            ? value
+            : value
+              ? [{ value }]
+              : []
+          if (formatValue.length) {
+            formatElementList(formatValue, {
+              isHandleFirstElement: false,
+              editorOptions: this.options
+            })
+          }
+          const numberFlag = new NumberFlagControl(element, this)
+          this.activeControl = numberFlag
+          if (formatValue.length) {
+            numberFlag.setValue(formatValue, controlContext, controlRule)
+          } else {
+            numberFlag.clearValue(controlContext, controlRule)
           }
         }
         // 控件值变更事件

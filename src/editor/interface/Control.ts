@@ -49,6 +49,8 @@ export interface IControlDate {
 export interface IControlNumber {
   numberExclusiveOptions?: {
     calculatorDisabled?: boolean
+    min?: number
+    max?: number
   }
 }
 

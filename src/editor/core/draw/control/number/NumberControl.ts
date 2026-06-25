@@ -123,7 +123,8 @@ export class NumberControl extends TextControl {
         ...propertyElement,
         type: ElementType.TEXT,
         value: valueStr[i],
-        controlComponent: ControlComponent.VALUE
+        controlComponent: ControlComponent.VALUE,
+        underline: true
       }
       data.push(newElement)
     }

@@ -4,7 +4,9 @@ export enum ControlType {
   CHECKBOX = 'checkbox',
   RADIO = 'radio',
   DATE = 'date',
-  NUMBER = 'number'
+  NUMBER = 'number',
+  NUMBER_FLAG = 'numberFlag',
+  CUSTOM_SELECT = 'customSelect'
 }
 
 export enum ControlComponent {

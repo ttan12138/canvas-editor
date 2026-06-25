@@ -81,7 +81,8 @@ import { RadioParticle } from './particle/RadioParticle'
 import { DeepRequired, IPadding } from '../../interface/Common'
 import {
   ControlComponent,
-  ControlIndentation
+  ControlIndentation,
+  ControlType
 } from '../../dataset/enum/Control'
 import { formatElementList } from '../../utils/element'
 import { WorkerManager } from '../worker/WorkerManager'
@@ -111,6 +112,7 @@ import {
 } from '../../dataset/constant/Regular'
 import { LineBreakParticle } from './particle/LineBreakParticle'
 import { WhiteSpaceParticle } from './particle/WhiteSpaceParticle'
+import { NumberFlagParticle } from './particle/number/NumberFlagParticle'
 import { MouseObserver } from '../observer/MouseObserver'
 import { LineNumber } from './frame/LineNumber'
 import { PageBorder } from './frame/PageBorder'
@@ -181,6 +183,7 @@ export class Draw {
   private listParticle: ListParticle
   private lineBreakParticle: LineBreakParticle
   private whiteSpaceParticle: WhiteSpaceParticle
+  private numberFlagParticle: NumberFlagParticle
   private control: Control
   private pageBorder: PageBorder
   private workerManager: WorkerManager
@@ -266,6 +269,7 @@ export class Draw {
     this.listParticle = new ListParticle(this)
     this.lineBreakParticle = new LineBreakParticle(this)
     this.whiteSpaceParticle = new WhiteSpaceParticle(this)
+    this.numberFlagParticle = new NumberFlagParticle()
     this.control = new Control(this)
     this.pageBorder = new PageBorder(this)
     this.graffiti = new Graffiti(this, data.graffiti)
@@ -2326,6 +2330,48 @@ export class Draw {
             this.textParticle.complete()
           }
         }
+        // NUMBER_FLAG控件箭头绘制
+        if (
+          element.controlComponent === ControlComponent.POSTFIX &&
+          element.control?.type === ControlType.NUMBER_FLAG
+        ) {
+          this.textParticle.complete()
+          const control = element.control
+          const { min, max } = control.numberExclusiveOptions || {}
+          let controlValue = ''
+          let prevIdx = j - 1
+          while (prevIdx >= 0) {
+            const prevElement = curRow.elementList[prevIdx]
+            if (
+              prevElement.controlId !== element.controlId ||
+              prevElement.controlComponent === ControlComponent.PREFIX ||
+              prevElement.controlComponent === ControlComponent.PRE_TEXT
+            ) {
+              break
+            }
+            if (prevElement.controlComponent === ControlComponent.VALUE) {
+              controlValue = prevElement.value + controlValue
+            }
+            prevIdx--
+          }
+          const numericValue = parseFloat(controlValue)
+          if (!isNaN(numericValue)) {
+            const rowMargin = this.getElementRowMargin(element)
+            // 箭头向左偏移使其更靠近内容区域
+            const arrowX = x + 4
+            const arrowY = y + rowMargin
+            const arrowHeight = curRow.height - 2 * rowMargin
+            this.numberFlagParticle.render({
+              ctx,
+              x: arrowX,
+              y: arrowY,
+              height: arrowHeight,
+              value: numericValue,
+              min,
+              max
+            })
+          }
+        }
         // 换行符绘制
         if (
           isDrawLineBreak &&
@@ -2361,7 +2407,14 @@ export class Draw {
           this.control.drawBorder(ctx)
         }
         // 下划线记录
-        if (element.underline || element.control?.underline) {
+        // NUMBER_FLAG控件的值元素和占位符始终显示下划线
+        const isNumberFlagValue =
+          element.controlComponent === ControlComponent.VALUE &&
+          element.control?.type === ControlType.NUMBER_FLAG
+        const isNumberFlagPlaceholder =
+          element.controlComponent === ControlComponent.PLACEHOLDER &&
+          element.control?.type === ControlType.NUMBER_FLAG
+        if (element.underline || element.control?.underline || isNumberFlagValue || isNumberFlagPlaceholder) {
           // 下标元素下划线单独绘制
           if (
             preElement?.type === ElementType.SUBSCRIPT &&

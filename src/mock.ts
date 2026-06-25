@@ -122,12 +122,13 @@ elementList.splice(94, 0, {
   value: '',
   control: {
     conceptId: '2',
-    type: ControlType.SELECT,
+    type: ControlType.CUSTOM_SELECT,
+
     value: null,
     code: null,
     placeholder: '有无',
-    prefix: '{',
-    postfix: '}',
+    prefix: '\u200c',
+    postfix: '➡️',
     valueSets: [
       {
         value: '有',
@@ -468,13 +469,15 @@ elementList.push(
       value: '',
       control: {
         conceptId: '7',
-        type: ControlType.NUMBER,
+        type: ControlType.NUMBER_FLAG,
         value: null,
         placeholder: '就诊次数',
-        prefix: '{',
-        postfix: '}',
+        prefix: '_',
+        postfix: '_',
         numberExclusiveOptions: {
-          calculatorDisabled: false
+          min: 20,
+          max: 100,
+          calculatorDisabled: true
         }
       }
     }
