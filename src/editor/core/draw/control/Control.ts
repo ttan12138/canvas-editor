@@ -560,7 +560,9 @@ export class Control {
   }
 
   public destroyControl(options: IDestroyControlOption = {}) {
-    if (!this.activeControl) return
+    if (!this.activeControl) {
+      return
+    }
     const { isEmitEvent = true } = options
     if (
       this.activeControl instanceof SelectControl ||

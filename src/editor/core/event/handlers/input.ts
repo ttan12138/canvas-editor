@@ -12,15 +12,22 @@ import { CanvasEvent } from '../CanvasEvent'
 
 export function input(data: string, host: CanvasEvent) {
   const draw = host.getDraw()
-  if (draw.isReadonly() || draw.isDisabled()) return
+  if (draw.isReadonly() || draw.isDisabled()) {
+    return
+  }
   const position = draw.getPosition()
   const cursorPosition = position.getCursorPosition()
-  if (!data || !cursorPosition) return
+  if (!data || !cursorPosition) {
+    return
+  }
   const isComposing = host.isComposing
   // 正在合成文本进行非输入操作
   if (isComposing && host.compositionInfo?.value === data) return
   const rangeManager = draw.getRange()
-  if (!rangeManager.getIsCanInput()) return
+  const canInput = rangeManager.getIsCanInput()
+  if (!canInput) {
+    return
+  }
   // 移除合成前，缓存设置的默认样式设置
   const defaultStyle =
     rangeManager.getDefaultStyle() || host.compositionInfo?.defaultStyle || null
@@ -34,8 +41,8 @@ export function input(data: string, host: CanvasEvent) {
   const text = data.replaceAll(`\n`, ZERO)
   const { startIndex, endIndex } = rangeManager.getRange()
   // 格式化元素
-  const elementList = draw.getElementList()
-  const copyElement = rangeManager.getRangeAnchorStyle(elementList, endIndex)
+  const inputElementList = draw.getElementList()
+  const copyElement = rangeManager.getRangeAnchorStyle(inputElementList, endIndex)
   if (!copyElement) return
   const isDesignMode = draw.isDesignMode()
   const inputData: IElement[] = splitText(text).map(value => {
@@ -46,7 +53,7 @@ export function input(data: string, host: CanvasEvent) {
       isDesignMode ||
       (!copyElement.title?.disabled && !copyElement.control?.disabled)
     ) {
-      const nextElement = elementList[endIndex + 1]
+      const nextElement = inputElementList[endIndex + 1]
       // 文本、超链接、日期、上下标：复制所有信息（元素类型、样式、特殊属性）
       if (
         !copyElement.type ||
@@ -93,12 +100,12 @@ export function input(data: string, host: CanvasEvent) {
   } else {
     const start = startIndex + 1
     if (startIndex !== endIndex) {
-      draw.spliceElementList(elementList, start, endIndex - startIndex)
+      draw.spliceElementList(inputElementList, start, endIndex - startIndex)
     }
-    formatElementContext(elementList, inputData, startIndex, {
+    formatElementContext(inputElementList, inputData, startIndex, {
       editorOptions: draw.getOptions()
     })
-    draw.spliceElementList(elementList, start, 0, inputData)
+    draw.spliceElementList(inputElementList, start, 0, inputData)
     curIndex = startIndex + inputData.length
   }
   if (~curIndex) {
@@ -110,7 +117,7 @@ export function input(data: string, host: CanvasEvent) {
   }
   if (isComposing && ~curIndex) {
     host.compositionInfo = {
-      elementList,
+      elementList: inputElementList,
       value: text,
       startIndex: curIndex - inputData.length,
       endIndex: curIndex,

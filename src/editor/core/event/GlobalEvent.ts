@@ -92,6 +92,16 @@ export class GlobalEvent {
     if (!this.cursor) return
     const composedPath = evt.composedPath ? evt.composedPath() : []
     const target = <Element>(composedPath[0] || evt.target)
+    // target 可能不是 Node（如 window/document 触发），需要做防御性检查
+    if (!target || !(target instanceof Node)) {
+      return
+    }
+    // const targetInfo = {
+    //   tag: target?.tagName,
+    //   className: target?.className,
+    //   hasActiveControl: !!this.control.getActiveControl(),
+    //   activeControlType: this.control.getActiveControl()?.constructor?.name
+    // }
 
     const contextMenuDom = findParent(
       target,
@@ -101,7 +111,9 @@ export class GlobalEvent {
         node.getAttribute(EDITOR_COMPONENT) === EditorComponent.CONTEXTMENU,
       true
     )
-    if (contextMenuDom) return
+    if (contextMenuDom) {
+      return
+    }
 
     const pageList = this.draw.getPageList()
     const innerEditorDom = findParent(
@@ -109,7 +121,29 @@ export class GlobalEvent {
       (node: HTMLCanvasElement) => pageList.includes(node),
       true
     )
-    if (innerEditorDom) return
+    if (innerEditorDom) {
+      return
+    }
+
+    const agentCursorDom = this.cursor.getAgentDom()
+    if (
+      target === agentCursorDom ||
+      (target instanceof Node && agentCursorDom.contains(target))
+    ) {
+      return
+    }
+    // 弹窗类控件(下拉/日期/数字)的弹窗属于 popup 组件，不应销毁控件
+    const popupDom = findParent(
+      target,
+      (node: Node & Element) =>
+        !!node &&
+        node.nodeType === 1 &&
+        node.getAttribute(EDITOR_COMPONENT) === EditorComponent.POPUP,
+      true
+    )
+    if (popupDom) {
+      return
+    }
     const outerEditorDom = findParent(
       target,
       (node: Node & Element) =>
