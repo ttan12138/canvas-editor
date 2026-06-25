@@ -1176,6 +1176,8 @@ export class CommandAdapt {
       delete element.url
       delete element.hyperlinkId
       delete element.underline
+      element.color = '#000000'
+      console.log(element)
     }
     this.draw.getHyperlinkParticle().clearHyperlinkPopup()
     // 重置画布
@@ -2257,6 +2259,10 @@ export class CommandAdapt {
 
   public deleteGroup(groupId: string) {
     this.draw.getGroup().deleteGroup(groupId)
+  }
+
+  public changeGroupStyle(groupId: string, styleFlag: { underline?: boolean, highlight?: string, color?: string, all?: boolean}) {
+    this.draw.getGroup().changeGroupStyle(groupId, styleFlag)
   }
 
   public getGroupIds(): Promise<string[]> {

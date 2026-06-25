@@ -33,34 +33,13 @@ window.onload = function () {
   const isApple =
     typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent)
 
+  console.log("data", data)
   // 1. 初始化编辑器
   const container = document.querySelector<HTMLDivElement>('.editor')!
   const instance = new Editor(
     container,
     {
-      header: [
-        {
-          value: '第一人民医院',
-          size: 32,
-          rowFlex: RowFlex.CENTER
-        },
-        {
-          value: '\n门诊病历',
-          size: 18,
-          rowFlex: RowFlex.CENTER
-        },
-        {
-          value: '\n',
-          type: ElementType.SEPARATOR
-        }
-      ],
-      main: <IElement[]>data,
-      footer: [
-        {
-          value: 'canvas-editor',
-          size: 12
-        }
-      ]
+      main: <IElement[]>data
     },
     options
   )
@@ -90,6 +69,7 @@ window.onload = function () {
     console.log('undo')
     instance.command.executeUndo()
   }
+
 
   const redoDom = document.querySelector<HTMLDivElement>('.menu-item__redo')!
   redoDom.title = `重做(${isApple ? '⌘' : 'Ctrl'}+Y)`
@@ -1877,17 +1857,53 @@ window.onload = function () {
               placeholder: '请输入批注'
             }
           ],
+          // onConfirm: payload => {
+          //   const value = payload.find(p => p.name === 'value')?.value
+          //   if (!value) return
+          //   const groupId = command.executeSetGroup()
+          //   if (!groupId) return
+          //   commentList.push({
+          //     id: groupId,
+          //     content: value,
+          //     userName: 'Hufe',
+          //     rangeText: command.getRangeText(),
+          //     createdDate: new Date().toLocaleString()
+          //   })
+          // }
           onConfirm: payload => {
-            const value = payload.find(p => p.name === 'value')?.value
-            if (!value) return
-            const groupId = command.executeSetGroup()
-            if (!groupId) return
-            commentList.push({
-              id: groupId,
-              content: value,
-              userName: 'Hufe',
-              rangeText: command.getRangeText(),
-              createdDate: new Date().toLocaleString()
+            // const value = payload.find(p => p.name === 'value')?.value
+            // if (!value) return
+            // command.executeSetImageCaption({
+            //   value
+            // })
+            console.log(payload)
+            command.executeSetValue({
+              main: [{
+                "size": 16,
+                "value": "这是一段测试文字"
+              },
+              {
+                  "value": "高密第影",
+                  "underline": true,
+                  "groupIds": [
+                      "1"
+                  ]
+              },
+              {
+                  "size": 16,
+                  "value": "，"
+              },
+              {
+                  "highlight": "#F2F27F",
+                  "value": "椎间盘突向",
+                  "groupIds": [
+                      "椎间盘突向~~椎间盘突出~~QC-S-006"
+                  ]
+              },
+              {
+                  "size": 16,
+                  "value": "测试文字"
+              }]
             })
           }
         })
@@ -1916,10 +1932,39 @@ window.onload = function () {
             }
           ],
           onConfirm: payload => {
-            const value = payload.find(p => p.name === 'value')?.value
-            if (!value) return
-            command.executeSetImageCaption({
-              value
+            // const value = payload.find(p => p.name === 'value')?.value
+            // if (!value) return
+            // command.executeSetImageCaption({
+            //   value
+            // })
+            console.log(payload)
+            command.executeSetValue({
+              main: [{
+                "size": 16,
+                "value": "这是一段测试文字"
+              },
+              {
+                  "highlight": "#F2F27F",
+                  "value": "高密第影",
+                  "groupIds": [
+                      "1"
+                  ]
+              },
+              {
+                  "size": 16,
+                  "value": "，"
+              },
+              {
+                  "highlight": "#F2F27F",
+                  "value": "椎间盘突向",
+                  "groupIds": [
+                      "椎间盘突向~~椎间盘突出~~QC-S-006"
+                  ]
+              },
+              {
+                  "size": 16,
+                  "value": "测试文字"
+              }]
             })
           }
         })
@@ -1955,6 +2000,8 @@ window.onload = function () {
               ...currentCaption,
               value: value || ''
             })
+            // console.log(payload)
+            // command.executeDeleteGroup("椎间盘突向~~椎间盘突出~~QC-S-006")
           }
         })
       }
@@ -1968,17 +2015,19 @@ window.onload = function () {
       callback: (command: Command) => {
         new Signature({
           onConfirm(payload) {
-            if (!payload) return
-            const { value, width, height } = payload
-            if (!value || !width || !height) return
-            command.executeInsertElementList([
-              {
-                value,
-                width,
-                height,
-                type: ElementType.IMAGE
-              }
-            ])
+            // if (!payload) return
+            // const { value, width, height } = payload
+            // if (!value || !width || !height) return
+            // command.executeInsertElementList([
+            //   {
+            //     value,
+            //     width,
+            //     height,
+            //     type: ElementType.IMAGE
+            //   }
+            // ])
+            console.log(payload)
+            command.executeDeleteGroup("1")
           }
         })
       }

@@ -10,7 +10,7 @@ export class HyperlinkParticle {
   private options: Required<IEditorOption>
   private container: HTMLDivElement
   private hyperlinkPopupContainer: HTMLDivElement
-  private hyperlinkDom: HTMLAnchorElement
+  private hyperlinkDom: HTMLDivElement
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -25,9 +25,10 @@ export class HyperlinkParticle {
   private _createHyperlinkPopupDom() {
     const hyperlinkPopupContainer = document.createElement('div')
     hyperlinkPopupContainer.classList.add(`${EDITOR_PREFIX}-hyperlink-popup`)
-    const hyperlinkDom = document.createElement('a')
-    hyperlinkDom.target = '_blank'
-    hyperlinkDom.rel = 'noopener'
+    const hyperlinkDom = document.createElement('div')
+    // hyperlinkDom.target = '_blank'
+    // hyperlinkDom.rel = 'noopener'
+    hyperlinkDom.classList.add(`${EDITOR_PREFIX}-hyperlink-dom`)
     hyperlinkPopupContainer.append(hyperlinkDom)
     this.container.append(hyperlinkPopupContainer)
     return { hyperlinkPopupContainer, hyperlinkDom }
@@ -49,7 +50,7 @@ export class HyperlinkParticle {
     this.hyperlinkPopupContainer.style.top = `${top + preY + lineHeight}px`
     // 标签
     const url = element.url || '#'
-    this.hyperlinkDom.href = url
+    // this.hyperlinkDom.href = '#'
     this.hyperlinkDom.title = url
     this.hyperlinkDom.innerText = url
   }
@@ -59,10 +60,11 @@ export class HyperlinkParticle {
   }
 
   public openHyperlink(element: IElement) {
-    const newTab = window.open(element.url, '_blank')
-    if (newTab) {
-      newTab.opener = null
-    }
+    if (element.url) return
+    // const newTab = window.open(element.url, '_blank')
+    // if (newTab) {
+    //   newTab.opener = null
+    // }
   }
 
   public render(

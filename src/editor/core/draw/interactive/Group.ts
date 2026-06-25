@@ -44,7 +44,8 @@ export class Group {
 
   public getElementListByGroupId(
     elementList: IElement[],
-    groupId: string
+    groupId: string,
+    isCheckNext?: boolean
   ): IElement[] {
     const groupElementList: IElement[] = []
     for (let e = 0; e < elementList.length; e++) {
@@ -57,7 +58,8 @@ export class Group {
             const td = tr.tdList[d]
             const tdGroupElementList = this.getElementListByGroupId(
               td.value,
-              groupId
+              groupId,
+              isCheckNext || false
             )
             if (tdGroupElementList.length) {
               groupElementList.push(...tdGroupElementList)
@@ -69,10 +71,63 @@ export class Group {
       if (element?.groupIds?.includes(groupId)) {
         groupElementList.push(element)
         const nextElement = elementList[e + 1]
-        if (!nextElement?.groupIds?.includes(groupId)) break
+        if (!nextElement?.groupIds?.includes(groupId) && !isCheckNext) break
       }
     }
     return groupElementList
+  }
+
+  public changeGroupStyle(groupId: string, styleFlag: {
+    underline?: boolean,
+    highlight?: string,
+    color?: string,
+    all?: boolean
+  }){
+    // 仅主体内容可以成组
+    const elementList = this.draw.getOriginalMainElementList()
+    const groupElementList = this.getElementListByGroupId(elementList, groupId, true)
+    if (!groupElementList.length) return
+    for (let e = 0; e < groupElementList.length; e++) {
+      const element = groupElementList[e]
+      if(styleFlag?.all){
+        ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
+        styleFlag?.highlight && (element.highlight = styleFlag.highlight)
+        styleFlag?.color && (element.color = styleFlag.color)
+      }else{
+        delete element.highlight
+        delete element.underline
+        delete element.color
+        ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
+        styleFlag?.highlight && (element.highlight = styleFlag.highlight)
+        styleFlag?.color && (element.color = styleFlag.color)
+      }
+    }
+    elementList.forEach(el => {
+      if(!el?.groupIds){
+        delete el.highlight
+        delete el.underline
+        delete el.color
+      }
+      // 开放此处会导致组丢失
+      // if(!el?.underline && !el?.highlight && !el?.color){
+      //   delete el.groupIds
+      // }
+      if(el.groupIds?.includes(groupId)){
+        const targetValue = groupId?.split('~~')[0]
+        if(targetValue && !targetValue.includes(el.value)){
+          delete el.highlight
+          delete el.underline
+          delete el.color
+          delete el.groupIds
+        }
+      }
+    })
+
+    this.draw.render({
+      isSetCursor: false,
+      isCompute: false,
+      isSubmitHistory: false
+    })
   }
 
   public deleteGroup(groupId: string) {
@@ -89,6 +144,10 @@ export class Group {
       if (!groupIds.length) {
         delete element.groupIds
       }
+      // 删除组时同时删除高亮等属性
+      delete element.highlight
+      delete element.underline
+      delete element.color
     }
     this.draw.render({
       isSetCursor: false,

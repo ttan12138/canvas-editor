@@ -11,9 +11,9 @@
       "delete": "删除控件"
     },
     "hyperlink": {
-      "delete": "删除链接",
-      "cancel": "取消链接",
-      "edit": "编辑链接"
+      "delete": "删除批注",
+      "cancel": "取消批注",
+      "edit": "编辑批注"
     },
     "image": {
       "change": "更改图片",

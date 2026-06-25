@@ -102,6 +102,7 @@ export class Command {
   public executeSetHTML: CommandAdapt['setHTML']
   public executeSetGroup: CommandAdapt['setGroup']
   public executeDeleteGroup: CommandAdapt['deleteGroup']
+  public executeChangeGroupStyle: CommandAdapt['changeGroupStyle']
   public executeLocationGroup: CommandAdapt['locationGroup']
   public executeSetZone: CommandAdapt['setZone']
   public executeSetControlValue: CommandAdapt['setControlValue']
@@ -262,6 +263,7 @@ export class Command {
     this.executeSetHTML = adapt.setHTML.bind(adapt)
     this.executeSetGroup = adapt.setGroup.bind(adapt)
     this.executeDeleteGroup = adapt.deleteGroup.bind(adapt)
+    this.executeChangeGroupStyle = adapt.changeGroupStyle.bind(adapt)
     this.executeLocationGroup = adapt.locationGroup.bind(adapt)
     this.executeSetZone = adapt.setZone.bind(adapt)
     this.executeUpdateOptions = adapt.updateOptions.bind(adapt)

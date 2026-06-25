@@ -36,7 +36,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "lib": "eslint . && tsc && vitest run && vite build --mode lib && pnpm exec babel lib/canvas-editor.js --out-file lib/canvas-editor.js && pnpm exec babel lib/canvas-editor.umd.cjs --out-file lib/canvas-editor.umd.cjs",
+    "lib": "eslint . && tsc && vite build --mode lib && pnpm exec babel lib/canvas-editor.js --out-file lib/canvas-editor.js && pnpm exec babel lib/canvas-editor.umd.cjs --out-file lib/canvas-editor.umd.cjs && copy lib\\canvas-editor.js D:\\dataup\\gitsvn\\rdtms\\src\\components\\canvasEditor\\ /Y",
     "build": "eslint . && tsc && vitest run && vite build --mode app",
     "serve": "vite preview",
     "lint": "eslint . && tsc --noEmit && vitest run",

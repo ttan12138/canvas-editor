@@ -10,18 +10,16 @@ export class Shortcut {
   private command: Command
   private globalShortcutList: IRegisterShortcut[]
   private agentShortcutList: IRegisterShortcut[]
+  private agentDom: HTMLTextAreaElement
 
   constructor(draw: Draw, command: Command) {
     this.command = command
     this.globalShortcutList = []
     this.agentShortcutList = []
-    // 内部快捷键
     this._addShortcutList([...richtextKeys, ...titleKeys, ...listKeys])
-    // 全局快捷键
     this._addEvent()
-    // 编辑器快捷键
-    const agentDom = draw.getCursor().getAgentDom()
-    agentDom.addEventListener('keydown', this._agentKeydown.bind(this))
+    this.agentDom = draw.getCursor().getAgentDom()
+    this.agentDom.addEventListener('keydown', this._agentKeydown.bind(this))
   }
 
   private _addEvent() {
@@ -49,6 +47,7 @@ export class Shortcut {
 
   private _globalKeydown = (evt: KeyboardEvent) => {
     if (!this.globalShortcutList.length) return
+    if (document.activeElement !== this.agentDom) return
     this._execute(evt, this.globalShortcutList)
   }
 

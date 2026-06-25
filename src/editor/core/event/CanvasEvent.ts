@@ -81,6 +81,7 @@ export class CanvasEvent {
     )
     this.pageContainer.addEventListener('mousemove', this.mousemove.bind(this))
     this.pageContainer.addEventListener('dblclick', this.dblclick.bind(this))
+    this.pageContainer.addEventListener('dragstart', this.dragstart.bind(this))
     this.pageContainer.addEventListener('dragover', this.dragover.bind(this))
     this.pageContainer.addEventListener('drop', this.drop.bind(this))
     threeClick(this.pageContainer, this.threeClick.bind(this))
@@ -211,5 +212,9 @@ export class CanvasEvent {
 
   public dragover(evt: DragEvent | MouseEvent) {
     drag.dragover(evt, this)
+  }
+
+  public dragstart(evt: DragEvent) {
+    drag.dragstart(evt, this)
   }
 }

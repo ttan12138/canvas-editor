@@ -175,56 +175,75 @@ export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
 export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
   const draw = host.getDraw()
   if (draw.isReadonly() || draw.isDisabled()) return
-  // 自定义粘贴事件
   const { paste } = draw.getOverride()
   if (paste) {
     const overrideResult = paste()
-    // 默认阻止默认事件
     if ((<IOverrideResult>overrideResult)?.preventDefault !== false) return
   }
-  // 优先读取编辑器内部粘贴板数据
-  const clipboardText = await navigator.clipboard.readText()
-  const editorClipboardData = getClipboardData()
-  if (
-    editorClipboardData &&
-    normalizeLineBreak(clipboardText) ===
-      normalizeLineBreak(editorClipboardData.text)
-  ) {
-    pasteElement(host, editorClipboardData.elementList)
-    return
+
+  let clipboardText = ''
+  let readClipboardSuccess = false
+
+  try {
+    clipboardText = await navigator.clipboard.readText()
+    readClipboardSuccess = true
+  } catch (e) {
+    console.warn('Failed to read clipboard text:', e)
   }
-  removeClipboardData()
-  // 从内存粘贴板获取数据
+
+  const editorClipboardData = getClipboardData()
+
+  if (editorClipboardData) {
+    if (!readClipboardSuccess || !clipboardText) {
+      pasteElement(host, editorClipboardData.elementList)
+      return
+    }
+
+    if (normalizeLineBreak(clipboardText) === normalizeLineBreak(editorClipboardData.text)) {
+      pasteElement(host, editorClipboardData.elementList)
+      return
+    }
+
+    removeClipboardData()
+  }
+
   if (options?.isPlainText) {
     if (clipboardText) {
       host.input(clipboardText)
     }
   } else {
-    const clipboardData = await navigator.clipboard.read()
-    let isHTML = false
-    for (const item of clipboardData) {
-      if (item.types.includes('text/html')) {
-        isHTML = true
-        break
+    try {
+      const clipboardData = await navigator.clipboard.read()
+      let isHTML = false
+      for (const item of clipboardData) {
+        if (item.types.includes('text/html')) {
+          isHTML = true
+          break
+        }
       }
-    }
-    for (const item of clipboardData) {
-      if (item.types.includes('text/plain') && !isHTML) {
-        const textBlob = await item.getType('text/plain')
-        const text = await textBlob.text()
-        if (text) {
-          host.input(text)
+      for (const item of clipboardData) {
+        if (item.types.includes('text/plain') && !isHTML) {
+          const textBlob = await item.getType('text/plain')
+          const text = await textBlob.text()
+          if (text) {
+            host.input(text)
+          }
+        } else if (item.types.includes('text/html') && isHTML) {
+          const htmlTextBlob = await item.getType('text/html')
+          const htmlText = await htmlTextBlob.text()
+          if (htmlText) {
+            pasteHTML(host, htmlText)
+          }
+        } else if (item.types.some(type => type.startsWith('image/'))) {
+          const type = item.types.find(type => type.startsWith('image/'))!
+          const imageBlob = await item.getType(type)
+          pasteImage(host, imageBlob)
         }
-      } else if (item.types.includes('text/html') && isHTML) {
-        const htmlTextBlob = await item.getType('text/html')
-        const htmlText = await htmlTextBlob.text()
-        if (htmlText) {
-          pasteHTML(host, htmlText)
-        }
-      } else if (item.types.some(type => type.startsWith('image/'))) {
-        const type = item.types.find(type => type.startsWith('image/'))!
-        const imageBlob = await item.getType(type)
-        pasteImage(host, imageBlob)
+      }
+    } catch (e) {
+      console.warn('Failed to read clipboard data:', e)
+      if (clipboardText) {
+        host.input(clipboardText)
       }
     }
   }

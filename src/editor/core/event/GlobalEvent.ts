@@ -1,6 +1,7 @@
 import { EDITOR_COMPONENT } from '../../dataset/constant/Editor'
+import { EditorComponent } from '../../dataset/enum/Editor'
 import { IEditorOption } from '../../interface/Editor'
-import { findParent } from '../../utils'
+import { deepClone, findParent } from '../../utils'
 import { Cursor } from '../cursor/Cursor'
 import { Control } from '../draw/control/Control'
 import { Draw } from '../draw/Draw'
@@ -15,6 +16,8 @@ import { INTERNAL_SHORTCUT_KEY } from '../../dataset/constant/Shortcut'
 import { Magnifier } from '../draw/interactive/Magnifier'
 
 export class GlobalEvent {
+  private static editorInstances: Map<Element, CanvasEvent> = new Map()
+
   private draw: Draw
   private options: Required<IEditorOption>
   private cursor: Cursor | null
@@ -45,6 +48,7 @@ export class GlobalEvent {
     this.dprMediaQueryList = window.matchMedia(
       `(resolution: ${window.devicePixelRatio}dppx)`
     )
+    GlobalEvent.editorInstances.set(draw.getContainer(), canvasEvent)
   }
 
   public register() {
@@ -53,15 +57,22 @@ export class GlobalEvent {
   }
 
   private addEvent() {
+    // console.log('[GLOBAL EVENT] Registering global drag listeners')
     window.addEventListener('blur', this.clearSideEffect)
     document.addEventListener('mousedown', this.clearSideEffect)
     document.addEventListener('mouseup', this.setCanvasEventAbility)
     document.addEventListener('wheel', this.setPageScale, { passive: false })
     document.addEventListener('visibilitychange', this._handleVisibilityChange)
+    document.addEventListener('dragover', this.handleGlobalDragover, { capture: true })
+    document.addEventListener('drop', this.handleGlobalDrop, { capture: true })
+    document.addEventListener('mousemove', this.handleGlobalMousemove)
+    document.addEventListener('mouseup', this.handleGlobalMouseup, { capture: true })
     this.dprMediaQueryList.addEventListener('change', this._handleDprChange)
+    // console.log('[GLOBAL EVENT] Global drag listeners registered (capture phase)')
   }
 
   public removeEvent() {
+    GlobalEvent.editorInstances.delete(this.draw.getContainer())
     window.removeEventListener('blur', this.clearSideEffect)
     document.removeEventListener('mousedown', this.clearSideEffect)
     document.removeEventListener('mouseup', this.setCanvasEventAbility)
@@ -70,14 +81,28 @@ export class GlobalEvent {
       'visibilitychange',
       this._handleVisibilityChange
     )
+    document.removeEventListener('dragover', this.handleGlobalDragover, true)
+    document.removeEventListener('drop', this.handleGlobalDrop, true)
+    document.removeEventListener('mousemove', this.handleGlobalMousemove)
+    document.removeEventListener('mouseup', this.handleGlobalMouseup, true)
     this.dprMediaQueryList.removeEventListener('change', this._handleDprChange)
   }
 
   public clearSideEffect = (evt: Event) => {
     if (!this.cursor) return
-    // 编辑器内部dom
     const composedPath = evt.composedPath ? evt.composedPath() : []
     const target = <Element>(composedPath[0] || evt.target)
+
+    const contextMenuDom = findParent(
+      target,
+      (node: Node & Element) =>
+        !!node &&
+        node.nodeType === 1 &&
+        node.getAttribute(EDITOR_COMPONENT) === EditorComponent.CONTEXTMENU,
+      true
+    )
+    if (contextMenuDom) return
+
     const pageList = this.draw.getPageList()
     const innerEditorDom = findParent(
       target,
@@ -85,7 +110,6 @@ export class GlobalEvent {
       true
     )
     if (innerEditorDom) return
-    // 编辑器外部组件dom
     const outerEditorDom = findParent(
       target,
       (node: Node & Element) =>
@@ -93,7 +117,24 @@ export class GlobalEvent {
       true
     )
     if (outerEditorDom) {
-      this.watchCursorActive()
+      const mouseEvt = evt as MouseEvent
+      if (mouseEvt.button !== undefined && mouseEvt.button !== 0) {
+        this.cursor.recoveryCursor()
+        this.range.recoveryRangeStyle()
+        this.control.destroyControl()
+        return
+      }
+      const range = this.range.getRange()
+      if (range.startIndex !== range.endIndex) {
+        this.range.setRange(range.endIndex, range.endIndex)
+        this.draw.render({
+          isSetCursor: false,
+          isSubmitHistory: false
+        })
+      }
+      this.cursor.recoveryCursor()
+      this.range.recoveryRangeStyle()
+      this.control.destroyControl()
       return
     }
     this.cursor.recoveryCursor()
@@ -110,6 +151,288 @@ export class GlobalEvent {
   public setCanvasEventAbility = () => {
     this.canvasEvent.setIsAllowDrag(false)
     this.canvasEvent.setIsAllowSelection(false)
+  }
+
+  private handleGlobalDragover = (evt: DragEvent) => {
+    // console.log('[GLOBAL DRAG] capture phase - clientX/Y:', evt.clientX, evt.clientY)
+
+    const pageContainer = this.draw.getPageContainer()
+    const containerRect = pageContainer.getBoundingClientRect()
+    // console.log('[GLOBAL DRAG] current editor rect:', containerRect)
+
+    const mouseX = evt.clientX
+    const mouseY = evt.clientY
+    const isInsideCurrentEditor =
+      mouseX >= containerRect.left &&
+      mouseX <= containerRect.right &&
+      mouseY >= containerRect.top &&
+      mouseY <= containerRect.bottom
+
+    // console.log('[GLOBAL DRAG] isInsideCurrentEditor:', isInsideCurrentEditor)
+
+    if (!isInsideCurrentEditor) {
+      // console.log('[GLOBAL DRAG] Mouse outside current editor, skipping')
+      return
+    }
+
+    const pageList = this.draw.getPageList()
+    const composedPath = evt.composedPath ? evt.composedPath() : []
+    const target = <Element>(composedPath[0] || evt.target)
+    const innerEditorDom = findParent(
+      target,
+      (node: HTMLCanvasElement) => pageList.includes(node),
+      true
+    )
+    // console.log('[GLOBAL DRAG] innerEditorDom found:', !!innerEditorDom)
+
+    if (innerEditorDom) {
+      // console.log('[GLOBAL DRAG] handling dragover for current editor')
+      this.canvasEvent.dragover(evt)
+    }
+  }
+
+  private handleGlobalDrop = (evt: DragEvent) => {
+    const pageList = this.draw.getPageList()
+    const composedPath = evt.composedPath ? evt.composedPath() : []
+    const target = <Element>(composedPath[0] || evt.target)
+    const innerEditorDom = findParent(
+      target,
+      (node: HTMLCanvasElement) => pageList.includes(node),
+      true
+    )
+    // console.log('[GLOBAL DRAG] drop, innerEditorDom found:', !!innerEditorDom, 'target:', target)
+    if (innerEditorDom) {
+      this.canvasEvent.drop(evt)
+    }
+  }
+
+  private handleGlobalMousemove = (evt: MouseEvent) => {
+    if (!this.canvasEvent.isAllowDrag) return
+
+    const pageContainer = this.draw.getPageContainer()
+    const containerRect = pageContainer.getBoundingClientRect()
+    const mouseX = evt.clientX
+    const mouseY = evt.clientY
+
+    const isInsideCurrentEditor =
+      mouseX >= containerRect.left &&
+      mouseX <= containerRect.right &&
+      mouseY >= containerRect.top &&
+      mouseY <= containerRect.bottom
+
+    if (!isInsideCurrentEditor) {
+      // 鼠标移出源编辑器，清除源编辑器的预览光标
+      const cursor = this.draw.getCursor()
+      cursor.recoveryCursor()
+
+      // console.log('[GLOBAL MOUSEMOVE] Mouse outside source editor, checking for target editor')
+
+      const editors = document.querySelectorAll(`[${EDITOR_COMPONENT}]`)
+      let foundTargetPageContainer: HTMLElement | null = null
+
+      for (const editor of editors) {
+        const pageContainerEl = editor.querySelector('.ce-page-container')
+        if (pageContainerEl && pageContainerEl !== pageContainer) {
+          const rect = pageContainerEl.getBoundingClientRect()
+          if (
+            mouseX >= rect.left &&
+            mouseX <= rect.right &&
+            mouseY >= rect.top &&
+            mouseY <= rect.bottom
+          ) {
+            foundTargetPageContainer = pageContainerEl as HTMLElement
+            break
+          }
+        }
+      }
+
+      if (foundTargetPageContainer !== null) {
+        // console.log('[GLOBAL MOUSEMOVE] Found target editor, pageContainer:', foundTargetPageContainer)
+
+        const rect = foundTargetPageContainer.getBoundingClientRect()
+        const x = mouseX - rect.left
+        const y = mouseY - rect.top
+
+        const targetCanvas = foundTargetPageContainer.querySelector('canvas')
+        if (targetCanvas) {
+          const pageIndex = targetCanvas.dataset.index
+          if (pageIndex) {
+            // console.log('[GLOBAL MOUSEMOVE] Target page index:', pageIndex)
+          }
+        }
+
+        const fakeEvent = {
+          clientX: mouseX,
+          clientY: mouseY,
+          offsetX: x,
+          offsetY: y,
+          preventDefault: () => {},
+          composedPath: () => [targetCanvas || foundTargetPageContainer, foundTargetPageContainer],
+          target: targetCanvas || foundTargetPageContainer,
+          type: 'mousemove'
+        } as unknown as DragEvent
+
+        // 查找目标编辑器的 CanvasEvent 实例
+        const targetEditorDom = foundTargetPageContainer.closest(`[${EDITOR_COMPONENT}]`)
+        // console.log('[GLOBAL MOUSEMOVE] targetEditorDom:', targetEditorDom)
+        // console.log('[GLOBAL MOUSEMOVE] editorInstances keys:', Array.from(GlobalEvent.editorInstances.keys()))
+        // console.log('[GLOBAL MOUSEMOVE] editorInstances size:', GlobalEvent.editorInstances.size)
+
+        if (targetEditorDom) {
+          const targetCanvasEvent = GlobalEvent.editorInstances.get(targetEditorDom as Element)
+          // console.log('[GLOBAL MOUSEMOVE] targetCanvasEvent found:', !!targetCanvasEvent)
+          if (targetCanvasEvent) {
+            // console.log('[GLOBAL MOUSEMOVE] Calling target editor dragover')
+            targetCanvasEvent.dragover(fakeEvent)
+            // 设置目标编辑器的 isAllowDrop 标记
+            targetCanvasEvent.isAllowDrop = true
+          } else {
+            // console.log('[GLOBAL MOUSEMOVE] Target editor CanvasEvent not found in registry')
+          }
+        } else {
+          // console.log('[GLOBAL MOUSEMOVE] targetEditorDom is null')
+        }
+      }
+    }
+  }
+
+  private handleGlobalMouseup = (evt: MouseEvent) => {
+    // 检查是否有编辑器正在进行拖拽
+    if (!this.canvasEvent.isAllowDrag) return
+
+    const pageContainer = this.draw.getPageContainer()
+    const containerRect = pageContainer.getBoundingClientRect()
+    const mouseX = evt.clientX
+    const mouseY = evt.clientY
+
+    const isInsideCurrentEditor =
+      mouseX >= containerRect.left &&
+      mouseX <= containerRect.right &&
+      mouseY >= containerRect.top &&
+      mouseY <= containerRect.bottom
+
+    // 如果鼠标在源编辑器内，让源编辑器的 mouseup 处理
+    if (isInsideCurrentEditor) return
+
+    // console.log('[GLOBAL MOUSEUP] Mouse outside source editor, checking for cross-editor drop')
+
+    // 查找目标编辑器
+    const editors = document.querySelectorAll(`[${EDITOR_COMPONENT}]`)
+    let foundTargetPageContainer: HTMLElement | null = null
+
+    for (const editor of editors) {
+      const pageContainerEl = editor.querySelector('.ce-page-container')
+      if (pageContainerEl && pageContainerEl !== pageContainer) {
+        const rect = pageContainerEl.getBoundingClientRect()
+        if (
+          mouseX >= rect.left &&
+          mouseX <= rect.right &&
+          mouseY >= rect.top &&
+          mouseY <= rect.bottom
+        ) {
+          foundTargetPageContainer = pageContainerEl as HTMLElement
+          break
+        }
+      }
+    }
+
+    if (!foundTargetPageContainer) {
+      // console.log('[GLOBAL MOUSEUP] No target editor found')
+      return
+    }
+
+    const targetEditorDom = foundTargetPageContainer.closest(`[${EDITOR_COMPONENT}]`)
+    if (!targetEditorDom) {
+      // console.log('[GLOBAL MOUSEUP] Target editor DOM not found')
+      return
+    }
+
+    const targetCanvasEvent = GlobalEvent.editorInstances.get(targetEditorDom as Element)
+    if (!targetCanvasEvent) {
+      // console.log('[GLOBAL MOUSEUP] Target editor CanvasEvent not found')
+      return
+    }
+
+    // 检查目标编辑器是否允许放置
+    if (!targetCanvasEvent.isAllowDrop) {
+      // console.log('[GLOBAL MOUSEUP] Target editor does not allow drop')
+      return
+    }
+
+    // console.log('[GLOBAL MOUSEUP] Cross-editor drop detected!')
+
+    // 获取源编辑器的拖拽数据
+    const sourceDraw = this.draw
+    const sourceRangeManager = sourceDraw.getRange()
+    const cacheRange = this.canvasEvent.cacheRange
+    const cacheElementList = this.canvasEvent.cacheElementList
+
+    if (!cacheRange || !cacheElementList) {
+      // console.log('[GLOBAL MOUSEUP] No cached drag data')
+      return
+    }
+
+    // 获取拖拽的元素
+    const { startIndex, endIndex } = cacheRange
+    const isCacheRangeCollapsed = startIndex === endIndex
+    const cacheStartIndex = isCacheRangeCollapsed ? startIndex - 1 : startIndex
+    const cacheEndIndex = endIndex
+
+    const dragElementList = cacheElementList.slice(cacheStartIndex + 1, cacheEndIndex + 1)
+    if (!dragElementList.length) {
+      // console.log('[GLOBAL MOUSEUP] No drag elements')
+      return
+    }
+
+    // 获取目标编辑器的当前光标位置
+    const targetDraw = targetCanvasEvent.getDraw()
+    const targetRangeManager = targetDraw.getRange()
+    const targetRange = targetRangeManager.getRange()
+
+    if (targetRange.startIndex < 0) {
+      // console.log('[GLOBAL MOUSEUP] Invalid target range')
+      return
+    }
+
+    // 深拷贝拖拽元素
+    const replaceElementList = deepClone(dragElementList)
+
+    // 获取目标编辑器的元素列表
+    const targetElementList = targetDraw.getElementList()
+
+    // 在目标位置插入元素
+    targetDraw.spliceElementList(targetElementList, targetRange.startIndex + 1, 0, replaceElementList)
+
+    // 从源编辑器删除原有元素
+    const sourceElementList = sourceDraw.getElementList()
+    sourceDraw.spliceElementList(sourceElementList, cacheStartIndex + 1, cacheEndIndex - cacheStartIndex)
+
+    // 重置拖拽状态
+    this.canvasEvent.setIsAllowDrag(false)
+    targetCanvasEvent.isAllowDrop = false
+
+    // 清除缓存
+    this.canvasEvent.cacheRange = null
+    this.canvasEvent.cacheElementList = null
+    this.canvasEvent.cachePositionList = null
+    this.canvasEvent.cachePositionContext = null
+
+    // 渲染源编辑器
+    sourceRangeManager.setRange(cacheStartIndex, cacheStartIndex)
+    sourceDraw.render({
+      isSetCursor: true,
+      isSubmitHistory: true
+    })
+
+    // 渲染目标编辑器
+    const newEndIndex = targetRange.startIndex + replaceElementList.length
+    targetRangeManager.setRange(targetRange.startIndex, newEndIndex)
+    targetDraw.render({
+      isSetCursor: false,
+      isSubmitHistory: true
+    })
+
+    // console.log('[GLOBAL MOUSEUP] Cross-editor drop completed!')
   }
 
   public watchCursorActive() {

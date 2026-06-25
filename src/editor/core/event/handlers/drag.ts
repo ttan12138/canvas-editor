@@ -2,34 +2,51 @@ import { ImageDisplay } from '../../../dataset/enum/Common'
 import { ElementType } from '../../../dataset/enum/Element'
 import { findParent } from '../../../utils'
 import { CanvasEvent } from '../CanvasEvent'
+import { IElement } from '../../../interface/Element'
 
 function dragover(evt: DragEvent | MouseEvent, host: CanvasEvent) {
   const draw = host.getDraw()
   const isReadonly = draw.isReadonly()
   if (isReadonly) return
   evt.preventDefault()
-  // 非编辑器区禁止拖放
+
   const pageContainer = draw.getPageContainer()
+  const containerRect = pageContainer.getBoundingClientRect()
+  const mouseX = evt.clientX
+  const mouseY = evt.clientY
+  const isInsideCurrentEditor =
+    mouseX >= containerRect.left &&
+    mouseX <= containerRect.right &&
+    mouseY >= containerRect.top &&
+    mouseY <= containerRect.bottom
+
+  if (!isInsideCurrentEditor) {
+    return
+  }
+
+  const composedPath = evt.composedPath ? evt.composedPath() : []
+  const target = <Element>(composedPath[0] || evt.target)
   const editorRegion = findParent(
-    evt.target as Element,
+    target,
     (node: Element) => node === pageContainer,
     true
   )
   if (!editorRegion) return
-  const target = evt.target as HTMLDivElement
-  const pageIndex = target.dataset.index
-  // 设置pageNo
+  const targetElement = evt.target as HTMLDivElement
+  const pageIndex = targetElement.dataset.index
   if (pageIndex) {
     draw.setPageNo(Number(pageIndex))
   }
+  const rect = editorRegion.getBoundingClientRect()
+  const x = mouseX - rect.left
+  const y = mouseY - rect.top
   const position = draw.getPosition()
   const positionContext = position.adjustPositionContext({
-    x: evt.offsetX,
-    y: evt.offsetY
+    x,
+    y
   })
   if (!positionContext) return
   const { isTable, tdValueIndex, index } = positionContext
-  // 设置选区及光标位置
   const positionList = position.getPositionList()
   const curIndex = isTable ? tdValueIndex! : index
   if (~index) {
@@ -41,7 +58,6 @@ function dragover(evt: DragEvent | MouseEvent, host: CanvasEvent) {
   const {
     cursor: { dragColor, dragWidth, dragFloatImageDisabled }
   } = draw.getOptions()
-  // 拖拽图片是否定位光标
   if (dragFloatImageDisabled) {
     const dragElement = host.cacheElementList?.[host.cacheRange!.startIndex]
     if (
@@ -61,6 +77,29 @@ function dragover(evt: DragEvent | MouseEvent, host: CanvasEvent) {
   })
 }
 
+function dragstart(evt: DragEvent, host: CanvasEvent) {
+  const draw = host.getDraw()
+  if (draw.isReadonly()) return
+  const rangeManager = draw.getRange()
+  const range = rangeManager.getRange()
+  const { startIndex, endIndex } = range
+  if (startIndex === endIndex && startIndex < 0) return
+  const elementList = draw.getElementList()
+  const dragElementList: IElement[] = elementList.slice(
+    startIndex + 1,
+    endIndex + 1
+  )
+  if (!dragElementList.length) return
+  try {
+    const data = JSON.stringify(dragElementList)
+    evt.dataTransfer?.setData('canvas-editor-elements', data)
+    evt.dataTransfer!.effectAllowed = 'copyMove'
+  } catch (e) {
+    console.error('Failed to serialize drag elements:', e)
+  }
+}
+
 export default {
-  dragover
+  dragover,
+  dragstart
 }
