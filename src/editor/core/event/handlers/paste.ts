@@ -70,6 +70,13 @@ export function pasteHTML(host: CanvasEvent, htmlText: string) {
   const elementList = getElementListByHTML(htmlText, {
     innerWidth: draw.getOriginalInnerWidth()
   })
+  // 格式化elementList
+  elementList.forEach(item => {
+    item.color = undefined
+    item.size = undefined
+    item.bold = false
+  })
+
   pasteElement(host, elementList)
 }
 
@@ -209,6 +216,7 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
 
   if (options?.isPlainText) {
     if (clipboardText) {
+      console.log("clipboardText", clipboardText)
       host.input(clipboardText)
     }
   } else {

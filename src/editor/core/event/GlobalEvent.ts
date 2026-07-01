@@ -102,7 +102,10 @@ export class GlobalEvent {
     //   hasActiveControl: !!this.control.getActiveControl(),
     //   activeControlType: this.control.getActiveControl()?.constructor?.name
     // }
-
+    // 当点击的元素及其父级元素带有允许禁止失焦的class时，直接return
+    if (target.closest('.disable-blur-course')) {
+      return
+    }
     const contextMenuDom = findParent(
       target,
       (node: Node & Element) =>
