@@ -69,6 +69,7 @@ import {
   WordBreak
 } from '../../dataset/enum/Editor'
 import { Control } from './control/Control'
+import { AssociationStateManager } from './control/association/AssociationStateManager'
 import {
   deleteSurroundElementList,
   getIsBlockElement,
@@ -113,6 +114,8 @@ import {
 import { LineBreakParticle } from './particle/LineBreakParticle'
 import { WhiteSpaceParticle } from './particle/WhiteSpaceParticle'
 import { NumberFlagParticle } from './particle/number/NumberFlagParticle'
+import { CustomSelectParticle } from './particle/customSelect/CustomSelectParticle'
+import { MultiCustomSelectParticle } from './particle/multiCustomSelect/MultiCustomSelectParticle'
 import { MouseObserver } from '../observer/MouseObserver'
 import { LineNumber } from './frame/LineNumber'
 import { PageBorder } from './frame/PageBorder'
@@ -184,6 +187,8 @@ export class Draw {
   private lineBreakParticle: LineBreakParticle
   private whiteSpaceParticle: WhiteSpaceParticle
   private numberFlagParticle: NumberFlagParticle
+  private customSelectParticle: CustomSelectParticle
+  private multiCustomSelectParticle: MultiCustomSelectParticle
   private control: Control
   private pageBorder: PageBorder
   private workerManager: WorkerManager
@@ -270,9 +275,13 @@ export class Draw {
     this.lineBreakParticle = new LineBreakParticle(this)
     this.whiteSpaceParticle = new WhiteSpaceParticle(this)
     this.numberFlagParticle = new NumberFlagParticle()
+    this.customSelectParticle = new CustomSelectParticle()
+    this.multiCustomSelectParticle = new MultiCustomSelectParticle()
     this.control = new Control(this)
     this.pageBorder = new PageBorder(this)
     this.graffiti = new Graffiti(this, data.graffiti)
+
+    AssociationStateManager.getInstance().registerEditor(this)
 
     this.scrollObserver = new ScrollObserver(this)
     this.selectionObserver = new SelectionObserver(this)
@@ -1805,6 +1814,35 @@ export class Draw {
         metrics.boundingBoxDescent = 0
         metrics.boundingBoxAscent =
           (defaultPadding[0] + fontMetrics.actualBoundingBoxAscent) * scale
+      } else if (
+        element.controlComponent === ControlComponent.POSTFIX &&
+        element.control &&
+        (element.control.type === ControlType.CUSTOM_SELECT ||
+          element.control.type === ControlType.MULTI_CUSTOM_SELECT)
+      ) {
+        const size = element.size || defaultSize
+        const particleSize = size * 0.8
+        const circleRadius = particleSize * 0.7
+        const elementWidth = circleRadius * 2 + size * 0.2
+        element.width = elementWidth
+        metrics.width = elementWidth * scale
+        metrics.height = size * scale
+        metrics.boundingBoxDescent = 0
+        metrics.boundingBoxAscent = metrics.height
+      } else if (
+        element.controlComponent === ControlComponent.POSTFIX &&
+        element.control &&
+        element.control.type === ControlType.NUMBER_FLAG
+      ) {
+        const size = element.size || defaultSize
+        const headSize = size * 0.2
+        const headAngle = Math.PI / 5
+        const elementWidth = headSize * Math.sin(headAngle) * 2 + size * 0.3
+        element.width = elementWidth
+        metrics.width = elementWidth * scale
+        metrics.height = size * scale
+        metrics.boundingBoxDescent = 0
+        metrics.boundingBoxAscent = metrics.height
       } else {
         // 设置上下标真实字体尺寸
         const size = element.size || defaultSize
@@ -2320,7 +2358,12 @@ export class Draw {
           if (element.left) {
             this.textParticle.complete()
           }
-          this.textParticle.record(ctx, element, x, y + offsetY)
+          const drawY =
+            element.controlComponent === ControlComponent.POSTFIX &&
+            element.control?.type === ControlType.NUMBER_FLAG
+            ? y + offsetY - 1
+            : y + offsetY
+          this.textParticle.record(ctx, element, x, drawY)
           // 如果设置字宽、字间距、标点符号（避免浏览器排版缩小间距）需单独绘制
           if (
             element.width ||
@@ -2357,10 +2400,9 @@ export class Draw {
           const numericValue = parseFloat(controlValue)
           if (!isNaN(numericValue)) {
             const rowMargin = this.getElementRowMargin(element)
-            // 箭头向左偏移使其更靠近内容区域
-            const arrowX = x + 4
-            const arrowY = y + rowMargin
             const arrowHeight = curRow.height - 2 * rowMargin
+            const arrowX = x + 4
+            const arrowY = y + rowMargin + arrowHeight * 0.6
             this.numberFlagParticle.render({
               ctx,
               x: arrowX,
@@ -2371,6 +2413,34 @@ export class Draw {
               max
             })
           }
+        }
+        // CUSTOM_SELECT控件下拉箭头绘制
+        if (
+          element.controlComponent === ControlComponent.POSTFIX &&
+          element.control?.type === ControlType.CUSTOM_SELECT
+        ) {
+          this.textParticle.complete()
+          this.customSelectParticle.render({
+            ctx,
+            x,
+            y,
+            row: curRow,
+            index: j
+          })
+        }
+        // MULTI_CUSTOM_SELECT控件下拉箭头绘制
+        if (
+          element.controlComponent === ControlComponent.POSTFIX &&
+          element.control?.type === ControlType.MULTI_CUSTOM_SELECT
+        ) {
+          this.textParticle.complete()
+          this.multiCustomSelectParticle.render({
+            ctx,
+            x,
+            y,
+            row: curRow,
+            index: j
+          })
         }
         // 换行符绘制
         if (
@@ -3009,6 +3079,7 @@ export class Draw {
     this.workerManager.destroy()
     this.magnifier.destroy()
     this.lazyRenderIntersectionObserver?.disconnect()
+    AssociationStateManager.getInstance().unregisterEditor(this)
   }
 
   public clearSideEffect() {

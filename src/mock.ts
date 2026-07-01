@@ -128,7 +128,7 @@ elementList.splice(94, 0, {
     code: null,
     placeholder: '有无',
     prefix: '\u200c',
-    postfix: '➡️',
+    postfix: '\u200c',
     valueSets: [
       {
         value: '有',
@@ -141,6 +141,143 @@ elementList.splice(94, 0, {
       {
         value: '不详',
         code: '98177'
+      }
+    ]
+  }
+})
+
+// 模拟多选下拉控件（带关联ID） - 第一个（同ID，同步用）
+elementList.splice(96, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: '10',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '请选择城市',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'city-select-001',
+    valueSets: [
+      {
+        value: '北京',
+        code: '1001'
+      },
+      {
+        value: '上海',
+        code: '1002'
+      },
+      {
+        value: '广州',
+        code: '1003'
+      },
+      {
+        value: '深圳',
+        code: '1004'
+      }
+    ]
+  }
+})
+
+// 模拟Surpass自定义下拉控件（带关联ID） - 第二个（同ID，同步用）
+elementList.splice(98, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: '11',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '请选择城市',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'city-select-001',
+    valueSets: [
+      {
+        value: '北京',
+        code: '1001'
+      },
+      {
+        value: '上海',
+        code: '1002'
+      },
+      {
+        value: '广州',
+        code: '1003'
+      },
+      {
+        value: '深圳',
+        code: '1004'
+      }
+    ]
+  }
+})
+
+
+// 模拟Surpass自定义下拉控件（带关联ID） - 第二个第一个
+elementList.splice(100, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: '12',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '请选择城市',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'city-select-002',
+    valueSets: [
+      {
+        value: '北京',
+        code: '1001'
+      },
+      {
+        value: '上海',
+        code: '1002'
+      },
+      {
+        value: '广州',
+        code: '1003'
+      },
+      {
+        value: '深圳',
+        code: '1004'
+      }
+    ]
+  }
+})
+
+// 模拟Surpass自定义下拉控件（带关联ID） - 第二个第二个（同ID，同步用）
+elementList.splice(102, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: '13',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '请选择城市',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'city-select-002',
+    valueSets: [
+      {
+        value: '北京',
+        code: '1001'
+      },
+      {
+        value: '上海',
+        code: '1002'
+      },
+      {
+        value: '广州',
+        code: '1003'
+      },
+      {
+        value: '深圳',
+        code: '1004'
       }
     ]
   }
@@ -472,7 +609,7 @@ elementList.push(
         type: ControlType.NUMBER_FLAG,
         value: null,
         placeholder: '就诊次数',
-        prefix: '_',
+        prefix: '\u200c',
         postfix: '_',
         numberExclusiveOptions: {
           min: 20,

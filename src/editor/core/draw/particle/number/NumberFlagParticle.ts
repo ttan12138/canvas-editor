@@ -47,33 +47,32 @@ export class NumberFlagParticle {
     height: number,
     direction: ArrowDirection
   ) {
-    const arrowSize = height * 0.65
-    const arrowWidth = arrowSize * 0.5
-    const arrowHeight = arrowSize * 0.7
+    const shaftHeight = height * 0.8
+    const headSize = height * 0.2
+    const headAngle = Math.PI / 5
 
     ctx.save()
-    ctx.fillStyle = '#FF0000'
-    ctx.strokeStyle = '#FF0000'
-    ctx.lineWidth = 1
-
-    const centerX = x
-    const centerY = y + height / 2
-
+    ctx.lineWidth = Math.max(1, height * 0.08)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     ctx.beginPath()
 
-    if (direction === ArrowDirection.UP) {
-      ctx.moveTo(centerX, centerY - arrowHeight / 2)
-      ctx.lineTo(centerX - arrowWidth / 2, centerY + arrowHeight / 2)
-      ctx.lineTo(centerX + arrowWidth / 2, centerY + arrowHeight / 2)
-      ctx.closePath()
+    if (direction === ArrowDirection.DOWN) {
+      ctx.strokeStyle = '#0000FF'
+      ctx.moveTo(x, y - shaftHeight / 2)
+      ctx.lineTo(x, y + shaftHeight / 2)
+      ctx.moveTo(x - headSize * Math.sin(headAngle), y + shaftHeight / 2 - headSize * Math.cos(headAngle))
+      ctx.lineTo(x, y + shaftHeight / 2)
+      ctx.lineTo(x + headSize * Math.sin(headAngle), y + shaftHeight / 2 - headSize * Math.cos(headAngle))
     } else {
-      ctx.moveTo(centerX, centerY + arrowHeight / 2)
-      ctx.lineTo(centerX - arrowWidth / 2, centerY - arrowHeight / 2)
-      ctx.lineTo(centerX + arrowWidth / 2, centerY - arrowHeight / 2)
-      ctx.closePath()
+      ctx.strokeStyle = '#f56b34'
+      ctx.moveTo(x, y + shaftHeight / 2)
+      ctx.lineTo(x, y - shaftHeight / 2)
+      ctx.moveTo(x - headSize * Math.sin(headAngle), y - shaftHeight / 2 + headSize * Math.cos(headAngle))
+      ctx.lineTo(x, y - shaftHeight / 2)
+      ctx.lineTo(x + headSize * Math.sin(headAngle), y - shaftHeight / 2 + headSize * Math.cos(headAngle))
     }
 
-    ctx.fill()
     ctx.stroke()
     ctx.restore()
   }

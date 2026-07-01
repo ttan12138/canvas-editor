@@ -61,6 +61,7 @@ import { DateControl } from './date/DateControl'
 import { NumberControl } from './number/NumberControl'
 import { NumberFlagControl } from './number/NumberFlagControl'
 import { CustomSelectControl } from './customSelect/CustomSelectControl'
+import { MultiCustomSelectControl } from './multiCustomSelect/MultiCustomSelectControl'
 
 import { MoveDirection } from '../../../dataset/enum/Observer'
 import {
@@ -501,7 +502,8 @@ export class Control {
         this.activeControl instanceof SelectControl ||
         this.activeControl instanceof DateControl ||
         this.activeControl instanceof NumberControl ||
-        this.activeControl instanceof CustomSelectControl
+        this.activeControl instanceof CustomSelectControl ||
+        this.activeControl instanceof MultiCustomSelectControl
       ) {
         if (element.controlComponent === ControlComponent.POSTFIX) {
           this.activeControl.destroy()
@@ -561,6 +563,10 @@ export class Control {
       const customSelectControl = new CustomSelectControl(element, this)
       this.activeControl = customSelectControl
       customSelectControl.awake()
+    } else if (control.type === ControlType.MULTI_CUSTOM_SELECT) {
+      const multiCustomSelectControl = new MultiCustomSelectControl(element, this)
+      this.activeControl = multiCustomSelectControl
+      multiCustomSelectControl.awake()
     }
     // 缓存控件数据
     this.updateActiveControlValue()
@@ -581,7 +587,8 @@ export class Control {
       this.activeControl instanceof DateControl ||
       this.activeControl instanceof NumberControl ||
       this.activeControl instanceof NumberFlagControl ||
-      this.activeControl instanceof CustomSelectControl
+      this.activeControl instanceof CustomSelectControl ||
+      this.activeControl instanceof MultiCustomSelectControl
     ) {
       this.activeControl.destroy()
     }
@@ -1056,7 +1063,8 @@ export class Control {
           type === ControlType.SELECT ||
           type === ControlType.CHECKBOX ||
           type === ControlType.RADIO ||
-          type === ControlType.CUSTOM_SELECT
+          type === ControlType.CUSTOM_SELECT ||
+          type === ControlType.MULTI_CUSTOM_SELECT
         ) {
           const innerText = code
             ?.split(',')
@@ -1191,6 +1199,15 @@ export class Control {
           } else {
             customSelect.clearSelect(controlContext, controlRule)
           }
+        } else if (type === ControlType.MULTI_CUSTOM_SELECT) {
+          if (Array.isArray(value)) continue
+          const multiCustomSelect = new MultiCustomSelectControl(element, this)
+          this.activeControl = multiCustomSelect
+          if (value) {
+            multiCustomSelect.setSelect(value, controlContext, controlRule)
+          } else {
+            multiCustomSelect.clearSelect(controlContext, controlRule)
+          }
         } else if (type === ControlType.CHECKBOX) {
           if (Array.isArray(value)) continue
           const checkbox = new CheckboxControl(element, this)
@@ -1294,6 +1311,114 @@ export class Control {
       }
       this.draw.render({
         isSubmitHistory: isExistSubmitHistory,
+        isSetCursor: false
+      })
+    }
+  }
+
+  public syncAssociationValue(
+    associationId: string,
+    value: string | number,
+    controlType: ControlType,
+    sourceControlId: string
+  ): void {
+    const setValue = (elementList: IElement[]) => {
+      let i = 0
+      while (i < elementList.length) {
+        const element = elementList[i]
+        i++
+        if (element.type === ElementType.TABLE) {
+          const trList = element.trList!
+          for (let r = 0; r < trList.length; r++) {
+            const tr = trList[r]
+            for (let d = 0; d < tr.tdList.length; d++) {
+              const td = tr.tdList[d]
+              setValue(td.value)
+            }
+          }
+        }
+        if (!element.control) continue
+        if (
+          element.control.type !== controlType ||
+          element.control.associationId !== associationId ||
+          !element.controlId ||
+          element.controlId === sourceControlId
+        ) {
+          continue
+        }
+        const controlId = element.controlId
+        let currentEndIndex = i
+        while (currentEndIndex < elementList.length) {
+          const nextElement = elementList[currentEndIndex]
+          if (nextElement.controlId !== controlId) break
+          currentEndIndex++
+        }
+        const fakeRange = {
+          startIndex: i - 1,
+          endIndex: currentEndIndex - 2
+        }
+        const controlContext: IControlContext = {
+          range: fakeRange,
+          elementList
+        }
+        const controlRule: IControlRuleOption = {
+          isIgnoreDisabledRule: true,
+          isIgnoreDeletedRule: true,
+          isSyncAssociation: false
+        }
+        if (
+          controlType === ControlType.CUSTOM_SELECT ||
+          controlType === ControlType.MULTI_CUSTOM_SELECT
+        ) {
+          const selectControl =
+            controlType === ControlType.MULTI_CUSTOM_SELECT
+              ? new MultiCustomSelectControl(element, this)
+              : new CustomSelectControl(element, this)
+          this.activeControl = selectControl
+          const strValue = String(value)
+          if (strValue) {
+            selectControl.setSelect(strValue, controlContext, controlRule)
+          } else {
+            selectControl.clearSelect(controlContext, controlRule)
+          }
+          this.activeControl = null
+        } else if (controlType === ControlType.NUMBER_FLAG) {
+          const numberControl = new NumberFlagControl(element, this)
+          this.activeControl = numberControl
+          const valueStr = String(value)
+          const data: IElement[] = valueStr.split('').map(char => ({
+            type: ElementType.TEXT,
+            value: char,
+            controlComponent: ControlComponent.VALUE
+          }))
+          numberControl.setValue(data, controlContext, controlRule)
+          this.activeControl = null
+        }
+        let newEndIndex = i
+        while (newEndIndex < elementList.length) {
+          const nextElement = elementList[newEndIndex]
+          if (nextElement.controlId !== controlId) break
+          newEndIndex++
+        }
+        i = newEndIndex
+      }
+    }
+    const data = [
+      this.draw.getHeaderElementList(),
+      this.draw.getOriginalMainElementList(),
+      this.draw.getFooterElementList()
+    ]
+    let isChanged = false
+    for (const elementList of data) {
+      const originalLength = elementList.length
+      setValue(elementList)
+      if (elementList.length !== originalLength) {
+        isChanged = true
+      }
+    }
+    if (isChanged) {
+      this.draw.render({
+        isSubmitHistory: false,
         isSetCursor: false
       })
     }

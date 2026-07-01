@@ -377,7 +377,9 @@ export function formatElementList(
         (value && value.length) ||
         type === ControlType.CHECKBOX ||
         type === ControlType.RADIO ||
-        (type === ControlType.SELECT && code && (!value || !value.length))
+        (type === ControlType.SELECT && code && (!value || !value.length)) ||
+        (type === ControlType.CUSTOM_SELECT && code && (!value || !value.length)) ||
+        (type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length))
       ) {
         let valueList: IElement[] = value ? deepClone(value) : []
         if (type === ControlType.CHECKBOX) {

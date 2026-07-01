@@ -1,5 +1,5 @@
 import { NON_NUMBER_STR_REG } from '../../../../dataset/constant/Regular'
-import { ControlComponent } from '../../../../dataset/enum/Control'
+import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
 import { ElementType } from '../../../../dataset/enum/Element'
 import {
   IControlContext,
@@ -14,15 +14,21 @@ import {
   CONTROL_STYLE_ATTR,
   EDITOR_ELEMENT_STYLE_ATTR
 } from '../../../../dataset/constant/Element'
+import { AssociationStateManager } from '../association/AssociationStateManager'
+import { Draw } from '../../Draw'
 
 export class NumberControl extends TextControl {
   private isPopup: boolean
   private calculator: Calculator | null
+  private stateManager: AssociationStateManager
+  private draw: Draw
 
   constructor(element: IElement, control: any) {
     super(element, control)
     this.isPopup = false
     this.calculator = null
+    this.draw = control.getDraw()
+    this.stateManager = AssociationStateManager.getInstance()
   }
 
   public getIsPopup(): boolean {
@@ -85,7 +91,28 @@ export class NumberControl extends TextControl {
     if (Number.isNaN(Number(text)) || !Number.isFinite(Number(text))) {
       return -1
     }
-    return super.setValue(data, context, options)
+    const result = super.setValue(data, context, options)
+    if (result !== -1) {
+      this._syncAssociationValue(Number(text), options)
+    }
+    return result
+  }
+
+  private _syncAssociationValue(value: number, options: IControlRuleOption): void {
+    const associationId = this.element.control?.associationId
+    if (
+      associationId &&
+      this.element.controlId &&
+      options.isSyncAssociation !== false
+    ) {
+      this.stateManager.setValue(
+        associationId,
+        value,
+        ControlType.NUMBER_FLAG,
+        this.draw,
+        this.element.controlId
+      )
+    }
   }
 
   private _setCalculatedValue(value: number) {

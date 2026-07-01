@@ -6,7 +6,8 @@ export enum ControlType {
   DATE = 'date',
   NUMBER = 'number',
   NUMBER_FLAG = 'numberFlag',
-  CUSTOM_SELECT = 'customSelect'
+  CUSTOM_SELECT = 'customSelect',
+  MULTI_CUSTOM_SELECT = 'multiCustomSelect'
 }
 
 export enum ControlComponent {

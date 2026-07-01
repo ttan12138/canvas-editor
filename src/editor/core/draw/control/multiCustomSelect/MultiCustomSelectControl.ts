@@ -33,7 +33,7 @@ import { Draw } from '../../Draw'
 import { Control } from '../Control'
 import { AssociationStateManager } from '../association/AssociationStateManager'
 
-export class CustomSelectControl implements IControlInstance {
+export class MultiCustomSelectControl implements IControlInstance {
   private draw: Draw
   private element: IElement
   private control: Control
@@ -109,11 +109,11 @@ export class CustomSelectControl implements IControlInstance {
 
   public getValue(context: IControlContext = {}): IElement[] {
     const elementList = context.elementList || this.control.getElementList()
-    const { startIndex } = context.range || this.control.getRange()
-    const startElement = elementList[startIndex]
+    const range = context.range || this.control.getRange()
     const data: IElement[] = []
+    const startElement = elementList[range.startIndex]
     // 向左查找
-    let preIndex = startIndex
+    let preIndex = range.startIndex
     while (preIndex > 0) {
       const preElement = elementList[preIndex]
       if (
@@ -129,7 +129,7 @@ export class CustomSelectControl implements IControlInstance {
       preIndex--
     }
     // 向右查找
-    let nextIndex = startIndex + 1
+    let nextIndex = range.startIndex + 1
     while (nextIndex < elementList.length) {
       const nextElement = elementList[nextIndex]
       if (
@@ -173,18 +173,14 @@ export class CustomSelectControl implements IControlInstance {
     }
     const elementList = context.elementList || this.control.getElementList()
     const range = context.range || this.control.getRange()
-    // 收缩边界到Value内
     this.control.shrinkBoundary(context)
     const { startIndex, endIndex } = range
     const draw = this.control.getDraw()
-    // 移除选区元素
     if (startIndex !== endIndex) {
       draw.spliceElementList(elementList, startIndex + 1, endIndex - startIndex)
     } else {
-      // 移除空白占位符
       this.control.removePlaceholder(startIndex, context)
     }
-    // 非文本类元素或前缀过渡掉样式属性
     const startElement = elementList[startIndex]
     const anchorElement =
       (startElement.type &&
@@ -197,7 +193,6 @@ export class CustomSelectControl implements IControlInstance {
             ...CONTROL_STYLE_ATTR
           ])
         : omitObject(startElement, ['type'])
-    // 插入起始位置
     const start = range.startIndex + 1
     for (let i = 0; i < data.length; i++) {
       const newElement: IElement = {
@@ -220,14 +215,11 @@ export class CustomSelectControl implements IControlInstance {
     }
     const elementList = this.control.getElementList()
     const range = this.control.getRange()
-    // 收缩边界到Value内
     this.control.shrinkBoundary()
     const { startIndex, endIndex } = range
     const startElement = elementList[startIndex]
     const endElement = elementList[endIndex]
-    // backspace
     if (evt.key === KeyMap.Backspace) {
-      // 清空选项
       if (startIndex !== endIndex) {
         this.draw.spliceElementList(
           elementList,
@@ -258,7 +250,6 @@ export class CustomSelectControl implements IControlInstance {
         }
       }
     } else if (evt.key === KeyMap.Delete) {
-      // 移除选区元素
       if (startIndex !== endIndex) {
         this.draw.spliceElementList(
           elementList,
@@ -303,7 +294,6 @@ export class CustomSelectControl implements IControlInstance {
     if (startIndex === endIndex) {
       return startIndex
     }
-    // 清空选项
     return this.clearSelect()
   }
 
@@ -312,7 +302,6 @@ export class CustomSelectControl implements IControlInstance {
     options: IControlRuleOption = {}
   ): number {
     const { isIgnoreDisabledRule = false, isAddPlaceholder = true } = options
-    // 校验是否可以设置
     if (!isIgnoreDisabledRule && this.control.getIsDisabledControl(context)) {
       return -1
     }
@@ -321,7 +310,6 @@ export class CustomSelectControl implements IControlInstance {
     const startElement = elementList[startIndex]
     let leftIndex = -1
     let rightIndex = -1
-    // 向左查找
     let preIndex = startIndex
     while (preIndex > 0) {
       const preElement = elementList[preIndex]
@@ -335,7 +323,6 @@ export class CustomSelectControl implements IControlInstance {
       }
       preIndex--
     }
-    // 向右查找
     let nextIndex = startIndex + 1
     while (nextIndex < elementList.length) {
       const nextElement = elementList[nextIndex]
@@ -350,7 +337,6 @@ export class CustomSelectControl implements IControlInstance {
       nextIndex++
     }
     if (!~leftIndex || !~rightIndex) return -1
-    // 删除元素
     const draw = this.control.getDraw()
     draw.spliceElementList(
       elementList,
@@ -361,7 +347,6 @@ export class CustomSelectControl implements IControlInstance {
         isIgnoreDeletedRule: options.isIgnoreDeletedRule
       }
     )
-    // 增加占位符
     if (isAddPlaceholder) {
       this.control.addPlaceholder(preIndex, context)
     }
@@ -382,7 +367,6 @@ export class CustomSelectControl implements IControlInstance {
     context: IControlContext = {},
     options: IControlRuleOption = {}
   ) {
-    // 校验是否可以设置
     if (
       !options.isIgnoreDisabledRule &&
       this.control.getIsDisabledControl(context)
@@ -393,15 +377,9 @@ export class CustomSelectControl implements IControlInstance {
     const range = context.range || this.control.getRange()
     const control = this.element.control!
     const newCodes = code?.split(this.VALUE_DELIMITER) || []
-    // 缓存旧值
     const oldCode = control.code
     const oldCodes = control.code?.split(this.VALUE_DELIMITER) || []
-    // 选项相同时无需重复渲染
-    const isMultiSelect = control.isMultiSelect
-    if (
-      (!isMultiSelect && code === oldCode) ||
-      (isMultiSelect && isArrayEqual(oldCodes, newCodes))
-    ) {
+    if (isArrayEqual(oldCodes, newCodes)) {
       this.control.repaintControl({
         curIndex: range.startIndex,
         isCompute: false,
@@ -412,10 +390,8 @@ export class CustomSelectControl implements IControlInstance {
     }
     const valueSets = control.valueSets
     if (!Array.isArray(valueSets) || !valueSets.length) return
-    // 转换文本
     const text = this.getText(newCodes)
     if (!text) {
-      // 之前存在内容时清空文本
       if (oldCode) {
         const prefixIndex = this.clearSelect(context, {
           isIgnoreDeletedRule: options.isIgnoreDeletedRule
@@ -431,22 +407,18 @@ export class CustomSelectControl implements IControlInstance {
       }
       return
     }
-    // 样式赋值元素-默认值的第一个字符样式，否则取默认样式
     const valueElement = this.getValue(context)[0]
     const styleElement = valueElement
       ? pickObject(valueElement, EDITOR_ELEMENT_STYLE_ATTR)
       : pickObject(elementList[range.startIndex], CONTROL_STYLE_ATTR)
-    // 清空选项
     const prefixIndex = this.clearSelect(context, {
       isAddPlaceholder: false,
       isIgnoreDeletedRule: options.isIgnoreDeletedRule
     })
     if (!~prefixIndex) return
-    // 当前无值时清空占位符
     if (!oldCode) {
       this.control.removePlaceholder(prefixIndex, context)
     }
-    // 属性赋值元素-默认为前缀属性
     const propertyElement = omitObject(
       elementList[prefixIndex],
       EDITOR_ELEMENT_STYLE_ATTR
@@ -468,7 +440,6 @@ export class CustomSelectControl implements IControlInstance {
       })
       draw.spliceElementList(elementList, start + i, 0, [newElement])
     }
-    // 设置状态
     this.control.setControlProperties(
       {
         code
@@ -478,7 +449,6 @@ export class CustomSelectControl implements IControlInstance {
         range: { startIndex: prefixIndex, endIndex: prefixIndex }
       }
     )
-    // 重新渲染控件
     const newIndex = start + data.length - 1
     this.control.repaintControl({
       curIndex: newIndex
@@ -486,9 +456,7 @@ export class CustomSelectControl implements IControlInstance {
     this.control.emitControlContentChange({
       context
     })
-    if (!isMultiSelect) {
-      this.destroy()
-    }
+    this.destroy()
     const associationId = control.associationId
     if (
       associationId &&
@@ -498,22 +466,12 @@ export class CustomSelectControl implements IControlInstance {
       this.stateManager.setValue(
         associationId,
         code,
-        ControlType.CUSTOM_SELECT,
+        ControlType.MULTI_CUSTOM_SELECT,
         this.draw,
         this.element.controlId
       )
     }
   }
-
-
-  // private _togglePopup() {
-  //   if (this.isPopup) {
-  //     this.destroy()
-  //   } else {
-  //     this._createSelectPopupDom()
-  //     this.isPopup = true
-  //   }
-  // }
 
   private _createSelectPopupDom() {
     const control = this.element.control!
@@ -527,7 +485,7 @@ export class CustomSelectControl implements IControlInstance {
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
     selectPopupContainer.style.display = 'flex'
     selectPopupContainer.style.flexDirection = 'column'
-    selectPopupContainer.style.minWidth = '250px'
+    selectPopupContainer.style.minWidth = '200px'
 
     const ul = document.createElement('ul')
     ul.style.flex = '1'
@@ -536,10 +494,10 @@ export class CustomSelectControl implements IControlInstance {
     ul.style.margin = '0'
     ul.style.padding = '0'
 
+    const selectedCodes = new Set(this.getCodes())
+    const checkboxMap = new Map<string, { li: HTMLLIElement; checkbox: HTMLSpanElement }>()
     const inputValues = new Map<string, string>()
     const inputElements = new Map<string, HTMLInputElement[]>()
-    const isMultiSelect = control.isMultiSelect
-    const activeCodes = isMultiSelect ? new Set(this.getCodes()) : this.getCodes()[0]
 
     for (let v = 0; v < valueSets.length; v++) {
       const valueSet = valueSets[v]
@@ -549,15 +507,44 @@ export class CustomSelectControl implements IControlInstance {
       li.style.padding = '8px 12px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
-      li.style.position = 'relative'
 
-      const isSelected = isMultiSelect
-        ? (activeCodes as Set<string>).has(valueSet.code)
-        : activeCodes === valueSet.code
+      const checkboxWrapper = document.createElement('span')
+      checkboxWrapper.style.display = 'inline-flex'
+      checkboxWrapper.style.alignItems = 'center'
+      checkboxWrapper.style.marginRight = '8px'
+      checkboxWrapper.style.flexShrink = '0'
 
-      if (isSelected) {
+      const checkbox = document.createElement('span')
+      checkbox.style.display = 'inline-block'
+      checkbox.style.width = '16px'
+      checkbox.style.height = '16px'
+      checkbox.style.border = '1px solid #DCDFE6'
+      checkbox.style.borderRadius = '2px'
+      checkbox.style.position = 'relative'
+      checkbox.style.boxSizing = 'border-box'
+      checkbox.style.flexShrink = '0'
+      checkbox.style.transition = 'all 0.2s'
+
+      const isChecked = selectedCodes.has(valueSet.code)
+      if (isChecked) {
+        checkbox.style.backgroundColor = '#409EFF'
+        checkbox.style.borderColor = '#409EFF'
+        const checkmark = document.createElement('span')
+        checkmark.style.position = 'absolute'
+        checkmark.style.left = '4px'
+        checkmark.style.top = '1px'
+        checkmark.style.width = '6px'
+        checkmark.style.height = '10px'
+        checkmark.style.border = 'solid white'
+        checkmark.style.borderWidth = '0 2px 2px 0'
+        checkmark.style.transform = 'rotate(45deg)'
+        checkmark.style.boxSizing = 'content-box'
+        checkbox.appendChild(checkmark)
         li.classList.add('active')
       }
+
+      checkboxWrapper.appendChild(checkbox)
+      li.appendChild(checkboxWrapper)
 
       const unitMatch = detectUnitPattern(valueSet.value)
 
@@ -613,7 +600,31 @@ export class CustomSelectControl implements IControlInstance {
             e.preventDefault()
             input.blur()
             this.hideHint(selectPopupContainer)
-            this.handleEnterSelect(valueSet.code, isMultiSelect || false, activeCodes, inputValues)
+            const isCurrentlyChecked = selectedCodes.has(valueSet.code)
+            if (isCurrentlyChecked) {
+              selectedCodes.delete(valueSet.code)
+              checkbox.style.backgroundColor = ''
+              checkbox.style.borderColor = '#DCDFE6'
+              const checkmark = checkbox.querySelector('span')
+              if (checkmark) checkmark.remove()
+              li.classList.remove('active')
+            } else {
+              selectedCodes.add(valueSet.code)
+              checkbox.style.backgroundColor = '#409EFF'
+              checkbox.style.borderColor = '#409EFF'
+              const checkmark = document.createElement('span')
+              checkmark.style.position = 'absolute'
+              checkmark.style.left = '4px'
+              checkmark.style.top = '1px'
+              checkmark.style.width = '6px'
+              checkmark.style.height = '10px'
+              checkmark.style.border = 'solid white'
+              checkmark.style.borderWidth = '0 2px 2px 0'
+              checkmark.style.transform = 'rotate(45deg)'
+              checkmark.style.boxSizing = 'content-box'
+              checkbox.appendChild(checkmark)
+              li.classList.add('active')
+            }
           }
         }
 
@@ -648,7 +659,6 @@ export class CustomSelectControl implements IControlInstance {
       li.onmouseenter = () => {
         li.style.backgroundColor = '#F5F7FA'
       }
-
       li.onmouseleave = () => {
         li.style.backgroundColor = ''
       }
@@ -665,26 +675,130 @@ export class CustomSelectControl implements IControlInstance {
           this.hideHint(selectPopupContainer)
         }
 
-        let newCodes: string[]
-        if (isMultiSelect) {
-          const currentCodes = new Set(activeCodes as Set<string>)
-          if (currentCodes.has(valueSet.code)) {
-            currentCodes.delete(valueSet.code)
-          } else {
-            currentCodes.add(valueSet.code)
-          }
-          newCodes = Array.from(currentCodes)
+        e.stopPropagation()
+        const isCurrentlyChecked = selectedCodes.has(valueSet.code)
+        if (isCurrentlyChecked) {
+          selectedCodes.delete(valueSet.code)
+          checkbox.style.backgroundColor = ''
+          checkbox.style.borderColor = '#DCDFE6'
+          const checkmark = checkbox.querySelector('span')
+          if (checkmark) checkmark.remove()
+          li.classList.remove('active')
         } else {
-          newCodes = activeCodes === valueSet.code ? [] : [valueSet.code]
+          selectedCodes.add(valueSet.code)
+          checkbox.style.backgroundColor = '#409EFF'
+          checkbox.style.borderColor = '#409EFF'
+          const checkmark = document.createElement('span')
+          checkmark.style.position = 'absolute'
+          checkmark.style.left = '4px'
+          checkmark.style.top = '1px'
+          checkmark.style.width = '6px'
+          checkmark.style.height = '10px'
+          checkmark.style.border = 'solid white'
+          checkmark.style.borderWidth = '0 2px 2px 0'
+          checkmark.style.transform = 'rotate(45deg)'
+          checkmark.style.boxSizing = 'content-box'
+          checkbox.appendChild(checkmark)
+          li.classList.add('active')
         }
-
-        this.setSelectWithInputValues(newCodes, inputValues)
       }
 
+      checkboxMap.set(valueSet.code, { li, checkbox })
       ul.append(li)
     }
-
     selectPopupContainer.append(ul)
+
+    const divider = document.createElement('div')
+    divider.style.height = '1px'
+    divider.style.backgroundColor = '#EBEEF5'
+    divider.style.margin = '0'
+    selectPopupContainer.append(divider)
+
+    const bottomBar = document.createElement('div')
+    bottomBar.style.display = 'flex'
+    bottomBar.style.alignItems = 'center'
+    bottomBar.style.justifyContent = 'space-between'
+    bottomBar.style.padding = '8px 12px'
+    bottomBar.style.gap = '12px'
+
+    const delimiterContainer = document.createElement('div')
+    delimiterContainer.style.display = 'flex'
+    delimiterContainer.style.alignItems = 'center'
+    delimiterContainer.style.gap = '6px'
+
+    const delimiterLabel = document.createElement('span')
+    delimiterLabel.textContent = '分隔符:'
+    delimiterLabel.style.fontSize = '12px'
+    delimiterLabel.style.color = '#606266'
+    delimiterContainer.appendChild(delimiterLabel)
+
+    const delimiters = [',', ';', '，']
+    const currentDelimiter = control.multiSelectDelimiter || ','
+    delimiters.forEach(delim => {
+      const delimBtn = document.createElement('button')
+      delimBtn.textContent = delim
+      delimBtn.style.padding = '2px 8px'
+      delimBtn.style.fontSize = '12px'
+      delimBtn.style.border = '1px solid #DCDFE6'
+      delimBtn.style.borderRadius = '3px'
+      delimBtn.style.backgroundColor = delim === currentDelimiter ? '#409EFF' : '#fff'
+      delimBtn.style.color = delim === currentDelimiter ? '#fff' : '#606266'
+      delimBtn.style.cursor = 'pointer'
+      delimBtn.style.outline = 'none'
+      delimBtn.onclick = (e) => {
+        e.stopPropagation()
+        delimiters.forEach(d => {
+          const btn = delimiterContainer.querySelector(`button[data-delim="${d}"]`) as HTMLButtonElement
+          if (btn) {
+            btn.style.backgroundColor = d === delim ? '#409EFF' : '#fff'
+            btn.style.color = d === delim ? '#fff' : '#606266'
+          }
+        })
+        ;(selectPopupContainer as any).currentDelimiter = delim
+      }
+      delimBtn.setAttribute('data-delim', delim)
+      delimiterContainer.appendChild(delimBtn)
+    })
+    ;(selectPopupContainer as any).currentDelimiter = currentDelimiter
+
+    bottomBar.appendChild(delimiterContainer)
+
+    const confirmBtn = document.createElement('button')
+    confirmBtn.textContent = '确认选择'
+    confirmBtn.style.padding = '6px 16px'
+    confirmBtn.style.fontSize = '12px'
+    confirmBtn.style.border = 'none'
+    confirmBtn.style.borderRadius = '4px'
+    confirmBtn.style.backgroundColor = '#409EFF'
+    confirmBtn.style.color = '#fff'
+    confirmBtn.style.cursor = 'pointer'
+    confirmBtn.style.outline = 'none'
+    confirmBtn.style.whiteSpace = 'nowrap'
+    confirmBtn.onclick = (e) => {
+      e.stopPropagation()
+      const delimiter = (selectPopupContainer as any).currentDelimiter || ','
+      const currentDelimiter = control.multiSelectDelimiter || ','
+      if (delimiter !== currentDelimiter) {
+        const elementList = this.control.getElementList()
+        const range = this.control.getRange()
+        this.control.setControlProperties(
+          { multiSelectDelimiter: delimiter },
+          { elementList, range }
+        )
+        this.valueSetCache.delete(this.element.controlId || '')
+      }
+      const codesArray = Array.from(selectedCodes)
+      this.setSelectWithInputValues(codesArray, inputValues, delimiter)
+    }
+    confirmBtn.onmouseenter = () => {
+      confirmBtn.style.backgroundColor = '#66B1FF'
+    }
+    confirmBtn.onmouseleave = () => {
+      confirmBtn.style.backgroundColor = '#409EFF'
+    }
+    bottomBar.appendChild(confirmBtn)
+
+    selectPopupContainer.append(bottomBar)
 
     const {
       coordinate: {
@@ -739,23 +853,7 @@ export class CustomSelectControl implements IControlInstance {
     inputs[nextIndex].select()
   }
 
-  private handleEnterSelect(code: string, isMultiSelect: boolean, activeCodes: Set<string> | string, inputValues: Map<string, string>): void {
-    let newCodes: string[]
-    if (isMultiSelect) {
-      const currentCodes = new Set(activeCodes as Set<string>)
-      if (currentCodes.has(code)) {
-        currentCodes.delete(code)
-      } else {
-        currentCodes.add(code)
-      }
-      newCodes = Array.from(currentCodes)
-    } else {
-      newCodes = [code]
-    }
-    this.setSelectWithInputValues(newCodes, inputValues)
-  }
-
-  private setSelectWithInputValues(codes: string[], inputValues: Map<string, string>): void {
+  private setSelectWithInputValues(codes: string[], inputValues: Map<string, string>, delimiter: string): void {
     const control = this.element.control!
     const valueSets = control.valueSets
     if (!Array.isArray(valueSets) || !valueSets.length) return
@@ -787,7 +885,7 @@ export class CustomSelectControl implements IControlInstance {
       }
     }
 
-    this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER))
+    this.setSelect(newCodesWithValues.join(delimiter))
   }
 
   public awake() {
