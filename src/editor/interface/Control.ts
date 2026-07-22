@@ -158,6 +158,7 @@ export interface IControlRuleOption {
   isIgnoreDeletedRule?: boolean
   isAddPlaceholder?: boolean
   isSyncAssociation?: boolean
+  isForceUpdate?: boolean
 }
 
 export interface IGetControlValueOption {

@@ -222,8 +222,8 @@ elementList.splice(100, 0, {
   control: {
     conceptId: '12',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
+    value: [{ value: '上海' }],
+    code: '1002',
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -256,8 +256,8 @@ elementList.splice(102, 0, {
   control: {
     conceptId: '13',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
+    value: [{ value: '上海' }],
+    code: '1002',
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -278,6 +278,153 @@ elementList.splice(102, 0, {
       {
         value: '深圳',
         code: '1004'
+      }
+    ]
+  }
+})
+
+// 模拟带单位识别的联动 MULTI_CUSTOM_SELECT 控件 - 第一个
+elementList.splice(104, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'unit-test-001',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '请选择检查项目',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'unit-check-001',
+    valueSets: [
+      {
+        value: '肝脏大小 120mm脾脏厚度 mm',
+        code: 'liver-size'
+      },
+      {
+        value: '肾脏体积 50ml',
+        code: 'kidney-volume'
+      },
+      {
+        value: '甲状腺密度 Hu',
+        code: 'thyroid-density'
+      }
+    ]
+  }
+})
+
+// 模拟带单位识别的联动 MULTI_CUSTOM_SELECT 控件 - 第二个（同 associationId）
+elementList.splice(105, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'unit-test-001',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '同步检查项目',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'unit-check-001',
+    valueSets: [
+      {
+        value: '肝脏大小 120mm脾脏厚度 mm',
+        code: 'liver-size'
+      },
+      {
+        value: '肾脏体积 50ml',
+        code: 'kidney-volume'
+      },
+      {
+        value: '甲状腺密度 Hu',
+        code: 'thyroid-density'
+      }
+    ]
+  }
+})
+
+// 模拟带单位识别的 CUSTOM_SELECT 控件（单选，带历史记录）
+elementList.splice(106, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'unit-test-002',
+    type: ControlType.CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '选择测量值',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'unit-check-002',
+    valueSets: [
+      {
+        value: '体温36.5°C',
+        code: 'temperature'
+      },
+      {
+        value: '血压33kPa',
+        code: 'blood-pressure'
+      },
+      {
+        value: '血糖5.6mg',
+        code: 'blood-sugar'
+      }
+    ]
+  }
+})// 模拟带单位识别的 CUSTOM_SELECT 控件（单选，带历史记录）
+elementList.splice(107, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'unit-test-002',
+    type: ControlType.CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '选择测量值',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    associationId: 'unit-check-002',
+    valueSets: [
+      {
+        value: '体温36.5°C',
+        code: 'temperature'
+      },
+      {
+        value: '血压33kPa',
+        code: 'blood-pressure'
+      },
+      {
+        value: '血糖5.6mg',
+        code: 'blood-sugar'
+      }
+    ]
+  }
+})
+
+// 模拟带单位识别的联动 MULTI_CUSTOM_SELECT 控件 - 不同 conceptId，测试历史记录隔离
+elementList.splice(108, 0, {
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'unit-test-003',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    value: null,
+    code: null,
+    placeholder: '独立测量项目',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    valueSets: [
+      {
+        value: '身高 175cm',
+        code: 'height'
+      },
+      {
+        value: '体重 kg',
+        code: 'weight'
+      },
+      {
+        value: '血氧 98%',
+        code: 'oxygen'
       }
     ]
   }

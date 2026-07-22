@@ -1,4 +1,5 @@
 import { ControlType } from '../../../../dataset/enum/Control'
+import { IValueSet } from '../../../../interface/Control'
 import { Draw } from '../../Draw'
 
 export interface IAssociationSyncPayload {
@@ -7,20 +8,23 @@ export interface IAssociationSyncPayload {
   controlType: ControlType
   sourceDraw: Draw
   sourceControlId: string
+  multiSelectDelimiter?: string
+  valueSets?: IValueSet[]
 }
 
 export class AssociationStateManager {
   private static instance: AssociationStateManager
-  private associationStates: Map<string, { value: string | number; controlType: ControlType }> = new Map()
+  private associationStates: Map<string, { value: string | number; controlType: ControlType; multiSelectDelimiter?: string; valueSets?: IValueSet[] }> = new Map()
   private syncingAssociationId: string | null = null
   private editorDraws: Set<Draw> = new Set()
 
   private constructor() {}
 
   public static getInstance(): AssociationStateManager {
-    if (!AssociationStateManager.instance) {
-      AssociationStateManager.instance = new AssociationStateManager()
+    if (AssociationStateManager.instance) {
+      return AssociationStateManager.instance
     }
+    AssociationStateManager.instance = new AssociationStateManager()
     return AssociationStateManager.instance
   }
 
@@ -36,23 +40,42 @@ export class AssociationStateManager {
     return this.associationStates.get(associationId)?.value
   }
 
+  public getMultiSelectDelimiter(associationId: string): string | undefined {
+    return this.associationStates.get(associationId)?.multiSelectDelimiter
+  }
+
+  public getValueSets(associationId: string): IValueSet[] | undefined {
+    return this.associationStates.get(associationId)?.valueSets
+  }
+
   public setValue(
     associationId: string,
     value: string | number,
     controlType: ControlType,
     sourceDraw: Draw,
-    sourceControlId: string
+    sourceControlId: string,
+    multiSelectDelimiter?: string,
+    valueSets?: IValueSet[]
   ): void {
     if (!associationId || !sourceControlId) return
     if (this.syncingAssociationId === associationId) return
 
     const state = this.associationStates.get(associationId)
-    if (state?.value === value) return
+    // 比较 value、multiSelectDelimiter 和 valueSets
+    const valueSetsChanged = valueSets && state?.valueSets
+      ? JSON.stringify(valueSets) !== JSON.stringify(state.valueSets)
+      : valueSets !== state?.valueSets
 
-    this.associationStates.set(associationId, { value, controlType })
+    console.log('AssociationStateManager.setValue - value:', value, 'multiSelectDelimiter:', multiSelectDelimiter, 'valueSetsChanged:', valueSetsChanged)
+
+    if (state?.value === value && state?.multiSelectDelimiter === multiSelectDelimiter && !valueSetsChanged) return
+
+    console.log('AssociationStateManager.setValue - 触发同步，valueSets:', valueSets)
+
+    this.associationStates.set(associationId, { value, controlType, multiSelectDelimiter, valueSets })
     this.syncingAssociationId = associationId
     try {
-      this.syncAllEditors(associationId, value, controlType, sourceDraw, sourceControlId)
+      this.syncAllEditors(associationId, value, controlType, sourceDraw, sourceControlId, multiSelectDelimiter, valueSets)
     } finally {
       this.syncingAssociationId = null
     }
@@ -63,14 +86,18 @@ export class AssociationStateManager {
     value: string | number,
     controlType: ControlType,
     sourceDraw: Draw,
-    sourceControlId: string
+    sourceControlId: string,
+    multiSelectDelimiter?: string,
+    valueSets?: IValueSet[]
   ): void {
     this.editorDraws.forEach(draw => {
       draw.getControl().syncAssociationValue(
         associationId,
         value,
         controlType,
-        draw === sourceDraw ? sourceControlId : ''
+        draw === sourceDraw ? sourceControlId : '',
+        multiSelectDelimiter,
+        valueSets
       )
     })
   }

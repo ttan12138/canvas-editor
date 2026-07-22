@@ -66,7 +66,7 @@ export class MultiCustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = '#0000FF'
+      ctx.fillStyle = '#4a9aff'
       ctx.fill()
 
       ctx.fillStyle = 'white'
@@ -84,7 +84,7 @@ export class MultiCustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = '#0000FF'
+      ctx.fillStyle = '#4a9aff'
       ctx.fill()
 
       ctx.fillStyle = 'white'

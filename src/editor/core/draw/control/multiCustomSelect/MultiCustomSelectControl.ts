@@ -28,7 +28,7 @@ import {
   splitText
 } from '../../../../utils'
 import { formatElementContext } from '../../../../utils/element'
-import { detectUnitPattern } from '../../../../utils/unitParser'
+import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
 import { AssociationStateManager } from '../association/AssociationStateManager'
@@ -40,7 +40,6 @@ export class MultiCustomSelectControl implements IControlInstance {
   private isPopup: boolean
   private selectDom: HTMLDivElement | null
   private options: DeepRequired<IEditorOption>
-  private VALUE_DELIMITER = ','
   private DEFAULT_MULTI_SELECT_DELIMITER = ','
   private stateManager: AssociationStateManager
   private valueSetCache: Map<string, Map<string, IValueSet>> = new Map()
@@ -69,9 +68,9 @@ export class MultiCustomSelectControl implements IControlInstance {
   }
 
   public getCodes(): string[] {
-    return this.element?.control?.code
-      ? this.element.control.code.split(',')
-      : []
+    if (!this.element?.control?.code) return []
+    const delimiter = this.element.control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    return this.element.control.code.split(delimiter)
   }
 
   private getValueSetMap(): Map<string, IValueSet> | null {
@@ -199,7 +198,7 @@ export class MultiCustomSelectControl implements IControlInstance {
         ...anchorElement,
         ...data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#0000FF'
+        color: '#4a9aff'
       }
       formatElementContext(elementList, [newElement], startIndex, {
         editorOptions: this.options
@@ -376,10 +375,12 @@ export class MultiCustomSelectControl implements IControlInstance {
     const elementList = context.elementList || this.control.getElementList()
     const range = context.range || this.control.getRange()
     const control = this.element.control!
-    const newCodes = code?.split(this.VALUE_DELIMITER) || []
+    // 使用当前设置的分隔符，而不是固定的 VALUE_DELIMITER
+    const delimiter = control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    const newCodes = code?.split(delimiter) || []
     const oldCode = control.code
-    const oldCodes = control.code?.split(this.VALUE_DELIMITER) || []
-    if (isArrayEqual(oldCodes, newCodes)) {
+    const oldCodes = control.code?.split(delimiter) || []
+    if (isArrayEqual(oldCodes, newCodes) && !options.isForceUpdate) {
       this.control.repaintControl({
         curIndex: range.startIndex,
         isCompute: false,
@@ -433,7 +434,7 @@ export class MultiCustomSelectControl implements IControlInstance {
         type: ElementType.TEXT,
         value: data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#0000FF'
+        color: '#4a9aff'
       }
       formatElementContext(elementList, [newElement], prefixIndex, {
         editorOptions: this.options
@@ -457,18 +458,40 @@ export class MultiCustomSelectControl implements IControlInstance {
       context
     })
     this.destroy()
+
+    // 设置光标到控件末尾（仅用户主动操作场景）
+    if (options.isSyncAssociation !== false) {
+      const draw = this.control.getDraw()
+      const rangeManager = draw.getRange()
+      // 找到控件末尾位置（POSTFIX 后面）
+      let endIndex = newIndex
+      const curElementList = context.elementList || this.control.getElementList()
+      while (endIndex < curElementList.length - 1) {
+        const nextElement = curElementList[endIndex + 1]
+        if (nextElement.controlId === this.element.controlId) {
+          endIndex++
+        } else {
+          break
+        }
+      }
+      rangeManager.setRange(endIndex, endIndex)
+    }
+
     const associationId = control.associationId
     if (
       associationId &&
       this.element.controlId &&
       options.isSyncAssociation !== false
     ) {
+      console.log('MultiCustomSelect setSelect - 触发联动，associationId:', associationId, 'code:', code, 'valueSets:', control.valueSets)
       this.stateManager.setValue(
         associationId,
         code,
         ControlType.MULTI_CUSTOM_SELECT,
         this.draw,
-        this.element.controlId
+        this.element.controlId,
+        control.multiSelectDelimiter,
+        control.valueSets
       )
     }
   }
@@ -485,7 +508,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
     selectPopupContainer.style.display = 'flex'
     selectPopupContainer.style.flexDirection = 'column'
-    selectPopupContainer.style.minWidth = '200px'
+    selectPopupContainer.style.minWidth = '400px'
 
     const ul = document.createElement('ul')
     ul.style.flex = '1'
@@ -503,10 +526,12 @@ export class MultiCustomSelectControl implements IControlInstance {
       const valueSet = valueSets[v]
       const li = document.createElement('li')
       li.style.display = 'flex'
-      li.style.alignItems = 'center'
+      li.style.alignItems = 'flex-start'
       li.style.padding = '8px 12px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
+      li.style.minHeight = '32px'
+      li.style.lineHeight = '1.5'
 
       const checkboxWrapper = document.createElement('span')
       checkboxWrapper.style.display = 'inline-flex'
@@ -524,6 +549,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       checkbox.style.boxSizing = 'border-box'
       checkbox.style.flexShrink = '0'
       checkbox.style.transition = 'all 0.2s'
+      checkbox.style.marginTop = '3px'
 
       const isChecked = selectedCodes.has(valueSet.code)
       if (isChecked) {
@@ -546,113 +572,168 @@ export class MultiCustomSelectControl implements IControlInstance {
       checkboxWrapper.appendChild(checkbox)
       li.appendChild(checkboxWrapper)
 
-      const unitMatch = detectUnitPattern(valueSet.value)
+      const multiUnitMatch = detectMultiUnitPattern(valueSet.value)
 
-      if (unitMatch && unitMatch.hasPlaceholder) {
+      if (multiUnitMatch && multiUnitMatch.parts.some(p => p.type === 'input')) {
         const contentContainer = document.createElement('span')
         contentContainer.style.display = 'flex'
         contentContainer.style.alignItems = 'center'
+        contentContainer.style.flexWrap = 'wrap'
         contentContainer.style.flex = '1'
+        contentContainer.style.lineHeight = '1.8'
+        contentContainer.style.wordBreak = 'break-word'
 
-        const prefixSpan = document.createElement('span')
-        prefixSpan.textContent = unitMatch.prefix
-        prefixSpan.style.whiteSpace = 'nowrap'
-        contentContainer.appendChild(prefixSpan)
+        // 用于跟踪输入框索引
+        let inputIndex = 0
 
-        const input = document.createElement('input')
-        input.type = 'text'
-        input.style.width = '60px'
-        input.style.height = '24px'
-        input.style.border = '1px solid #409EFF'
-        input.style.borderRadius = '3px'
-        input.style.padding = '0 6px'
-        input.style.fontSize = '14px'
-        input.style.margin = '0 4px'
-        input.style.outline = 'none'
-        input.style.textAlign = 'center'
-        input.style.background = '#F0F7FF'
+        multiUnitMatch.parts.forEach((part) => {
+          if (part.type === 'text') {
+            // 文本部分
+            const textSpan = document.createElement('span')
+            textSpan.textContent = part.text || ''
+            textSpan.style.whiteSpace = 'nowrap'
+            textSpan.style.marginRight = '2px'
+            contentContainer.appendChild(textSpan)
+          } else if (part.type === 'input') {
+            // 输入框部分
+            const input = document.createElement('input')
+            input.type = 'text'
+            input.style.width = '60px'
+            input.style.height = '24px'
+            input.style.border = '1px solid #409EFF'
+            input.style.borderRadius = '3px'
+            input.style.padding = '0 6px'
+            input.style.fontSize = '14px'
+            input.style.margin = '0 2px'
+            input.style.outline = 'none'
+            input.style.textAlign = 'center'
+            input.style.background = '#F0F7FF'
 
-        const savedValue = inputValues.get(valueSet.code)
-        input.value = savedValue || ''
-        input.placeholder = unitMatch.placeholder
+            // 获取初始值
+            const inputKey = `${valueSet.code}_${inputIndex}`
+            let initialValue = inputValues.get(inputKey)
+            if (!initialValue && part.value) {
+              initialValue = part.value
+            }
+            input.value = initialValue || ''
+            input.placeholder = '请输入数值'
 
-        input.onfocus = () => {
-          input.style.borderColor = '#67C23A'
-          input.style.boxShadow = '0 0 0 2px rgba(103, 194, 58, 0.2)'
-          this.showHint(selectPopupContainer)
-        }
+            input.onfocus = () => {
+              input.style.borderColor = '#67C23A'
+              input.style.boxShadow = '0 0 0 2px rgba(103, 194, 58, 0.2)'
+              this.showHint(selectPopupContainer)
+            }
 
-        input.onblur = () => {
-          input.style.borderColor = '#409EFF'
-          input.style.boxShadow = 'none'
-        }
+            input.onblur = () => {
+              input.style.borderColor = '#409EFF'
+              input.style.boxShadow = 'none'
+            }
 
-        input.onkeydown = (e) => {
-          e.stopPropagation()
-          if (e.key === KeyMap.TAB) {
-            e.preventDefault()
-            this.navigateToNextInput(selectPopupContainer, input)
-          } else if (e.key === KeyMap.ESC) {
-            e.preventDefault()
-            input.blur()
-            this.hideHint(selectPopupContainer)
-          } else if (e.key === KeyMap.Enter) {
-            e.preventDefault()
-            input.blur()
-            this.hideHint(selectPopupContainer)
-            const isCurrentlyChecked = selectedCodes.has(valueSet.code)
-            if (isCurrentlyChecked) {
-              selectedCodes.delete(valueSet.code)
-              checkbox.style.backgroundColor = ''
-              checkbox.style.borderColor = '#DCDFE6'
-              const checkmark = checkbox.querySelector('span')
-              if (checkmark) checkmark.remove()
-              li.classList.remove('active')
-            } else {
-              selectedCodes.add(valueSet.code)
-              checkbox.style.backgroundColor = '#409EFF'
-              checkbox.style.borderColor = '#409EFF'
-              const checkmark = document.createElement('span')
-              checkmark.style.position = 'absolute'
-              checkmark.style.left = '4px'
-              checkmark.style.top = '1px'
-              checkmark.style.width = '6px'
-              checkmark.style.height = '10px'
-              checkmark.style.border = 'solid white'
-              checkmark.style.borderWidth = '0 2px 2px 0'
-              checkmark.style.transform = 'rotate(45deg)'
-              checkmark.style.boxSizing = 'content-box'
-              checkbox.appendChild(checkmark)
-              li.classList.add('active')
+            input.onkeydown = (e) => {
+              e.stopPropagation()
+              if (e.key === KeyMap.TAB) {
+                e.preventDefault()
+                this.navigateToNextInput(selectPopupContainer, input)
+              } else if (e.key === KeyMap.ESC) {
+                e.preventDefault()
+                input.blur()
+                this.hideHint(selectPopupContainer)
+              } else if (e.key === KeyMap.Enter) {
+                e.preventDefault()
+                input.blur()
+                this.hideHint(selectPopupContainer)
+                const isCurrentlyChecked = selectedCodes.has(valueSet.code)
+                if (isCurrentlyChecked) {
+                  selectedCodes.delete(valueSet.code)
+                  checkbox.style.backgroundColor = ''
+                  checkbox.style.borderColor = '#DCDFE6'
+                  const checkmark = checkbox.querySelector('span')
+                  if (checkmark) checkmark.remove()
+                  li.classList.remove('active')
+                } else {
+                  selectedCodes.add(valueSet.code)
+                  checkbox.style.backgroundColor = '#409EFF'
+                  checkbox.style.borderColor = '#409EFF'
+                  const checkmark = document.createElement('span')
+                  checkmark.style.position = 'absolute'
+                  checkmark.style.left = '4px'
+                  checkmark.style.top = '1px'
+                  checkmark.style.width = '6px'
+                  checkmark.style.height = '10px'
+                  checkmark.style.border = 'solid white'
+                  checkmark.style.borderWidth = '0 2px 2px 0'
+                  checkmark.style.transform = 'rotate(45deg)'
+                  checkmark.style.boxSizing = 'content-box'
+                  checkbox.appendChild(checkmark)
+                  li.classList.add('active')
+                }
+              }
+            }
+
+            input.oninput = () => {
+              // 只允许数字、负号、±和小数点
+              let value = input.value
+              // let lastValidValue = inputValues.get(inputKey) || ''
+
+              // 移除所有不允许的字符
+              value = value.replace(/[^\d.\-±]/g, '')
+
+              // 处理负号和±：只能出现在开头，且只能有一个
+              let prefix = ''
+              if (value.startsWith('±')) {
+                prefix = '±'
+                value = value.substring(1)
+              } else if (value.startsWith('-')) {
+                prefix = '-'
+                value = value.substring(1)
+              }
+              // 移除剩余的负号和±
+              value = value.replace(/[\-±]/g, '')
+
+              // 处理小数点：只能有一个
+              const parts = value.split('.')
+              if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('')
+              }
+
+              // 组合最终值
+              value = prefix + value
+
+              // 更新输入框值
+              if (input.value !== value) {
+                input.value = value
+              }
+              inputValues.set(inputKey, value)
+            }
+
+            // 将输入框存储到 inputElements Map
+            if (!inputElements.has(valueSet.code)) {
+              inputElements.set(valueSet.code, [])
+            }
+            inputElements.get(valueSet.code)!.push(input)
+
+            contentContainer.appendChild(input)
+            inputIndex++
+
+            // 添加单位文本
+            if (part.unit) {
+              const unitSpan = document.createElement('span')
+              unitSpan.textContent = part.unit
+              unitSpan.style.whiteSpace = 'nowrap'
+              unitSpan.style.marginRight = '2px'
+              contentContainer.appendChild(unitSpan)
             }
           }
-        }
-
-        input.oninput = () => {
-          inputValues.set(valueSet.code, input.value)
-        }
-
-        contentContainer.appendChild(input)
-
-        const unitSpan = document.createElement('span')
-        unitSpan.textContent = unitMatch.unit
-        unitSpan.style.whiteSpace = 'nowrap'
-        contentContainer.appendChild(unitSpan)
+        })
 
         li.appendChild(contentContainer)
-
-        if (!inputElements.has(valueSet.code)) {
-          inputElements.set(valueSet.code, [])
-        }
-        inputElements.get(valueSet.code)!.push(input)
-
       } else {
         const textSpan = document.createElement('span')
         textSpan.textContent = valueSet.value
         textSpan.style.flex = '1'
-        textSpan.style.overflow = 'hidden'
-        textSpan.style.textOverflow = 'ellipsis'
-        textSpan.style.whiteSpace = 'nowrap'
+        textSpan.style.lineHeight = '1.8'
+        textSpan.style.wordBreak = 'break-word'
+        textSpan.style.whiteSpace = 'pre-wrap'
         li.appendChild(textSpan)
       }
 
@@ -727,7 +808,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     delimiterContainer.style.gap = '6px'
 
     const delimiterLabel = document.createElement('span')
-    delimiterLabel.textContent = '分隔符:'
+    delimiterLabel.textContent = ''
     delimiterLabel.style.fontSize = '12px'
     delimiterLabel.style.color = '#606266'
     delimiterContainer.appendChild(delimiterLabel)
@@ -764,7 +845,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     bottomBar.appendChild(delimiterContainer)
 
     const confirmBtn = document.createElement('button')
-    confirmBtn.textContent = '确认选择'
+    confirmBtn.textContent = '确认'
     confirmBtn.style.padding = '6px 16px'
     confirmBtn.style.fontSize = '12px'
     confirmBtn.style.border = 'none'
@@ -776,6 +857,15 @@ export class MultiCustomSelectControl implements IControlInstance {
     confirmBtn.style.whiteSpace = 'nowrap'
     confirmBtn.onclick = (e) => {
       e.stopPropagation()
+
+      // 从 DOM 输入框读取最新值，确保数据同步
+      inputElements.forEach((inputs, code) => {
+        inputs.forEach((input, index) => {
+          const inputKey = `${code}_${index}`
+          inputValues.set(inputKey, input.value)
+        })
+      })
+
       const delimiter = (selectPopupContainer as any).currentDelimiter || ','
       const currentDelimiter = control.multiSelectDelimiter || ','
       if (delimiter !== currentDelimiter) {
@@ -787,7 +877,11 @@ export class MultiCustomSelectControl implements IControlInstance {
         )
         this.valueSetCache.delete(this.element.controlId || '')
       }
-      const codesArray = Array.from(selectedCodes)
+      let codesArray = Array.from(selectedCodes)
+      // 如果没有任何选中，自动选择第一个选项
+      if (codesArray.length === 0 && valueSets.length > 0) {
+        codesArray = [valueSets[0].code]
+      }
       this.setSelectWithInputValues(codesArray, inputValues, delimiter)
     }
     confirmBtn.onmouseenter = () => {
@@ -859,33 +953,55 @@ export class MultiCustomSelectControl implements IControlInstance {
     if (!Array.isArray(valueSets) || !valueSets.length) return
 
     const newCodesWithValues: string[] = []
+    let hasValueChanged = false
 
     for (const code of codes) {
       const valueSet = valueSets.find(v => v.code === code)
       if (!valueSet) continue
 
-      const inputValue = inputValues.get(code)
-      if (inputValue && inputValue.trim() !== '') {
-        const unitMatch = detectUnitPattern(valueSet.value)
-        if (unitMatch && unitMatch.hasPlaceholder) {
-          const newValue = unitMatch.prefix + inputValue.trim() + unitMatch.unit
-          const modifiedValueSet: IValueSet = {
-            code: code + '_custom',
-            value: newValue
+      const unitMatch = detectMultiUnitPattern(valueSet.value)
+      const originalValue = valueSet.value
+
+      if (unitMatch && unitMatch.parts.some(p => p.type === 'input')) {
+        // 构建新的值
+        let newValue = ''
+        let inputIndex = 0
+
+        unitMatch.parts.forEach((part) => {
+          if (part.type === 'text') {
+            newValue += part.text || ''
+          } else if (part.type === 'input') {
+            const inputKey = `${code}_${inputIndex}`
+            const inputValue = inputValues.get(inputKey)
+            newValue += (inputValue && inputValue.trim() !== '' ? inputValue.trim() : part.value || '')
+            newValue += part.unit || ''
+            inputIndex++
           }
-          if (!valueSets.find(v => v.code === modifiedValueSet.code)) {
-            valueSets.push(modifiedValueSet)
-          }
-          newCodesWithValues.push(modifiedValueSet.code)
-        } else {
-          newCodesWithValues.push(code)
+        })
+
+        // 直接更新原有选项的值
+        if (newValue !== originalValue) {
+          valueSet.value = newValue
+          hasValueChanged = true
         }
+        newCodesWithValues.push(code)
       } else {
         newCodesWithValues.push(code)
       }
     }
 
-    this.setSelect(newCodesWithValues.join(delimiter))
+
+    // 如果值有变化，需要强制更新正文
+    if (hasValueChanged) {
+      // 清除缓存，确保获取最新值
+      this.valueSetCache.delete(this.element.controlId || '')
+      console.log('setSelectWithInputValues - 值有变化，调用 setSelect，valueSets:', control.valueSets)
+      // 调用 setSelect 并强制更新
+      this.setSelect(newCodesWithValues.join(delimiter), {}, { isForceUpdate: true })
+    } else {
+      console.log('setSelectWithInputValues - 值无变化，调用 setSelect')
+      this.setSelect(newCodesWithValues.join(delimiter))
+    }
   }
 
   public awake() {

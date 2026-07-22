@@ -26,7 +26,8 @@ import {
   ISetControlExtensionOption,
   ISetControlProperties,
   ISetControlRowFlexOption,
-  ISetControlValueOption
+  ISetControlValueOption,
+  IValueSet
 } from '../../../interface/Control'
 import { IEditorData, IEditorOption } from '../../../interface/Editor'
 import { IElement, IElementPosition } from '../../../interface/Element'
@@ -1194,8 +1195,18 @@ export class Control {
           if (Array.isArray(value)) continue
           const customSelect = new CustomSelectControl(element, this)
           this.activeControl = customSelect
+          const control = element.control!
+          // 判断是否需要自动选择第一个选项：value 或 code 为 null/undefined 时
+          const shouldSelectFirst = control.value == null || control.code == null
           if (value) {
             customSelect.setSelect(value, controlContext, controlRule)
+          } else if (shouldSelectFirst && control.valueSets?.length) {
+            // 自动选择第一个选项
+            const firstCode = control.valueSets[0].code
+            customSelect.setSelect(firstCode, controlContext, controlRule)
+          } else if (control.code) {
+            // 根据 control.code 初始化
+            customSelect.setSelect(control.code, controlContext, controlRule)
           } else {
             customSelect.clearSelect(controlContext, controlRule)
           }
@@ -1203,8 +1214,18 @@ export class Control {
           if (Array.isArray(value)) continue
           const multiCustomSelect = new MultiCustomSelectControl(element, this)
           this.activeControl = multiCustomSelect
+          const control = element.control!
+          // 判断是否需要自动选择第一个选项：value 或 code 为 null/undefined 时
+          const shouldSelectFirst = control.value == null || control.code == null
           if (value) {
             multiCustomSelect.setSelect(value, controlContext, controlRule)
+          } else if (shouldSelectFirst && control.valueSets?.length) {
+            // 自动选择第一个选项
+            const firstCode = control.valueSets[0].code
+            multiCustomSelect.setSelect(firstCode, controlContext, controlRule)
+          } else if (control.code) {
+            // 根据 control.code 初始化
+            multiCustomSelect.setSelect(control.code, controlContext, controlRule)
           } else {
             multiCustomSelect.clearSelect(controlContext, controlRule)
           }
@@ -1320,7 +1341,9 @@ export class Control {
     associationId: string,
     value: string | number,
     controlType: ControlType,
-    sourceControlId: string
+    sourceControlId: string,
+    multiSelectDelimiter?: string,
+    valueSets?: IValueSet[]
   ): void {
     const setValue = (elementList: IElement[]) => {
       let i = 0
@@ -1364,7 +1387,8 @@ export class Control {
         const controlRule: IControlRuleOption = {
           isIgnoreDisabledRule: true,
           isIgnoreDeletedRule: true,
-          isSyncAssociation: false
+          isSyncAssociation: false,
+          isForceUpdate: true
         }
         if (
           controlType === ControlType.CUSTOM_SELECT ||
@@ -1376,6 +1400,15 @@ export class Control {
               : new CustomSelectControl(element, this)
           this.activeControl = selectControl
           const strValue = String(value)
+          // 对于 MULTI_CUSTOM_SELECT，需要先同步分隔符
+          if (controlType === ControlType.MULTI_CUSTOM_SELECT && element.control && multiSelectDelimiter) {
+            element.control.multiSelectDelimiter = multiSelectDelimiter
+          }
+          // 同步 valueSets（包含输入值）
+          if (valueSets && element.control && 'valueSets' in element.control) {
+            console.log('syncAssociationValue - 同步 valueSets 到联动控件:', valueSets)
+            element.control.valueSets = JSON.parse(JSON.stringify(valueSets))
+          }
           if (strValue) {
             selectControl.setSelect(strValue, controlContext, controlRule)
           } else {

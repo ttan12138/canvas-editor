@@ -28,7 +28,7 @@ import {
   splitText
 } from '../../../../utils'
 import { formatElementContext } from '../../../../utils/element'
-import { detectUnitPattern } from '../../../../utils/unitParser'
+import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
 import { AssociationStateManager } from '../association/AssociationStateManager'
@@ -204,7 +204,7 @@ export class CustomSelectControl implements IControlInstance {
         ...anchorElement,
         ...data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#0000FF'
+        color: '#4a9aff'
       }
       formatElementContext(elementList, [newElement], startIndex, {
         editorOptions: this.options
@@ -399,8 +399,8 @@ export class CustomSelectControl implements IControlInstance {
     // 选项相同时无需重复渲染
     const isMultiSelect = control.isMultiSelect
     if (
-      (!isMultiSelect && code === oldCode) ||
-      (isMultiSelect && isArrayEqual(oldCodes, newCodes))
+      (!isMultiSelect && code === oldCode && !options.isForceUpdate) ||
+      (isMultiSelect && isArrayEqual(oldCodes, newCodes) && !options.isForceUpdate)
     ) {
       this.control.repaintControl({
         curIndex: range.startIndex,
@@ -461,7 +461,7 @@ export class CustomSelectControl implements IControlInstance {
         type: ElementType.TEXT,
         value: data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#0000FF'
+        color: '#4a9aff'
       }
       formatElementContext(elementList, [newElement], prefixIndex, {
         editorOptions: this.options
@@ -489,6 +489,24 @@ export class CustomSelectControl implements IControlInstance {
     if (!isMultiSelect) {
       this.destroy()
     }
+
+    // 设置光标到控件末尾（仅用户主动操作场景）
+    if (options.isSyncAssociation !== false) {
+      const draw = this.control.getDraw()
+      const rangeManager = draw.getRange()
+      // 找到控件末尾位置（POSTFIX 后面）
+      let endIndex = newIndex
+      while (endIndex < elementList.length - 1) {
+        const nextElement = elementList[endIndex + 1]
+        if (nextElement.controlId === this.element.controlId) {
+          endIndex++
+        } else {
+          break
+        }
+      }
+      rangeManager.setRange(endIndex, endIndex)
+    }
+
     const associationId = control.associationId
     if (
       associationId &&
@@ -500,7 +518,9 @@ export class CustomSelectControl implements IControlInstance {
         code,
         ControlType.CUSTOM_SELECT,
         this.draw,
-        this.element.controlId
+        this.element.controlId,
+        undefined,
+        control.valueSets
       )
     }
   }
@@ -545,10 +565,12 @@ export class CustomSelectControl implements IControlInstance {
       const valueSet = valueSets[v]
       const li = document.createElement('li')
       li.style.display = 'flex'
-      li.style.alignItems = 'center'
+      li.style.alignItems = 'flex-start'
       li.style.padding = '8px 12px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
+      li.style.minHeight = '32px'
+      li.style.lineHeight = '1.5'
       li.style.position = 'relative'
 
       const isSelected = isMultiSelect
@@ -559,89 +581,150 @@ export class CustomSelectControl implements IControlInstance {
         li.classList.add('active')
       }
 
-      const unitMatch = detectUnitPattern(valueSet.value)
+      const multiUnitMatch = detectMultiUnitPattern(valueSet.value)
 
-      if (unitMatch && unitMatch.hasPlaceholder) {
+      if (multiUnitMatch && multiUnitMatch.parts.some(p => p.type === 'input')) {
         const contentContainer = document.createElement('span')
         contentContainer.style.display = 'flex'
         contentContainer.style.alignItems = 'center'
+        contentContainer.style.flexWrap = 'wrap'
         contentContainer.style.flex = '1'
+        contentContainer.style.lineHeight = '1.8'
+        contentContainer.style.wordBreak = 'break-word'
 
-        const prefixSpan = document.createElement('span')
-        prefixSpan.textContent = unitMatch.prefix
-        prefixSpan.style.whiteSpace = 'nowrap'
-        contentContainer.appendChild(prefixSpan)
+        // 用于跟踪输入框索引
+        let inputIndex = 0
 
-        const input = document.createElement('input')
-        input.type = 'text'
-        input.style.width = '60px'
-        input.style.height = '24px'
-        input.style.border = '1px solid #409EFF'
-        input.style.borderRadius = '3px'
-        input.style.padding = '0 6px'
-        input.style.fontSize = '14px'
-        input.style.margin = '0 4px'
-        input.style.outline = 'none'
-        input.style.textAlign = 'center'
-        input.style.background = '#F0F7FF'
+        multiUnitMatch.parts.forEach((part) => {
+          if (part.type === 'text') {
+            // 文本部分
+            const textSpan = document.createElement('span')
+            textSpan.textContent = part.text || ''
+            textSpan.style.whiteSpace = 'nowrap'
+            textSpan.style.marginRight = '2px'
+            contentContainer.appendChild(textSpan)
+          } else if (part.type === 'input') {
+            // 输入框部分
+            const input = document.createElement('input')
+            input.type = 'text'
+            input.style.width = '60px'
+            input.style.height = '24px'
+            input.style.border = '1px solid #409EFF'
+            input.style.borderRadius = '3px'
+            input.style.padding = '0 6px'
+            input.style.fontSize = '14px'
+            input.style.margin = '0 2px'
+            input.style.outline = 'none'
+            input.style.textAlign = 'center'
+            input.style.background = '#F0F7FF'
 
-        const savedValue = inputValues.get(valueSet.code)
-        input.value = savedValue || ''
-        input.placeholder = unitMatch.placeholder
+            // 获取初始值
+            const inputKey = `${valueSet.code}_${inputIndex}`
+            let initialValue = inputValues.get(inputKey)
+            if (!initialValue && part.value) {
+              initialValue = part.value
+            }
+            input.value = initialValue || ''
+            input.placeholder = '请输入数值'
 
-        input.onfocus = () => {
-          input.style.borderColor = '#67C23A'
-          input.style.boxShadow = '0 0 0 2px rgba(103, 194, 58, 0.2)'
-          this.showHint(selectPopupContainer)
-        }
+            input.onfocus = () => {
+              input.style.borderColor = '#67C23A'
+              input.style.boxShadow = '0 0 0 2px rgba(103, 194, 58, 0.2)'
+              this.showHint(selectPopupContainer)
+            }
 
-        input.onblur = () => {
-          input.style.borderColor = '#409EFF'
-          input.style.boxShadow = 'none'
-        }
+            input.onblur = () => {
+              input.style.borderColor = '#409EFF'
+              input.style.boxShadow = 'none'
+            }
 
-        input.onkeydown = (e) => {
-          e.stopPropagation()
-          if (e.key === KeyMap.TAB) {
-            e.preventDefault()
-            this.navigateToNextInput(selectPopupContainer, input)
-          } else if (e.key === KeyMap.ESC) {
-            e.preventDefault()
-            input.blur()
-            this.hideHint(selectPopupContainer)
-          } else if (e.key === KeyMap.Enter) {
-            e.preventDefault()
-            input.blur()
-            this.hideHint(selectPopupContainer)
-            this.handleEnterSelect(valueSet.code, isMultiSelect || false, activeCodes, inputValues)
+            input.onkeydown = (e) => {
+              e.stopPropagation()
+              if (e.key === KeyMap.TAB) {
+                e.preventDefault()
+                this.navigateToNextInput(selectPopupContainer, input)
+              } else if (e.key === KeyMap.ESC) {
+                e.preventDefault()
+                input.blur()
+                this.hideHint(selectPopupContainer)
+              } else if (e.key === KeyMap.Enter) {
+                e.preventDefault()
+                input.blur()
+                this.hideHint(selectPopupContainer)
+                // 从 DOM 输入框读取最新值，确保数据同步
+                inputElements.forEach((inputs, code) => {
+                  inputs.forEach((input, index) => {
+                    const inputKey = `${code}_${index}`
+                    inputValues.set(inputKey, input.value)
+                  })
+                })
+                this.handleEnterSelect(valueSet.code, isMultiSelect || false, activeCodes, inputValues)
+              }
+            }
+
+            input.oninput = () => {
+              // 只允许数字、负号、±和小数点
+              let value = input.value
+
+              // 移除所有不允许的字符
+              value = value.replace(/[^\d.\-±]/g, '')
+
+              // 处理负号和±：只能出现在开头，且只能有一个
+              let prefix = ''
+              if (value.startsWith('±')) {
+                prefix = '±'
+                value = value.substring(1)
+              } else if (value.startsWith('-')) {
+                prefix = '-'
+                value = value.substring(1)
+              }
+              // 移除剩余的负号和±
+              value = value.replace(/[\-±]/g, '')
+
+              // 处理小数点：只能有一个
+              const parts = value.split('.')
+              if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('')
+              }
+
+              // 组合最终值
+              value = prefix + value
+
+              // 更新输入框值
+              if (input.value !== value) {
+                input.value = value
+              }
+              inputValues.set(inputKey, value)
+            }
+
+            // 将输入框存储到 inputElements Map
+            if (!inputElements.has(valueSet.code)) {
+              inputElements.set(valueSet.code, [])
+            }
+            inputElements.get(valueSet.code)!.push(input)
+
+            contentContainer.appendChild(input)
+            inputIndex++
+
+            // 添加单位文本
+            if (part.unit) {
+              const unitSpan = document.createElement('span')
+              unitSpan.textContent = part.unit
+              unitSpan.style.whiteSpace = 'nowrap'
+              unitSpan.style.marginRight = '2px'
+              contentContainer.appendChild(unitSpan)
+            }
           }
-        }
-
-        input.oninput = () => {
-          inputValues.set(valueSet.code, input.value)
-        }
-
-        contentContainer.appendChild(input)
-
-        const unitSpan = document.createElement('span')
-        unitSpan.textContent = unitMatch.unit
-        unitSpan.style.whiteSpace = 'nowrap'
-        contentContainer.appendChild(unitSpan)
+        })
 
         li.appendChild(contentContainer)
-
-        if (!inputElements.has(valueSet.code)) {
-          inputElements.set(valueSet.code, [])
-        }
-        inputElements.get(valueSet.code)!.push(input)
-
       } else {
         const textSpan = document.createElement('span')
         textSpan.textContent = valueSet.value
         textSpan.style.flex = '1'
-        textSpan.style.overflow = 'hidden'
-        textSpan.style.textOverflow = 'ellipsis'
-        textSpan.style.whiteSpace = 'nowrap'
+        textSpan.style.lineHeight = '1.8'
+        textSpan.style.wordBreak = 'break-word'
+        textSpan.style.whiteSpace = 'pre-wrap'
         li.appendChild(textSpan)
       }
 
@@ -658,12 +741,16 @@ export class CustomSelectControl implements IControlInstance {
           return
         }
 
-        const hasInput = inputElements.has(valueSet.code) && inputElements.get(valueSet.code)!.length > 0
-        if (hasInput) {
-          const inputs = inputElements.get(valueSet.code)!
-          inputs.forEach(input => input.blur())
-          this.hideHint(selectPopupContainer)
-        }
+        // 从 DOM 输入框读取最新值，确保数据同步
+        inputElements.forEach((inputs, code) => {
+          inputs.forEach((input, index) => {
+            const inputKey = `${code}_${index}`
+            inputValues.set(inputKey, input.value)
+          })
+        })
+
+        // 隐藏提示
+        this.hideHint(selectPopupContainer)
 
         let newCodes: string[]
         if (isMultiSelect) {
@@ -675,7 +762,8 @@ export class CustomSelectControl implements IControlInstance {
           }
           newCodes = Array.from(currentCodes)
         } else {
-          newCodes = activeCodes === valueSet.code ? [] : [valueSet.code]
+          // 单选时不允许清空，必须有选中值
+          newCodes = [valueSet.code]
         }
 
         this.setSelectWithInputValues(newCodes, inputValues)
@@ -761,33 +849,50 @@ export class CustomSelectControl implements IControlInstance {
     if (!Array.isArray(valueSets) || !valueSets.length) return
 
     const newCodesWithValues: string[] = []
+    let hasValueChanged = false
 
     for (const code of codes) {
       const valueSet = valueSets.find(v => v.code === code)
       if (!valueSet) continue
 
-      const inputValue = inputValues.get(code)
-      if (inputValue && inputValue.trim() !== '') {
-        const unitMatch = detectUnitPattern(valueSet.value)
-        if (unitMatch && unitMatch.hasPlaceholder) {
-          const newValue = unitMatch.prefix + inputValue.trim() + unitMatch.unit
-          const modifiedValueSet: IValueSet = {
-            code: code + '_custom',
-            value: newValue
+      const unitMatch = detectMultiUnitPattern(valueSet.value)
+      const originalValue = valueSet.value
+
+      if (unitMatch && unitMatch.parts.some(p => p.type === 'input')) {
+        // 构建新的值
+        let newValue = ''
+        let inputIndex = 0
+
+        unitMatch.parts.forEach((part) => {
+          if (part.type === 'text') {
+            newValue += part.text || ''
+          } else if (part.type === 'input') {
+            const inputKey = `${code}_${inputIndex}`
+            const inputValue = inputValues.get(inputKey)
+            newValue += (inputValue && inputValue.trim() !== '' ? inputValue.trim() : part.value || '')
+            newValue += part.unit || ''
+            inputIndex++
           }
-          if (!valueSets.find(v => v.code === modifiedValueSet.code)) {
-            valueSets.push(modifiedValueSet)
-          }
-          newCodesWithValues.push(modifiedValueSet.code)
-        } else {
-          newCodesWithValues.push(code)
+        })
+
+        // 直接更新原有选项的值
+        if (newValue !== originalValue) {
+          valueSet.value = newValue
+          hasValueChanged = true
         }
+        newCodesWithValues.push(code)
       } else {
         newCodesWithValues.push(code)
       }
     }
 
-    this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER))
+    // 如果值有变化，需要强制更新正文
+    if (hasValueChanged) {
+      // 调用 setSelect 并强制更新
+      this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER), {}, { isForceUpdate: true })
+    } else {
+      this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER))
+    }
   }
 
   public awake() {

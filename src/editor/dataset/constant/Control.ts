@@ -1,7 +1,7 @@
 import { IControlOption } from '../../interface/Control'
 
 export const defaultControlOption: Readonly<Required<IControlOption>> = {
-  placeholderColor: '#9c9b9b',
+  placeholderColor: '#2dbe7f',
   bracketColor: '#000000',
   prefix: '{',
   postfix: '}',

@@ -373,15 +373,31 @@ export function formatElementList(
         }
       }
       // 值
+      // 对于 CUSTOM_SELECT 和 MULTI_CUSTOM_SELECT：当 value 或 code 为 null 时，自动选择第一个选项
+      const shouldAutoSelectFirst =
+        (type === ControlType.CUSTOM_SELECT || type === ControlType.MULTI_CUSTOM_SELECT) &&
+        (value == null || code == null) &&
+        Array.isArray(valueSets) &&
+        valueSets.length > 0
       if (
         (value && value.length) ||
         type === ControlType.CHECKBOX ||
         type === ControlType.RADIO ||
         (type === ControlType.SELECT && code && (!value || !value.length)) ||
         (type === ControlType.CUSTOM_SELECT && code && (!value || !value.length)) ||
-        (type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length))
+        (type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length)) ||
+        shouldAutoSelectFirst
       ) {
-        let valueList: IElement[] = value ? deepClone(value) : []
+        // 处理 value 可能是字符串的情况，转换为 IElement[] 格式
+        let valueList: IElement[] = []
+        if (value) {
+          if (Array.isArray(value)) {
+            valueList = deepClone(value)
+          } else if (typeof value === 'string') {
+            // 字符串类型转换为 IElement 数组
+            valueList = [{ value }]
+          }
+        }
         if (type === ControlType.CHECKBOX) {
           const codeList = code ? code.split(',') : []
           if (Array.isArray(valueSets) && valueSets.length) {
@@ -482,13 +498,26 @@ export function formatElementList(
         } else {
           if (!value || !value.length) {
             if (Array.isArray(valueSets) && valueSets.length) {
-              const valueSet = valueSets.find(v => v.code === code)
-              if (valueSet) {
+              // 当 value 或 code 为 null 时，自动选择第一个选项
+              if (shouldAutoSelectFirst) {
+                const firstValueSet = valueSets[0]
                 valueList = [
                   {
-                    value: valueSet.value
+                    value: firstValueSet.value
                   }
                 ]
+                // 更新 control.code 为第一个选项的 code
+                el.control!.code = firstValueSet.code
+              } else if (code) {
+                // 根据 code 查找对应的值
+                const valueSet = valueSets.find(v => v.code === code)
+                if (valueSet) {
+                  valueList = [
+                    {
+                      value: valueSet.value
+                    }
+                  ]
+                }
               }
             }
           }
