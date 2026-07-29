@@ -530,11 +530,37 @@ export class SelectControl implements IControlInstance {
       lineHeight
     } = position
     const preY = this.control.getPreY()
-    selectPopupContainer.style.left = `${left}px`
-    selectPopupContainer.style.top = `${top + preY + lineHeight}px`
     // 追加至container
     const container = this.control.getContainer()
     container.append(selectPopupContainer)
+
+    // 边界检测：确保弹出框不超出编辑器容器
+    const popupRect = selectPopupContainer.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+
+    let finalLeft = left
+    let finalTop = top + preY + lineHeight
+
+    // 检查右边界
+    if (finalLeft + popupRect.width > containerRect.width) {
+      finalLeft = containerRect.width - popupRect.width - 10
+    }
+    // 检查左边界
+    if (finalLeft < 0) {
+      finalLeft = 10
+    }
+    // 检查下边界
+    if (finalTop + popupRect.height > containerRect.height) {
+      // 显示在上方
+      finalTop = top + preY - popupRect.height
+    }
+    // 检查上边界
+    if (finalTop < 0) {
+      finalTop = 10
+    }
+
+    selectPopupContainer.style.left = `${finalLeft}px`
+    selectPopupContainer.style.top = `${finalTop}px`
     this.selectDom = selectPopupContainer
     // 将激活项跳转到可视视野范围内
     if (activeSelectDom) {

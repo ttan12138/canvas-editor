@@ -1,5 +1,5 @@
 import { ImageDisplay } from '../../../dataset/enum/Common'
-import { EditorMode } from '../../../dataset/enum/Editor'
+import { ControlRenderMode, EditorMode } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
 import { MouseEventButton } from '../../../dataset/enum/Event'
 import { ControlComponent } from '../../../dataset/enum/Control'
@@ -7,6 +7,7 @@ import { ControlType } from '../../../dataset/enum/Control'
 import { IPreviewerDrawOption } from '../../../interface/Previewer'
 import { deepClone } from '../../../utils'
 import { isMod } from '../../../utils/hotkey'
+import { getElementIndexFromPositionListIndex } from '../../../utils/element'
 import { CheckboxControl } from '../../draw/control/checkbox/CheckboxControl'
 import { RadioControl } from '../../draw/control/radio/RadioControl'
 import { CanvasEvent } from '../CanvasEvent'
@@ -112,16 +113,24 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     tdValueIndex,
     hitLineStartIndex
   } = positionResult
+  const elementList = draw.getElementList()
+  const positionList = position.getPositionList()
+  const positionIndex = isTable ? tdValueIndex! : index
+  // 文本模式下 positionIndex 是 positionList 索引（跳过 PREFIX/POSTFIX/PLACEHOLDER）
+  // 需要映射到 elementList 索引才能正确访问元素
+  const controlRenderMode = draw.getControlRenderMode()
+  const isTextMode = controlRenderMode === ControlRenderMode.TEXT
+  const curIndex = isTextMode
+    ? getElementIndexFromPositionListIndex(elementList, positionIndex, true)
+    : positionIndex
   // 记录选区开始位置
+  // 使用 curIndex（elementList 索引）确保拖选时 range 操作正确
   host.mouseDownStartPosition = {
     ...positionResult,
-    index: isTable ? tdValueIndex! : index,
+    index: curIndex,
     x: evt.offsetX,
     y: evt.offsetY
   }
-  const elementList = draw.getElementList()
-  const positionList = position.getPositionList()
-  const curIndex = isTable ? tdValueIndex! : index
   const curElement = elementList[curIndex]
   // 绘制
   const isDirectHitImage = !!(isDirectHit && isImage)
@@ -146,7 +155,7 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
       }
     }
     rangeManager.setRange(startIndex, endIndex)
-    position.setCursorPosition(positionList[curIndex])
+    position.setCursorPosition(positionList[positionIndex])
     // 更新只读状态
     isReadonly = draw.isReadonly()
     // 复选框
@@ -212,7 +221,7 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     }
     previewer.drawResizer(
       curElement,
-      positionList[curIndex],
+      positionList[positionIndex],
       previewerDrawOption
     )
     // 光标事件代理丢失，重新定位
@@ -250,13 +259,13 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     if (isMod(evt)) {
       hyperlinkParticle.openHyperlink(curElement)
     } else {
-      hyperlinkParticle.drawHyperlinkPopup(curElement, positionList[curIndex])
+      hyperlinkParticle.drawHyperlinkPopup(curElement, positionList[positionIndex])
     }
   }
   // 日期控件
   const dateParticle = draw.getDateParticle()
   dateParticle.clearDatePicker()
   if (curElement.type === ElementType.DATE && !isReadonly) {
-    dateParticle.renderDatePicker(curElement, positionList[curIndex])
+    dateParticle.renderDatePicker(curElement, positionList[positionIndex])
   }
 }

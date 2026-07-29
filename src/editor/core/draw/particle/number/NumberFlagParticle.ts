@@ -1,3 +1,9 @@
+import { DeepRequired } from '../../../../interface/Common'
+import { IEditorOption } from '../../../../interface/Editor'
+import { IElement } from '../../../../interface/Element'
+// import { AssociationStateManager } from '../../control/association/AssociationStateManager'
+import { Draw } from '../../Draw'
+
 export enum ArrowDirection {
   UP = 'up',
   DOWN = 'down'
@@ -11,9 +17,20 @@ export interface INumberFlagRenderOption {
   value: number
   min?: number
   max?: number
+  element?: IElement
 }
 
 export class NumberFlagParticle {
+  private draw: Draw
+  private options: DeepRequired<IEditorOption>
+  // private stateManager: AssociationStateManager
+
+  constructor(draw: Draw) {
+    this.draw = draw
+    this.options = this.draw.getOptions()
+    // this.stateManager = AssociationStateManager.getInstance()
+  }
+
   public render(option: INumberFlagRenderOption) {
     const { ctx, x, y, height, value, min, max } = option
 
@@ -58,14 +75,14 @@ export class NumberFlagParticle {
     ctx.beginPath()
 
     if (direction === ArrowDirection.DOWN) {
-      ctx.strokeStyle = '#0000FF'
+      ctx.strokeStyle = this.options.control.lowNumberColor
       ctx.moveTo(x, y - shaftHeight / 2)
       ctx.lineTo(x, y + shaftHeight / 2)
       ctx.moveTo(x - headSize * Math.sin(headAngle), y + shaftHeight / 2 - headSize * Math.cos(headAngle))
       ctx.lineTo(x, y + shaftHeight / 2)
       ctx.lineTo(x + headSize * Math.sin(headAngle), y + shaftHeight / 2 - headSize * Math.cos(headAngle))
     } else {
-      ctx.strokeStyle = '#f56b34'
+      ctx.strokeStyle = this.options.control.highNumberColor
       ctx.moveTo(x, y + shaftHeight / 2)
       ctx.lineTo(x, y - shaftHeight / 2)
       ctx.moveTo(x - headSize * Math.sin(headAngle), y - shaftHeight / 2 + headSize * Math.cos(headAngle))
@@ -74,6 +91,7 @@ export class NumberFlagParticle {
     }
 
     ctx.stroke()
+
     ctx.restore()
   }
 }

@@ -16,6 +16,7 @@ import {
   LocationPosition
 } from './dataset/enum/Common'
 import { ElementType } from './dataset/enum/Element'
+import {ControlRenderMode} from './dataset/enum/Editor'
 import { formatElementList } from './utils/element'
 import { Register } from './core/register/Register'
 import { ContextMenu } from './core/contextmenu/ContextMenu'
@@ -191,6 +192,7 @@ export {
   VerticalAlign,
   EditorZone,
   EditorMode,
+  ControlRenderMode,
   ElementType,
   ControlType,
   EditorComponent,

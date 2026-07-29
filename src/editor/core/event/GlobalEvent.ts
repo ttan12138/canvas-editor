@@ -244,6 +244,48 @@ export class GlobalEvent {
   }
 
   private handleGlobalMousemove = (evt: MouseEvent) => {
+    // 处理选区拖拽：鼠标超出编辑器范围时仍能调整选区
+    if (this.canvasEvent.isAllowSelection && this.canvasEvent.mouseDownStartPosition) {
+      // console.log('GlobalEvent - 检测到选区拖拽状态')
+      const pageList = this.draw.getPageList()
+      const pageNo = this.draw.getPageNo()
+      const currentCanvas = pageList[pageNo]
+
+      // console.log('GlobalEvent - pageNo:', pageNo, 'currentCanvas:', currentCanvas)
+
+      if (!currentCanvas) {
+        // console.log('GlobalEvent - 无法获取当前canvas，返回')
+        return
+      }
+
+      const canvasRect = currentCanvas.getBoundingClientRect()
+      const mouseX = evt.clientX
+      const mouseY = evt.clientY
+
+      // console.log('GlobalEvent - mouseX:', mouseX, 'mouseY:', mouseY)
+      // console.log('GlobalEvent - canvasRect:', canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height)
+
+      // 计算相对于当前 canvas 的位置，限制在 canvas 范围内
+      const clampedX = Math.max(0, Math.min(canvasRect.width, mouseX - canvasRect.left))
+      const clampedY = Math.max(0, Math.min(canvasRect.height, mouseY - canvasRect.top))
+
+      // console.log('GlobalEvent - clampedX:', clampedX, 'clampedY:', clampedY)
+
+      // 构造模拟事件
+      const fakeEvent = {
+        offsetX: clampedX,
+        offsetY: clampedY,
+        target: currentCanvas,
+        preventDefault: () => {}
+      } as unknown as MouseEvent
+
+      // console.log('GlobalEvent - 调用 mousemove')
+
+      // 调用 mousemove 处理
+      this.canvasEvent.mousemove(fakeEvent)
+      return
+    }
+
     if (!this.canvasEvent.isAllowDrag) return
 
     const pageContainer = this.draw.getPageContainer()

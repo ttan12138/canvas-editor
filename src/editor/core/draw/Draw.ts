@@ -61,6 +61,7 @@ import { PageBreakParticle } from './particle/PageBreakParticle'
 import { Watermark } from './frame/Watermark'
 import { WatermarkLayer } from '../../dataset/enum/Watermark'
 import {
+  ControlRenderMode,
   EditorComponent,
   EditorMode,
   EditorZone,
@@ -116,6 +117,7 @@ import { WhiteSpaceParticle } from './particle/WhiteSpaceParticle'
 import { NumberFlagParticle } from './particle/number/NumberFlagParticle'
 import { CustomSelectParticle } from './particle/customSelect/CustomSelectParticle'
 import { MultiCustomSelectParticle } from './particle/multiCustomSelect/MultiCustomSelectParticle'
+import { LabelParticle as LabelControlParticle } from './particle/label/LabelParticle'
 import { MouseObserver } from '../observer/MouseObserver'
 import { LineNumber } from './frame/LineNumber'
 import { PageBorder } from './frame/PageBorder'
@@ -143,6 +145,7 @@ export class Draw {
   private listener: Listener
   private eventBus: EventBus<EventBusMap>
   private override: Override
+  private controlRenderMode: ControlRenderMode
 
   private i18n: I18n
   private canvasEvent: CanvasEvent
@@ -189,6 +192,7 @@ export class Draw {
   private numberFlagParticle: NumberFlagParticle
   private customSelectParticle: CustomSelectParticle
   private multiCustomSelectParticle: MultiCustomSelectParticle
+  private labelControlParticle: LabelControlParticle
   private control: Control
   private pageBorder: PageBorder
   private workerManager: WorkerManager
@@ -228,6 +232,7 @@ export class Draw {
     this.listener = listener
     this.eventBus = eventBus
     this.override = override
+    this.controlRenderMode = ControlRenderMode.CONTROL
 
     this._formatContainer()
     this.pageContainer = this._createPageContainer()
@@ -274,9 +279,10 @@ export class Draw {
     this.listParticle = new ListParticle(this)
     this.lineBreakParticle = new LineBreakParticle(this)
     this.whiteSpaceParticle = new WhiteSpaceParticle(this)
-    this.numberFlagParticle = new NumberFlagParticle()
-    this.customSelectParticle = new CustomSelectParticle()
-    this.multiCustomSelectParticle = new MultiCustomSelectParticle()
+    this.numberFlagParticle = new NumberFlagParticle(this)
+    this.customSelectParticle = new CustomSelectParticle(this)
+    this.multiCustomSelectParticle = new MultiCustomSelectParticle(this)
+    this.labelControlParticle = new LabelControlParticle(this)
     this.control = new Control(this)
     this.pageBorder = new PageBorder(this)
     this.graffiti = new Graffiti(this, data.graffiti)
@@ -432,6 +438,153 @@ export class Draw {
 
   public isGraffitiMode() {
     return this.mode === EditorMode.GRAFFITI
+  }
+
+  public getControlRenderMode(): ControlRenderMode {
+    return this.controlRenderMode
+  }
+
+  public setControlRenderMode(payload: ControlRenderMode) {
+    // 参数验证
+    if (
+      payload !== ControlRenderMode.CONTROL &&
+      payload !== ControlRenderMode.TEXT
+    ) {
+      console.warn('Invalid ControlRenderMode:', payload)
+      return
+    }
+    // 模式相同时不执行
+    if (this.controlRenderMode === payload) return
+
+    const targetMode = payload
+    this.controlRenderMode = targetMode
+
+    // 记录历史（双向恢复函数：undo/redo 均可正确切换）
+    this.historyManager.execute(() => {
+      // 在 undo 流程中，该函数被弹出到 redoStack，实际由上一个
+      // submitHistory 快照恢复模式（快照已包含 controlRenderMode）
+      // 在 redo 流程中，该函数直接执行，将模式恢复到 targetMode
+      this.controlRenderMode = targetMode
+      this.listener.controlRenderModeChange?.(targetMode)
+      this.render({
+        isSubmitHistory: false,
+        isSetCursor: false
+      })
+    })
+
+    // 触发回调
+    this.listener.controlRenderModeChange?.(targetMode)
+
+    // 重新渲染
+    this.render({
+      isSubmitHistory: false,
+      isSetCursor: false
+    })
+  }
+
+  /**
+   * 设置 LABEL 控件当前显示值（A 还是 B）
+   * @param id 控件 ID
+   * @param useValueA true=显示 valueA, false=显示 valueB
+   */
+  public setLabelValue(id: string, useValueA: boolean): boolean {
+    const elementList = this.elementList
+    const labelElements = this.scanLabelValueElements(elementList, id)
+    if (labelElements.length === 0) return false
+
+    for (const { element } of labelElements) {
+      const control = element.control!
+      const targetValue = useValueA ? control.valueA || '' : control.valueB || ''
+      element.value = targetValue
+      control.useValueA = useValueA
+    }
+
+    this.render({ isSubmitHistory: true })
+    return true
+  }
+
+  /**
+   * 获取所有 LABEL 类型的控件元素
+   * @returns 包含 LABEL 控件的元素列表
+   */
+  public getLabelControls(): IElement[] {
+    const result: IElement[] = []
+    const elementList = this.elementList
+    for (const element of elementList) {
+      if (
+        element.control?.type === ControlType.LABEL &&
+        element.controlComponent === ControlComponent.VALUE
+      ) {
+        result.push(element)
+      }
+    }
+    return result
+  }
+
+  /**
+   * 设置 LABEL 控件样式（不计入 history）
+   * @param id 控件 ID
+   * @param style 样式属性
+   */
+  public setLabelStyle(
+    id: string,
+    style: {
+      font?: string
+      size?: number
+      bold?: boolean
+      color?: string
+      italic?: boolean
+    }
+  ): boolean {
+    const elementList = this.elementList
+    const labelElements = this.scanLabelValueElements(elementList, id)
+    if (labelElements.length === 0) return false
+
+    for (const { element } of labelElements) {
+      const control = element.control!
+      // 同时更新 labelStyle（用于 LabelParticle 下划线渲染）
+      // 和 element 自身样式属性（用于 TextParticle 文本渲染）
+      control.labelStyle = { ...control.labelStyle, ...style }
+      if (style.font !== undefined) {
+        element.font = style.font
+      }
+      if (style.size !== undefined) {
+        element.size = style.size
+      }
+      if (style.bold !== undefined) {
+        element.bold = style.bold
+      }
+      if (style.color !== undefined) {
+        element.color = style.color
+      }
+      if (style.italic !== undefined) {
+        element.italic = style.italic
+      }
+    }
+
+    this.render({ isSubmitHistory: false })
+    return true
+  }
+
+  /**
+   * 扫描 elementList 中属于指定 ID 的 LABEL VALUE 元素
+   */
+  private scanLabelValueElements(
+    elementList: IElement[],
+    controlId: string
+  ): { element: IElement; index: number }[] {
+    const result: { element: IElement; index: number }[] = []
+    for (let i = 0; i < elementList.length; i++) {
+      const element = elementList[i]
+      if (
+        element.control?.type === ControlType.LABEL &&
+        element.controlComponent === ControlComponent.VALUE &&
+        element.controlId === controlId
+      ) {
+        result.push({ element, index: i })
+      }
+    }
+    return result
   }
 
   public getOriginalWidth(): number {
@@ -1873,6 +2026,16 @@ export class Draw {
           metrics.boundingBoxDescent += metrics.height / 2
         }
       }
+      // 文本模式下，PREFIX 和 POSTFIX 的宽度设置为0
+      if (
+        this.controlRenderMode === ControlRenderMode.TEXT &&
+        (element.controlComponent === ControlComponent.PREFIX ||
+          element.controlComponent === ControlComponent.POSTFIX)
+      ) {
+        metrics.width = 0
+        metrics.boundingBoxAscent = 0
+        metrics.boundingBoxDescent = 0
+      }
       const ascent =
         !element.hide &&
         ((element.imgDisplay !== ImageDisplay.INLINE &&
@@ -2173,13 +2336,43 @@ export class Draw {
     const highlightMarginHeight = this.getHighlightMarginHeight()
     for (let i = 0; i < rowList.length; i++) {
       const curRow = rowList[i]
+      // 文本模式下计算正确的 positionIndex
+      let positionIndex: number
+      if (this.controlRenderMode === ControlRenderMode.TEXT) {
+        // 在文本模式下，positionIndex 是 positionList 的数组索引
+        // 需要计算当前行之前有多少个非 PREFIX/POSTFIX 元素
+        positionIndex = 0
+        for (let r = 0; r < i; r++) {
+          const row = rowList[r]
+          for (let e = 0; e < row.elementList.length; e++) {
+            const el = row.elementList[e]
+            if (
+              el.controlComponent !== ControlComponent.PREFIX &&
+              el.controlComponent !== ControlComponent.POSTFIX
+            ) {
+              positionIndex++
+            }
+          }
+        }
+      } else {
+        // 控件模式下，positionIndex 等于 row.startIndex
+        positionIndex = curRow.startIndex
+      }
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const preElement = curRow.elementList[j - 1]
+        // 文本模式下跳过 PREFIX 和 POSTFIX
+        if (
+          this.controlRenderMode === ControlRenderMode.TEXT &&
+          (element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX)
+        ) {
+          continue
+        }
         // 高亮配置：元素 > 控件配置
         const highlight =
           element.highlight ||
-          this.control.getControlHighlight(elementList, curRow.startIndex + j)
+          this.control.getControlHighlight(elementList, positionIndex)
         if (highlight) {
           // 高亮元素相连需立即绘制，并记录下一元素坐标
           if (
@@ -2194,7 +2387,7 @@ export class Draw {
             coordinate: {
               leftTop: [x, y]
             }
-          } = positionList[curRow.startIndex + j]
+          } = positionList[positionIndex]
           // 元素向左偏移量
           const offsetX = element.left || 0
           this.highlight.recordFillInfo(
@@ -2209,6 +2402,7 @@ export class Draw {
           // 之前是高亮元素，当前不是需立即绘制
           this.highlight.render(ctx)
         }
+        positionIndex++
       }
       this.highlight.render(ctx)
     }
@@ -2249,18 +2443,49 @@ export class Draw {
         height: 0
       }
       let tableRangeElement: IElement | null = null
+      // 文本模式下计算正确的 positionIndex
+      let positionIndex: number
+      if (this.controlRenderMode === ControlRenderMode.TEXT) {
+        // 在文本模式下，positionIndex 是 positionList 的数组索引
+        // 需要计算当前行之前有多少个非 PREFIX/POSTFIX 元素
+        positionIndex = 0
+        for (let r = 0; r < i; r++) {
+          const row = rowList[r]
+          for (let e = 0; e < row.elementList.length; e++) {
+            const el = row.elementList[e]
+            if (
+              el.controlComponent !== ControlComponent.PREFIX &&
+              el.controlComponent !== ControlComponent.POSTFIX
+            ) {
+              positionIndex++
+            }
+          }
+        }
+      } else {
+        // 控件模式下，positionIndex 等于 row.startIndex
+        positionIndex = curRow.startIndex
+      }
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const metrics = element.metrics
+        // 元素绘制
+        // 纯文本模式下跳过控件前缀和后缀
+        if (
+          this.controlRenderMode === ControlRenderMode.TEXT &&
+          (element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX)
+        ) {
+          continue
+        }
         // 当前元素位置信息
         const {
           ascent: offsetY,
           coordinate: {
             leftTop: [x, y]
           }
-        } = positionList[curRow.startIndex + j]
+        } = positionList[positionIndex]
+        positionIndex++
         const preElement = curRow.elementList[j - 1]
-        // 元素绘制
         if (
           (element.hide || element.control?.hide || element.area?.hide) &&
           !this.isDesignMode()
@@ -2322,25 +2547,31 @@ export class Draw {
           element.controlComponent === ControlComponent.CHECKBOX
         ) {
           this.textParticle.complete()
-          this.checkboxParticle.render({
-            ctx,
-            x,
-            y: y + offsetY,
-            index: j,
-            row: curRow
-          })
+          // 纯文本模式下跳过控件UI元素渲染
+          if (this.controlRenderMode === ControlRenderMode.CONTROL) {
+            this.checkboxParticle.render({
+              ctx,
+              x,
+              y: y + offsetY,
+              index: j,
+              row: curRow
+            })
+          }
         } else if (
           element.type === ElementType.RADIO ||
           element.controlComponent === ControlComponent.RADIO
         ) {
           this.textParticle.complete()
-          this.radioParticle.render({
-            ctx,
-            x,
-            y: y + offsetY,
-            index: j,
-            row: curRow
-          })
+          // 纯文本模式下跳过控件UI元素渲染
+          if (this.controlRenderMode === ControlRenderMode.CONTROL) {
+            this.radioParticle.render({
+              ctx,
+              x,
+              y: y + offsetY,
+              index: j,
+              row: curRow
+            })
+          }
         } else if (element.type === ElementType.TAB) {
           this.textParticle.complete()
         } else if (
@@ -2376,7 +2607,8 @@ export class Draw {
         // NUMBER_FLAG控件箭头绘制
         if (
           element.controlComponent === ControlComponent.POSTFIX &&
-          element.control?.type === ControlType.NUMBER_FLAG
+          element.control?.type === ControlType.NUMBER_FLAG &&
+          this.controlRenderMode === ControlRenderMode.CONTROL
         ) {
           this.textParticle.complete()
           const control = element.control
@@ -2410,14 +2642,16 @@ export class Draw {
               height: arrowHeight,
               value: numericValue,
               min,
-              max
+              max,
+              element
             })
           }
         }
         // CUSTOM_SELECT控件下拉箭头绘制
         if (
           element.controlComponent === ControlComponent.POSTFIX &&
-          element.control?.type === ControlType.CUSTOM_SELECT
+          element.control?.type === ControlType.CUSTOM_SELECT &&
+          this.controlRenderMode === ControlRenderMode.CONTROL
         ) {
           this.textParticle.complete()
           this.customSelectParticle.render({
@@ -2431,10 +2665,25 @@ export class Draw {
         // MULTI_CUSTOM_SELECT控件下拉箭头绘制
         if (
           element.controlComponent === ControlComponent.POSTFIX &&
-          element.control?.type === ControlType.MULTI_CUSTOM_SELECT
+          element.control?.type === ControlType.MULTI_CUSTOM_SELECT &&
+          this.controlRenderMode === ControlRenderMode.CONTROL
         ) {
           this.textParticle.complete()
           this.multiCustomSelectParticle.render({
+            ctx,
+            x,
+            y,
+            row: curRow,
+            index: j
+          })
+        }
+        // LABEL 控件渲染（TEXT 模式下绘制下划线）
+        if (
+          element.controlComponent === ControlComponent.VALUE &&
+          element.control?.type === ControlType.LABEL
+        ) {
+          this.textParticle.complete()
+          this.labelControlParticle.render({
             ctx,
             x,
             y,
@@ -2501,10 +2750,19 @@ export class Draw {
           if (element.type === ElementType.SUBSCRIPT) {
             offsetY = this.subscriptParticle.getOffsetY(element)
           }
+          // 检查是否是联动控件且正在被聚焦
+          const associationId = element.control?.associationId
+          const isAssociationFocused = associationId && this.control.isAssociationFocused(associationId)
           // 占位符不参与颜色计算
-          const color = element.control?.underline
-            ? this.options.underlineColor
-            : element.color
+          let color: string | undefined
+          // 联动状态优先级最高
+          if (isAssociationFocused) {
+            color = this.options.control.selectValueColor
+          } else if (element.control?.underline) {
+            color = this.options.underlineColor
+          } else {
+            color = element.color
+          }
           this.underline.recordFillInfo(
             ctx,
             x - offsetX,
@@ -3006,6 +3264,18 @@ export class Draw {
   public setCursor(curIndex: number | undefined) {
     const positionContext = this.position.getPositionContext()
     const positionList = this.position.getPositionList()
+    const isTextMode = this.controlRenderMode === ControlRenderMode.TEXT
+
+    // 调试日志：记录光标设置前的索引信息
+    if (isTextMode && curIndex !== undefined) {
+      console.log('[setCursor Before]', {
+        curIndex,
+        positionListLength: positionList.length,
+        'curIndex < positionList.length': curIndex < positionList.length,
+        'positionList[curIndex]': positionList[curIndex]?.value
+      })
+    }
+
     if (positionContext.isTable) {
       const { index, trIndex, tdIndex } = positionContext
       const elementList = this.getOriginalElementList()
@@ -3017,8 +3287,18 @@ export class Draw {
       const tablePosition = tablePositionList?.[curIndex!]
       this.position.setCursorPosition(tablePosition || null)
     } else {
+      // 在文本模式下，需要将 elementList 的索引映射到 positionList 的索引
+      let actualCurIndex = curIndex
+      if (isTextMode && curIndex !== undefined) {
+        actualCurIndex = this.getActualPositionIndex(curIndex)
+        console.log('[setCursor After Mapping]', {
+          originalCurIndex: curIndex,
+          actualCurIndex,
+          'positionList[actualCurIndex]': positionList[actualCurIndex]?.value
+        })
+      }
       this.position.setCursorPosition(
-        curIndex !== undefined ? positionList[curIndex] : null
+        actualCurIndex !== undefined ? positionList[actualCurIndex] : null
       )
     }
     // 定位到图片元素并且位置发生变化
@@ -3042,6 +3322,33 @@ export class Draw {
     return curIndex
   }
 
+  /**
+   * 在文本模式下，将 elementList 的索引映射到 positionList 的索引
+   * 因为 positionList 跳过了 PREFIX/POSTFIX 元素
+   */
+  private getActualPositionIndex(elementListIndex: number): number {
+    const elementList = this.getElementList()
+    const positionList = this.position.getPositionList()
+
+    let positionIndex = 0
+    for (let i = 0; i < elementList.length; i++) {
+      const element = elementList[i]
+      // 只计算非 PREFIX/POSTFIX 元素
+      if (
+        element.controlComponent !== ControlComponent.PREFIX &&
+        element.controlComponent !== ControlComponent.POSTFIX
+      ) {
+        if (i === elementListIndex) {
+          return positionIndex
+        }
+        positionIndex++
+      }
+    }
+
+    // 如果找不到，返回最后一个有效的索引
+    return positionList.length - 1
+  }
+
   public submitHistory(curIndex: number | undefined) {
     const positionContext = this.position.getPositionContext()
     const oldElementList = getSlimCloneElementList(this.elementList)
@@ -3055,9 +3362,11 @@ export class Draw {
     const pageNo = this.pageNo
     const oldPositionContext = deepClone(positionContext)
     const zone = this.zone.getZone()
+    const oldControlRenderMode = this.controlRenderMode
     this.historyManager.execute(() => {
       this.zone.setZone(zone)
       this.setPageNo(pageNo)
+      this.controlRenderMode = oldControlRenderMode
       this.position.setPositionContext(deepClone(oldPositionContext))
       this.header.setElementList(deepClone(oldHeaderElementList))
       this.footer.setElementList(deepClone(oldFooterElementList))

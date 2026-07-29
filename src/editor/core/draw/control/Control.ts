@@ -63,6 +63,8 @@ import { NumberControl } from './number/NumberControl'
 import { NumberFlagControl } from './number/NumberFlagControl'
 import { CustomSelectControl } from './customSelect/CustomSelectControl'
 import { MultiCustomSelectControl } from './multiCustomSelect/MultiCustomSelectControl'
+import { LabelControl } from './label/LabelControl'
+import { AssociationStateManager } from './association/AssociationStateManager'
 
 import { MoveDirection } from '../../../dataset/enum/Observer'
 import {
@@ -91,6 +93,7 @@ export class Control {
   private activeControl: IControlInstance | null
   private activeControlValue: IElement[]
   private preElement: IElement | null
+  private stateManager: AssociationStateManager
 
   constructor(draw: Draw) {
     this.controlBorder = new ControlBorder(draw)
@@ -100,6 +103,7 @@ export class Control {
     this.listener = draw.getListener()
     this.eventBus = draw.getEventBus()
     this.controlSearch = new ControlSearch(this)
+    this.stateManager = AssociationStateManager.getInstance()
 
     this.options = draw.getOptions()
     this.controlOptions = this.options.control
@@ -568,6 +572,8 @@ export class Control {
       const multiCustomSelectControl = new MultiCustomSelectControl(element, this)
       this.activeControl = multiCustomSelectControl
       multiCustomSelectControl.awake()
+    } else if (control.type === ControlType.LABEL) {
+      this.activeControl = new LabelControl(element, this)
     }
     // 缓存控件数据
     this.updateActiveControlValue()
@@ -1037,7 +1043,8 @@ export class Control {
             (type === ControlType.TEXT ||
               type === ControlType.DATE ||
               type === ControlType.NUMBER ||
-              type === ControlType.NUMBER_FLAG) &&
+              type === ControlType.NUMBER_FLAG ||
+              type === ControlType.LABEL) &&
             nextElement.controlComponent === ControlComponent.VALUE
           ) {
             textControlValue += nextElement.value
@@ -1051,7 +1058,8 @@ export class Control {
           type === ControlType.TEXT ||
           type === ControlType.DATE ||
           type === ControlType.NUMBER ||
-          type === ControlType.NUMBER_FLAG
+          type === ControlType.NUMBER_FLAG ||
+          type === ControlType.LABEL
         ) {
           result.push({
             ...element.control,
@@ -1163,7 +1171,7 @@ export class Control {
           isIgnoreDisabledRule: true,
           isIgnoreDeletedRule: true
         }
-        if (type === ControlType.TEXT) {
+        if (type === ControlType.TEXT || type === ControlType.LABEL) {
           const formatValue = Array.isArray(value)
             ? value
             : value
@@ -1406,7 +1414,6 @@ export class Control {
           }
           // 同步 valueSets（包含输入值）
           if (valueSets && element.control && 'valueSets' in element.control) {
-            console.log('syncAssociationValue - 同步 valueSets 到联动控件:', valueSets)
             element.control.valueSets = JSON.parse(JSON.stringify(valueSets))
           }
           if (strValue) {
@@ -1418,14 +1425,32 @@ export class Control {
         } else if (controlType === ControlType.NUMBER_FLAG) {
           const numberControl = new NumberFlagControl(element, this)
           this.activeControl = numberControl
-          const valueStr = String(value)
-          const data: IElement[] = valueStr.split('').map(char => ({
-            type: ElementType.TEXT,
-            value: char,
-            controlComponent: ControlComponent.VALUE
-          }))
-          numberControl.setValue(data, controlContext, controlRule)
+          // 处理空值或无效值
+          if (value === '' || value === null || value === undefined) {
+            numberControl.clearValue(controlContext, controlRule)
+          } else {
+            const valueStr = String(value)
+            const data: IElement[] = valueStr.split('').map(char => ({
+              type: ElementType.TEXT,
+              value: char,
+              controlComponent: ControlComponent.VALUE
+            }))
+            numberControl.setValue(data, controlContext, controlRule)
+          }
           this.activeControl = null
+        } else if (controlType === ControlType.LABEL) {
+          // LABEL 控件：仅更新存储值（valueA/valueB）
+          // useValueA 变化时同步 element.value
+          const labelProps = value as any
+          if (labelProps.valueA !== undefined) {
+            element.control!.valueA = labelProps.valueA
+          }
+          if (labelProps.valueB !== undefined) {
+            element.control!.valueB = labelProps.valueB
+          }
+          if (labelProps.useValueA !== undefined) {
+            element.control!.useValueA = labelProps.useValueA
+          }
         }
         let newEndIndex = i
         while (newEndIndex < elementList.length) {
@@ -1455,6 +1480,10 @@ export class Control {
         isSetCursor: false
       })
     }
+  }
+
+  public isAssociationFocused(associationId: string): boolean {
+    return this.stateManager.isFocused(associationId)
   }
 
   public setExtensionListById(payload: ISetControlExtensionOption[]) {
@@ -1973,5 +2002,77 @@ export class Control {
       rowElement.left = left - controlFirstElementLeft
       row.width += left - controlFirstElementLeft
     }
+  }
+
+  /**
+   * 根据控件Id设置LABEL控件使用值A还是值B
+   */
+  public setLabelUseValueA(conceptId: string, useValueA: boolean, isSubmitHistory: boolean = true) {
+    const elementList = this.getElementList()
+    for (const element of elementList) {
+      if (element.control?.type === ControlType.LABEL && element.control.conceptId === conceptId) {
+        element.control.useValueA = useValueA
+        element.value = useValueA ? (element.control.valueA || '') : (element.control.valueB || '')
+      }
+    }
+    this.repaintControl({ isSubmitHistory, isCompute: true, isSetCursor: false })
+  }
+
+  /**
+   * 获取所有的LABEL控件
+   */
+  public getLabelControls(): Array<{
+    conceptId: string;
+    element: IElement;
+    value: string;
+    isValueA: boolean;
+  }> {
+    const elementList = this.getElementList()
+    const labels: Array<{
+      conceptId: string;
+      element: IElement;
+      value: string;
+      isValueA: boolean;
+    }> = []
+
+    for (const element of elementList) {
+      if (element.control?.type === ControlType.LABEL) {
+        const control = element.control
+        const isValueA = control.useValueA !== false
+        labels.push({
+          conceptId: control.conceptId || '',
+          element,
+          value: isValueA ? (control.valueA || '') : (control.valueB || ''),
+          isValueA
+        })
+      }
+    }
+    return labels
+  }
+
+  /**
+   * 根据Id设置LABEL控件样式
+   */
+  public setLabelStyle(
+    conceptId: string,
+    style: {
+      font?: string;
+      size?: number;
+      bold?: boolean;
+      color?: string;
+      italic?: boolean;
+    }
+  ) {
+    const elementList = this.getElementList()
+    for (const element of elementList) {
+      if (element.control?.type === ControlType.LABEL && element.control.conceptId === conceptId) {
+        if (!element.control.labelStyle) {
+          element.control.labelStyle = {}
+        }
+        Object.assign(element.control.labelStyle, style)
+      }
+    }
+    // 样式更改不提交历史记录
+    this.repaintControl({ isSubmitHistory: false, isCompute: true, isSetCursor: false })
   }
 }

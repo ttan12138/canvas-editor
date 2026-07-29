@@ -14,6 +14,7 @@ import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
 import { ImageDisplay, LocationPosition } from '../../dataset/enum/Common'
 import { ControlComponent } from '../../dataset/enum/Control'
 import {
+  ControlRenderMode,
   EditorMode,
   EditorZone,
   PageMode,
@@ -37,7 +38,9 @@ import {
   ISetControlExtensionOption,
   ISetControlHighlightOption,
   ISetControlProperties,
-  ISetControlValueOption
+  ISetControlValueOption,
+  ISetLabelStyleOption,
+  ISetLabelValueOption
 } from '../../interface/Control'
 import {
   IAppendElementListOption,
@@ -137,6 +140,7 @@ import {
 import { IAreaBadge, IBadge } from '../../interface/Badge'
 import { IRichtextOption } from '../../interface/Command'
 import { WatermarkType } from '../../dataset/enum/Watermark'
+import { Convert, IConvertToControlOption } from './Convert'
 
 export class CommandAdapt {
   private draw: Draw
@@ -151,6 +155,7 @@ export class CommandAdapt {
   private i18n: I18n
   private zone: Zone
   private tableOperate: TableOperate
+  private convert: Convert
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -165,6 +170,7 @@ export class CommandAdapt {
     this.i18n = draw.getI18n()
     this.zone = draw.getZone()
     this.tableOperate = draw.getTableOperate()
+    this.convert = new Convert(draw)
   }
 
   public mode(payload: EditorMode) {
@@ -2347,6 +2353,18 @@ export class CommandAdapt {
     return this.draw.getControl().getList()
   }
 
+  public setLabelValue(payload: ISetLabelValueOption) {
+    return this.draw.setLabelValue(payload.id, payload.useValueA)
+  }
+
+  public getLabelControls(): IElement[] {
+    return this.draw.getLabelControls()
+  }
+
+  public setLabelStyle(payload: ISetLabelStyleOption) {
+    return this.draw.setLabelStyle(payload.id, payload.style)
+  }
+
   public locationControl(controlId: string, options?: ILocationControlOption) {
     function location(
       elementList: IElement[],
@@ -2760,5 +2778,25 @@ export class CommandAdapt {
         isSubmitHistory: false
       })
     }
+  }
+
+  // 设置控件渲染模式
+  public setControlRenderMode(payload: ControlRenderMode) {
+    this.draw.setControlRenderMode(payload)
+  }
+
+  // 获取控件渲染模式
+  public getControlRenderMode(): ControlRenderMode {
+    return this.draw.getControlRenderMode()
+  }
+
+  // 将所有控件转换为纯文本
+  public convertToText() {
+    this.convert.convertToText()
+  }
+
+  // 将纯文本识别并转换为控件
+  public convertToControl(options?: IConvertToControlOption) {
+    this.convert.convertToControl(options)
   }
 }

@@ -8,7 +8,7 @@ import {
   TEXTLIKE_ELEMENT_TYPE
 } from '../../../../dataset/constant/Element'
 import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
-import { EditorComponent } from '../../../../dataset/enum/Editor'
+import { ControlRenderMode, EditorComponent } from '../../../../dataset/enum/Editor'
 import { ElementType } from '../../../../dataset/enum/Element'
 import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import { DeepRequired } from '../../../../interface/Common'
@@ -32,6 +32,9 @@ import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
 import { AssociationStateManager } from '../association/AssociationStateManager'
+function hex16toRgba(hex: string, alpha: number = 1): string {
+  return `rgba(${hex.slice(1, 3)}, ${hex.slice(3, 5)}, ${hex.slice(5, 7)}, ${hex.slice(7, 16)}, ${alpha})`
+}
 
 export class CustomSelectControl implements IControlInstance {
   private draw: Draw
@@ -204,7 +207,7 @@ export class CustomSelectControl implements IControlInstance {
         ...anchorElement,
         ...data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#4a9aff'
+        color: this.options.control.selectValueColor
       }
       formatElementContext(elementList, [newElement], startIndex, {
         editorOptions: this.options
@@ -461,7 +464,7 @@ export class CustomSelectControl implements IControlInstance {
         type: ElementType.TEXT,
         value: data[i],
         controlComponent: ControlComponent.VALUE,
-        color: '#4a9aff'
+        color: this.options.control.selectValueColor
       }
       formatElementContext(elementList, [newElement], prefixIndex, {
         editorOptions: this.options
@@ -572,6 +575,10 @@ export class CustomSelectControl implements IControlInstance {
       li.style.minHeight = '32px'
       li.style.lineHeight = '1.5'
       li.style.position = 'relative'
+      li.style.flexWrap = 'wrap'
+      li.style.wordBreak = 'break-word'
+      li.style.overflowWrap = 'break-word'
+      li.style.height = 'auto'
 
       const isSelected = isMultiSelect
         ? (activeCodes as Set<string>).has(valueSet.code)
@@ -600,23 +607,25 @@ export class CustomSelectControl implements IControlInstance {
             // 文本部分
             const textSpan = document.createElement('span')
             textSpan.textContent = part.text || ''
-            textSpan.style.whiteSpace = 'nowrap'
+            textSpan.style.whiteSpace = 'pre-wrap'
+            textSpan.style.wordBreak = 'break-word'
             textSpan.style.marginRight = '2px'
             contentContainer.appendChild(textSpan)
           } else if (part.type === 'input') {
             // 输入框部分
             const input = document.createElement('input')
             input.type = 'text'
-            input.style.width = '60px'
+            input.style.width = 'auto'
+            input.style.minWidth = '60px'
             input.style.height = '24px'
-            input.style.border = '1px solid #409EFF'
-            input.style.borderRadius = '3px'
+            input.style.borderWidth = '0 0 1px 0'
+            input.style.borderRadius = '0px'
             input.style.padding = '0 6px'
             input.style.fontSize = '14px'
             input.style.margin = '0 2px'
             input.style.outline = 'none'
             input.style.textAlign = 'center'
-            input.style.background = '#F0F7FF'
+            input.style.borderBottom = `1px solid #000000`
 
             // 获取初始值
             const inputKey = `${valueSet.code}_${inputIndex}`
@@ -628,13 +637,13 @@ export class CustomSelectControl implements IControlInstance {
             input.placeholder = '请输入数值'
 
             input.onfocus = () => {
-              input.style.borderColor = '#67C23A'
-              input.style.boxShadow = '0 0 0 2px rgba(103, 194, 58, 0.2)'
+              input.style.borderColor = `${this.options.control.selectValueColor}`
+              input.style.boxShadow = `0 0 0 2px ${hex16toRgba(this.options.control.selectValueColor, 0.2)}`
               this.showHint(selectPopupContainer)
             }
 
             input.onblur = () => {
-              input.style.borderColor = '#409EFF'
+              input.style.borderColor = '#000000'
               input.style.boxShadow = 'none'
             }
 
@@ -695,6 +704,9 @@ export class CustomSelectControl implements IControlInstance {
                 input.value = value
               }
               inputValues.set(inputKey, value)
+
+              // 动态调整 input 宽度
+              this.adjustInputWidth(input)
             }
 
             // 将输入框存储到 inputElements Map
@@ -704,13 +716,18 @@ export class CustomSelectControl implements IControlInstance {
             inputElements.get(valueSet.code)!.push(input)
 
             contentContainer.appendChild(input)
+
+            // 初始化 input 宽度
+            this.adjustInputWidth(input)
+
             inputIndex++
 
             // 添加单位文本
             if (part.unit) {
               const unitSpan = document.createElement('span')
               unitSpan.textContent = part.unit
-              unitSpan.style.whiteSpace = 'nowrap'
+              unitSpan.style.whiteSpace = 'pre-wrap'
+              unitSpan.style.wordBreak = 'break-word'
               unitSpan.style.marginRight = '2px'
               contentContainer.appendChild(unitSpan)
             }
@@ -781,8 +798,6 @@ export class CustomSelectControl implements IControlInstance {
       lineHeight
     } = position
     const preY = this.control.getPreY()
-    selectPopupContainer.style.left = `${left}px`
-    selectPopupContainer.style.top = `${top + preY + lineHeight}px`
     selectPopupContainer.style.zIndex = '1000'
     selectPopupContainer.style.backgroundColor = '#fff'
     selectPopupContainer.style.border = '1px solid #E4E7ED'
@@ -791,6 +806,34 @@ export class CustomSelectControl implements IControlInstance {
 
     const container = this.control.getContainer()
     container.append(selectPopupContainer)
+
+    // 边界检测：确保弹出框不超出编辑器容器
+    const popupRect = selectPopupContainer.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+
+    let finalLeft = left
+    let finalTop = top + preY + lineHeight
+
+    // 检查右边界
+    if (finalLeft + popupRect.width > containerRect.width) {
+      finalLeft = containerRect.width - popupRect.width - 10
+    }
+    // 检查左边界
+    if (finalLeft < 0) {
+      finalLeft = 10
+    }
+    // 检查下边界
+    if (finalTop + popupRect.height > containerRect.height) {
+      // 显示在上方
+      finalTop = top + preY - popupRect.height
+    }
+    // 检查上边界
+    if (finalTop < 0) {
+      finalTop = 10
+    }
+
+    selectPopupContainer.style.left = `${finalLeft}px`
+    selectPopupContainer.style.top = `${finalTop}px`
     this.selectDom = selectPopupContainer
   }
 
@@ -825,6 +868,25 @@ export class CustomSelectControl implements IControlInstance {
     const nextIndex = (currentIndex + 1) % inputs.length
     inputs[nextIndex].focus()
     inputs[nextIndex].select()
+  }
+
+  private adjustInputWidth(input: HTMLInputElement): void {
+    // 创建临时 span 测量文本宽度
+    const span = document.createElement('span')
+    span.style.fontSize = input.style.fontSize
+    span.style.fontFamily = input.style.fontFamily || 'inherit'
+    span.style.padding = input.style.padding
+    span.style.visibility = 'hidden'
+    span.style.position = 'absolute'
+    span.style.whiteSpace = 'pre'
+    span.textContent = input.value || input.placeholder
+    document.body.appendChild(span)
+
+    // 计算宽度（最小 60px，根据内容调整）
+    const width = Math.max(60, span.offsetWidth + 20)
+    input.style.width = `${width}px`
+
+    document.body.removeChild(span)
   }
 
   private handleEnterSelect(code: string, isMultiSelect: boolean, activeCodes: Set<string> | string, inputValues: Map<string, string>): void {
@@ -896,6 +958,10 @@ export class CustomSelectControl implements IControlInstance {
   }
 
   public awake() {
+    // 纯文本模式下不显示下拉列表
+    if (this.draw.getControlRenderMode() === ControlRenderMode.TEXT) {
+      return
+    }
     if (
       this.control.getIsDisabledControl() ||
       !this.control.getIsRangeWithinControl()

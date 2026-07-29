@@ -16,6 +16,7 @@ export class AssociationStateManager {
   private static instance: AssociationStateManager
   private associationStates: Map<string, { value: string | number; controlType: ControlType; multiSelectDelimiter?: string; valueSets?: IValueSet[] }> = new Map()
   private syncingAssociationId: string | null = null
+  private focusedAssociationId: string | null = null
   private editorDraws: Set<Draw> = new Set()
 
   private constructor() {}
@@ -34,6 +35,18 @@ export class AssociationStateManager {
 
   public unregisterEditor(draw: Draw): void {
     this.editorDraws.delete(draw)
+  }
+
+  public setFocusedAssociation(associationId: string | null): void {
+    this.focusedAssociationId = associationId
+  }
+
+  public getFocusedAssociation(): string | null {
+    return this.focusedAssociationId
+  }
+
+  public isFocused(associationId: string): boolean {
+    return this.focusedAssociationId === associationId
   }
 
   public getCurrentValue(associationId: string): string | number | undefined {

@@ -1,8 +1,10 @@
 import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
+import { DeepRequired } from '../../../../interface/Common'
+import { IEditorOption } from '../../../../interface/Editor'
 import { IElement } from '../../../../interface/Element'
 import { IRow } from '../../../../interface/Row'
-// import { Draw } from '../../Draw'
 import { AssociationStateManager } from '../../control/association/AssociationStateManager'
+import { Draw } from '../../Draw'
 
 export interface ICustomSelectSvgConfig {
   size?: number
@@ -21,9 +23,13 @@ export interface ICustomSelectParticleRenderOption {
 }
 
 export class CustomSelectParticle {
+  private draw: Draw
+  private options: DeepRequired<IEditorOption>
   private stateManager: AssociationStateManager
 
-  constructor() {
+  constructor(draw: Draw) {
+    this.draw = draw
+    this.options = this.draw.getOptions()
     this.stateManager = AssociationStateManager.getInstance()
   }
 
@@ -66,7 +72,7 @@ export class CustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = '#4a9aff'
+      ctx.fillStyle = this.options.control.selectValueColor
       ctx.fill()
 
       ctx.fillStyle = 'white'
@@ -84,7 +90,7 @@ export class CustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = '#4a9aff'
+      ctx.fillStyle = this.options.control.selectValueColor
       ctx.fill()
 
       ctx.fillStyle = 'white'

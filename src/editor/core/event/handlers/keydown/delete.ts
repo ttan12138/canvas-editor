@@ -1,8 +1,18 @@
+import { ControlComponent } from '../../../../dataset/enum/Control'
+import { ControlRenderMode } from '../../../../dataset/enum/Editor'
+import { LocationPosition } from '../../../../dataset/enum/Common'
+import { getNonHideElementIndex, getElementIndexFromPositionListIndex, removeControlIfEmpty } from '../../../../utils/element'
 import { CanvasEvent } from '../../CanvasEvent'
 
-// 删除光后前隐藏元素
+// 删除光标后隐藏元素
 function deleteHideElement(host: CanvasEvent) {
   const draw = host.getDraw()
+  // 文本模式下不删除整个控件
+  const controlRenderMode = draw.getControlRenderMode()
+  if (controlRenderMode === ControlRenderMode.TEXT) {
+    return
+  }
+
   const rangeManager = draw.getRange()
   const range = rangeManager.getRange()
   // 光标所在位置为隐藏元素时触发循环删除
@@ -70,39 +80,144 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
     curIndex = isDeleted ? 0 : null
   } else if (control.getActiveControl() && control.getIsRangeWithinControl()) {
     // 光标在控件内
-    curIndex = control.keydown(evt)
-    if (curIndex) {
-      control.emitControlContentChange()
+    // 文本模式下，如果光标在控件的值边界，不调用控件的删除逻辑
+    if (draw.getControlRenderMode() === ControlRenderMode.TEXT) {
+      // 执行普通文本删除
+      const position = draw.getPosition()
+      const cursorPosition = position.getCursorPosition()
+      if (!cursorPosition) return
+      const elementList = draw.getElementList()
+      const positionList = position.getPositionList()
+      // cursorPosition 是 positionList 中的引用，找到其在 positionList 中的索引
+      const positionListIndex = positionList.indexOf(cursorPosition)
+      if (positionListIndex === -1) return
+      // 将 positionList 索引映射到 elementList 索引
+      const elementIndex = getElementIndexFromPositionListIndex(
+        elementList,
+        positionListIndex,
+        true
+      )
+      const nextElement = elementList[elementIndex + 1]
+
+      // 检查是否需要跳过 PREFIX/POSTFIX/PLACEHOLDER
+      if (
+        nextElement?.controlComponent === ControlComponent.PREFIX ||
+        nextElement?.controlComponent === ControlComponent.POSTFIX ||
+        nextElement?.controlComponent === ControlComponent.PLACEHOLDER
+      ) {
+        // 跳过这些元素，不删除
+        return
+      }
+
+      // 删除下一个元素
+      if (!elementList[elementIndex + 1]) return
+      const deletedControlId = nextElement?.controlId
+      draw.spliceElementList(elementList, elementIndex + 1, 1)
+
+      // 检查删除后控件是否为空，若为空则移除整个控件（PREFIX/POSTFIX/PLACEHOLDER）
+      if (deletedControlId) {
+        const removedStart = removeControlIfEmpty(
+          elementList,
+          deletedControlId,
+          (list, start, count) => draw.spliceElementList(list, start, count)
+        )
+        curIndex = removedStart !== null ? removedStart - 1 : elementIndex
+      } else {
+        curIndex = elementIndex
+      }
+    } else {
+      // 控件模式下调用控件的删除逻辑
+      curIndex = control.keydown(evt)
+      if (curIndex) {
+        control.emitControlContentChange()
+      }
     }
   } else if (elementList[endIndex + 1]?.controlId) {
     // 光标在控件前
-    curIndex = control.removeControl(endIndex + 1)
-  } else {
-    // 普通元素
-    const position = draw.getPosition()
-    const cursorPosition = position.getCursorPosition()
-    if (!cursorPosition) return
-    const { index } = cursorPosition
-    // 命中图片直接删除
-    const positionContext = position.getPositionContext()
-    if (positionContext.isDirectHit && positionContext.isImage) {
-      draw.spliceElementList(elementList, index, 1)
-      curIndex = index - 1
-    } else {
+    const controlRenderMode = draw.getControlRenderMode()
+    if (controlRenderMode === ControlRenderMode.TEXT) {
+      // 文本模式下只删除一个字符，不删除整个控件
+      const position = draw.getPosition()
+      const cursorPosition = position.getCursorPosition()
+      if (!cursorPosition) return
+      const positionList = position.getPositionList()
+      // cursorPosition 是 positionList 中的引用，找到其在 positionList 中的索引
+      const positionListIndex = positionList.indexOf(cursorPosition)
+      if (positionListIndex === -1) return
+      // 将 positionList 索引映射到 elementList 索引
+      const elementIndex = getElementIndexFromPositionListIndex(
+        elementList,
+        positionListIndex,
+        true
+      )
       const isCollapsed = rangeManager.getIsCollapsed()
+
       if (!isCollapsed) {
-        draw.spliceElementList(
-          elementList,
-          startIndex + 1,
-          endIndex - startIndex
-        )
+        draw.spliceElementList(elementList, elementIndex + 1, endIndex - startIndex)
+        curIndex = elementIndex
       } else {
-        if (!elementList[index + 1]) return
-        draw.spliceElementList(elementList, index + 1, 1)
+        if (!elementList[elementIndex + 1]) return
+        const deletedElement = elementList[elementIndex + 1]
+        // 不删除控件结构元素
+        if (
+          deletedElement?.controlComponent === ControlComponent.PREFIX ||
+          deletedElement?.controlComponent === ControlComponent.POSTFIX ||
+          deletedElement?.controlComponent === ControlComponent.PLACEHOLDER
+        ) {
+          return
+        }
+        const deletedControlId = deletedElement?.controlId
+        draw.spliceElementList(elementList, elementIndex + 1, 1)
+        // 检查删除后控件是否为空，若为空则移除整个控件
+        if (deletedControlId) {
+          const removedStart = removeControlIfEmpty(
+            elementList,
+            deletedControlId,
+            (list, start, count) => draw.spliceElementList(list, start, count)
+          )
+          curIndex = removedStart !== null ? removedStart - 1 : elementIndex
+        } else {
+          curIndex = elementIndex
+        }
       }
-      curIndex = isCollapsed ? index : startIndex
+    } else {
+      // 控件模式下删除整个控件
+      curIndex = control.removeControl(endIndex + 1)
     }
-  }
+  } else {
+      // 普通元素
+      const position = draw.getPosition()
+      const cursorPosition = position.getCursorPosition()
+      if (!cursorPosition) return
+      // 文本模式下 cursorPosition.index 不是 elementList 索引，
+      // 需要将 positionList 索引映射到 elementList 索引
+      const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
+      const positionList = position.getPositionList()
+      const positionListIndex = positionList.indexOf(cursorPosition)
+      const elementIndex = isTextMode && positionListIndex !== -1
+        ? getElementIndexFromPositionListIndex(elementList, positionListIndex, true)
+        : cursorPosition.index
+      // 命中图片直接删除
+      const positionContext = position.getPositionContext()
+      if (positionContext.isDirectHit && positionContext.isImage) {
+        draw.spliceElementList(elementList, elementIndex, 1)
+        curIndex = elementIndex - 1
+      } else {
+        const isCollapsed = rangeManager.getIsCollapsed()
+
+        if (!isCollapsed) {
+          draw.spliceElementList(
+            elementList,
+            elementIndex + 1,
+            endIndex - startIndex
+          )
+        } else {
+          if (!elementList[elementIndex + 1]) return
+          draw.spliceElementList(elementList, elementIndex + 1, 1)
+        }
+        curIndex = elementIndex
+      }
+    }
   draw.getGlobalEvent().setCanvasEventAbility()
   if (curIndex === null) {
     rangeManager.setRange(startIndex, startIndex)
@@ -111,6 +226,18 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
       isSubmitHistory: false
     })
   } else {
+    // 文本模式下调整光标位置，跳过 PREFIX/POSTFIX 元素
+    const controlRenderMode = draw.getControlRenderMode()
+    const isTextMode = controlRenderMode === ControlRenderMode.TEXT
+    if (isTextMode) {
+      const newElementList = draw.getElementList()
+      curIndex = getNonHideElementIndex(
+        newElementList,
+        curIndex,
+        LocationPosition.BEFORE,
+        isTextMode
+      )
+    }
     rangeManager.setRange(curIndex, curIndex)
     draw.render({
       curIndex

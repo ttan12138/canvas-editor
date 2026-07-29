@@ -379,13 +379,16 @@ export function formatElementList(
         (value == null || code == null) &&
         Array.isArray(valueSets) &&
         valueSets.length > 0
+      // MULTI_CUSTOM_SELECT 支持 code 包含多个值（逗号分隔）
+      const isMultiCustomSelectWithCode = type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length)
       if (
         (value && value.length) ||
         type === ControlType.CHECKBOX ||
         type === ControlType.RADIO ||
+        type === ControlType.LABEL ||
         (type === ControlType.SELECT && code && (!value || !value.length)) ||
         (type === ControlType.CUSTOM_SELECT && code && (!value || !value.length)) ||
-        (type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length)) ||
+        isMultiCustomSelectWithCode ||
         shouldAutoSelectFirst
       ) {
         // 处理 value 可能是字符串的情况，转换为 IElement[] 格式
@@ -396,6 +399,14 @@ export function formatElementList(
           } else if (typeof value === 'string') {
             // 字符串类型转换为 IElement 数组
             valueList = [{ value }]
+          }
+        }
+        // LABEL 控件：从 valueA/valueB 派生显示值
+        if (type === ControlType.LABEL && !value) {
+          const control = el.control
+          const displayValue = control.useValueA ? control.valueA : control.valueB
+          if (displayValue) {
+            valueList = [{ value: displayValue }]
           }
         }
         if (type === ControlType.CHECKBOX) {
@@ -503,20 +514,41 @@ export function formatElementList(
                 const firstValueSet = valueSets[0]
                 valueList = [
                   {
-                    value: firstValueSet.value
+                    value: firstValueSet.value,
+                    color: editorOptions.control.selectValueColor
                   }
                 ]
                 // 更新 control.code 为第一个选项的 code
                 el.control!.code = firstValueSet.code
               } else if (code) {
-                // 根据 code 查找对应的值
-                const valueSet = valueSets.find(v => v.code === code)
-                if (valueSet) {
-                  valueList = [
-                    {
-                      value: valueSet.value
+                // MULTI_CUSTOM_SELECT: code 可以包含多个值（逗号分隔）
+                if (type === ControlType.MULTI_CUSTOM_SELECT) {
+                  const delimiter = el.control?.multiSelectDelimiter || ','
+                  const codes = code.split(delimiter)
+                  const values: IElement[] = []
+                  codes.forEach(c => {
+                    const valueSet = valueSets.find(v => v.code === c.trim())
+                    if (valueSet) {
+                      values.push({
+                        value: valueSet.value,
+                        color: editorOptions.control.selectValueColor
+                      })
                     }
-                  ]
+                  })
+                  if (values.length > 0) {
+                    valueList = values
+                  }
+                } else {
+                  // 其他控件：根据 code 查找对应的值
+                  const valueSet = valueSets.find(v => v.code === code)
+                  if (valueSet) {
+                    valueList = [
+                      {
+                        value: valueSet.value,
+                        color: editorOptions.control.selectValueColor
+                      }
+                    ]
+                  }
                 }
               }
             }
@@ -1897,40 +1929,175 @@ export function deleteSurroundElementList(
 export function getNonHideElementIndex(
   elementList: IElement[],
   index: number,
+  position: LocationPosition = LocationPosition.BEFORE,
+  isTextMode?: boolean
+) {
+  const element = elementList[index]
+
+  // 在文本模式下，检查当前元素是否是 PREFIX 或 POSTFIX
+  // 如果是，需要跳到前一个或后一个元素
+  if (isTextMode &&
+    (element?.controlComponent === ControlComponent.PREFIX ||
+      element?.controlComponent === ControlComponent.POSTFIX)) {
+    let i = index
+    if (position === LocationPosition.BEFORE) {
+      // 向前查找：找到前一个非 PREFIX/POSTFIX 元素
+      i = index - 1
+      while (i >= 0) {
+        const el = elementList[i]
+        if (
+          el?.controlComponent !== ControlComponent.PREFIX &&
+          el?.controlComponent !== ControlComponent.POSTFIX
+        ) {
+          return i
+        }
+        i--
+      }
+    } else {
+      // 向后查找：找到后一个非 PREFIX/POSTFIX 元素
+      i = index + 1
+      while (i < elementList.length) {
+        const el = elementList[i]
+        if (
+          el?.controlComponent !== ControlComponent.PREFIX &&
+          el?.controlComponent !== ControlComponent.POSTFIX
+        ) {
+          return i
+        }
+        i++
+      }
+    }
+    // 如果找不到，返回原索引（边界情况）
+    return index
+  }
+
+  // 非文本模式或当前元素不是 PREFIX/POSTFIX，直接返回原索引
+  return index
+}
+
+/**
+ * 根据 positionList 的数组索引获取对应的 elementList 索引
+ * 在文本模式下 positionList 跳过了 PREFIX/POSTFIX/PLACEHOLDER 元素，
+ * 因此 positionList 索引与 elementList 索引不再一一对应
+ * @param elementList 完整元素列表（包含 PREFIX/POSTFIX/PLACEHOLDER）
+ * @param positionListIndex positionList 数组中的索引
+ * @param isTextMode 是否为文本模式
+ * @returns elementList 中对应的元素索引
+ */
+export function getElementIndexFromPositionListIndex(
+  elementList: IElement[],
+  positionListIndex: number,
+  isTextMode: boolean
+): number {
+  if (!isTextMode) return positionListIndex
+
+  let count = 0
+  for (let i = 0; i < elementList.length; i++) {
+    const element = elementList[i]
+    if (
+      element.controlComponent !== ControlComponent.PREFIX &&
+      element.controlComponent !== ControlComponent.POSTFIX &&
+      element.controlComponent !== ControlComponent.PLACEHOLDER
+    ) {
+      if (count === positionListIndex) {
+        return i
+      }
+      count++
+    }
+  }
+  // 未找到匹配项，返回最后一个有效元素索引
+  return elementList.length - 1
+}
+
+/**
+ * 在文本模式下获取非 PREFIX/POSTFIX 元素的索引
+ * 用于处理文本模式下光标移动时跳过控件前缀和后缀
+ * 只有当 index 指向的元素本身是 PREFIX/POSTFIX 时才进行跳过
+ */
+export function getTextModeElementIndex(
+  elementList: IElement[],
+  index: number,
   position: LocationPosition = LocationPosition.BEFORE
 ) {
+  const element = elementList[index]
+  // 如果当前元素不是 PREFIX 或 POSTFIX，或者索引越界，直接返回
   if (
-    !elementList[index]?.hide &&
-    !elementList[index]?.control?.hide &&
-    !elementList[index]?.area?.hide
+    !element ||
+    (element.controlComponent !== ControlComponent.PREFIX &&
+      element.controlComponent !== ControlComponent.POSTFIX)
   ) {
     return index
   }
-  let i = index
+
+  // 当前元素是 PREFIX 或 POSTFIX，根据方向查找最近的非 PREFIX/POSTFIX 元素
   if (position === LocationPosition.BEFORE) {
-    i = index - 1
-    while (i > 0) {
+    // 向前查找
+    let i = index - 1
+    while (i >= 0) {
+      const el = elementList[i]
       if (
-        !elementList[i]?.hide &&
-        !elementList[i]?.control?.hide &&
-        !elementList[i]?.area?.hide
+        el &&
+        el.controlComponent !== ControlComponent.PREFIX &&
+        el.controlComponent !== ControlComponent.POSTFIX
       ) {
         return i
       }
       i--
     }
+    return index // 没有找到，返回原索引
   } else {
-    i = index + 1
+    // 向后查找
+    let i = index + 1
     while (i < elementList.length) {
+      const el = elementList[i]
       if (
-        !elementList[i]?.hide &&
-        !elementList[i]?.control?.hide &&
-        !elementList[i]?.area?.hide
+        el &&
+        el.controlComponent !== ControlComponent.PREFIX &&
+        el.controlComponent !== ControlComponent.POSTFIX
       ) {
         return i
       }
       i++
     }
+    return index // 没有找到，返回原索引
   }
-  return i
+}
+
+/**
+ * 检查控件是否已无 VALUE 元素，若是则从 elementList 中移除整个控件
+ * 用于文本模式下删除最后一个字符后清理 PREFIX/POSTFIX/PLACEHOLDER
+ * @param elementList 元素列表
+ * @param controlId 要检查的控件 ID
+ * @param spliceFn 删除元素列表片段的函数
+ * @returns 移除的起始索引，若未移除则返回 null
+ */
+export function removeControlIfEmpty(
+  elementList: IElement[],
+  controlId: string,
+  spliceFn: (elementList: IElement[], startIndex: number, count: number) => void
+): number | null {
+  // 查找控件范围并检查是否还有 VALUE 元素
+  let startIndex = -1
+  let endIndex = -1
+  let hasValue = false
+
+  for (let i = 0; i < elementList.length; i++) {
+    const el = elementList[i]
+    if (el.controlId === controlId) {
+      if (startIndex === -1) startIndex = i
+      endIndex = i + 1
+      if (el.controlComponent === ControlComponent.VALUE) {
+        hasValue = true
+      }
+    } else if (startIndex !== -1) {
+      // 已遍历完该控件范围
+      break
+    }
+  }
+
+  if (!hasValue && startIndex !== -1 && endIndex !== -1) {
+    spliceFn(elementList, startIndex, endIndex - startIndex)
+    return startIndex
+  }
+  return null
 }

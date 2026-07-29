@@ -115,6 +115,11 @@ export class Command {
   public executeLocationControl: CommandAdapt['locationControl']
   public executeInsertControl: CommandAdapt['insertControl']
   public executeJumpControl: CommandAdapt['jumpControl']
+  public executeConvertToText: CommandAdapt['convertToText']
+  public executeConvertToControl: CommandAdapt['convertToControl']
+  public executeSetControlRenderMode: CommandAdapt['setControlRenderMode']
+  public executeSetLabelValue: CommandAdapt['setLabelValue']
+  public executeSetLabelStyle: CommandAdapt['setLabelStyle']
   public executeUpdateOptions: CommandAdapt['updateOptions']
   public executeInsertTitle: CommandAdapt['insertTitle']
   public executeFocus: CommandAdapt['focus']
@@ -143,10 +148,12 @@ export class Command {
   public getGroupIds: CommandAdapt['getGroupIds']
   public getControlValue: CommandAdapt['getControlValue']
   public getControlList: CommandAdapt['getControlList']
+  public getLabelControls: CommandAdapt['getLabelControls']
   public getContainer: CommandAdapt['getContainer']
   public getTitleValue: CommandAdapt['getTitleValue']
   public getPositionContextByEvent: CommandAdapt['getPositionContextByEvent']
   public getElementById: CommandAdapt['getElementById']
+  public getControlRenderMode: CommandAdapt['getControlRenderMode']
 
   constructor(adapt: CommandAdapt) {
     // 全局命令
@@ -307,10 +314,52 @@ export class Command {
     this.executeSetControlPropertiesList =
       adapt.setControlPropertiesList.bind(adapt)
     this.executeSetControlHighlight = adapt.setControlHighlight.bind(adapt)
+    this.executeSetLabelValue = adapt.setLabelValue.bind(adapt)
+    this.executeSetLabelStyle = adapt.setLabelStyle.bind(adapt)
     this.getControlValue = adapt.getControlValue.bind(adapt)
     this.getControlList = adapt.getControlList.bind(adapt)
+    this.getLabelControls = adapt.getLabelControls.bind(adapt)
     this.executeLocationControl = adapt.locationControl.bind(adapt)
     this.executeInsertControl = adapt.insertControl.bind(adapt)
     this.executeJumpControl = adapt.jumpControl.bind(adapt)
+    // 文本和控件转换
+    this.executeConvertToText = adapt.convertToText.bind(adapt)
+    this.executeConvertToControl = adapt.convertToControl.bind(adapt)
+    // 控件渲染模式
+    this.executeSetControlRenderMode = adapt.setControlRenderMode.bind(adapt)
+    this.executeUpdateOptions = adapt.updateOptions.bind(adapt)
+    this.executeInsertTitle = adapt.insertTitle.bind(adapt)
+    this.executeFocus = adapt.focus.bind(adapt)
+    this.executeComputeElementListHeight =
+      adapt.computeElementListHeight.bind(adapt)
+    // 控件渲染模式
+    this.executeSetControlRenderMode = adapt.setControlRenderMode.bind(adapt)
+    // 获取
+    this.getImage = adapt.getImage.bind(adapt)
+    this.getOptions = adapt.getOptions.bind(adapt)
+    this.getValue = adapt.getValue.bind(adapt)
+    this.getValueAsync = adapt.getValueAsync.bind(adapt)
+    this.getHTML = adapt.getHTML.bind(adapt)
+    this.getText = adapt.getText.bind(adapt)
+    this.getWordCount = adapt.getWordCount.bind(adapt)
+    this.getCursorPosition = adapt.getCursorPosition.bind(adapt)
+    this.getRemainingContentHeight = adapt.getRemainingContentHeight.bind(adapt)
+    this.getRange = adapt.getRange.bind(adapt)
+    this.getRangeText = adapt.getRangeText.bind(adapt)
+    this.getRangeContext = adapt.getRangeContext.bind(adapt)
+    this.getRangeRow = adapt.getRangeRow.bind(adapt)
+    this.getRangeParagraph = adapt.getRangeParagraph.bind(adapt)
+    this.getKeywordRangeList = adapt.getKeywordRangeList.bind(adapt)
+    this.getKeywordContext = adapt.getKeywordContext.bind(adapt)
+    this.getCatalog = adapt.getCatalog.bind(adapt)
+    this.getPaperMargin = adapt.getPaperMargin.bind(adapt)
+    this.getSearchNavigateInfo = adapt.getSearchNavigateInfo.bind(adapt)
+    this.getLocale = adapt.getLocale.bind(adapt)
+    this.getGroupIds = adapt.getGroupIds.bind(adapt)
+    this.getContainer = adapt.getContainer.bind(adapt)
+    this.getTitleValue = adapt.getTitleValue.bind(adapt)
+    this.getPositionContextByEvent = adapt.getPositionContextByEvent.bind(adapt)
+    this.getElementById = adapt.getElementById.bind(adapt)
+    this.getControlRenderMode = adapt.getControlRenderMode.bind(adapt)
   }
 }

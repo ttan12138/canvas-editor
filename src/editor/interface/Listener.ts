@@ -1,4 +1,4 @@
-import { EditorZone, PageMode } from '../dataset/enum/Editor'
+import { ControlRenderMode, EditorZone, PageMode } from '../dataset/enum/Editor'
 import { ElementType } from '../dataset/enum/Element'
 import { ListStyle, ListType } from '../dataset/enum/List'
 import { RowFlex } from '../dataset/enum/Row'
@@ -54,6 +54,8 @@ export type IControlContentChange = (
 ) => void
 
 export type IPageModeChange = (payload: PageMode) => void
+
+export type IControlRenderModeChange = (payload: ControlRenderMode) => void
 
 export type IZoneChange = (payload: EditorZone) => void
 

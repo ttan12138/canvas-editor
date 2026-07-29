@@ -755,9 +755,57 @@ elementList.push(
         conceptId: '7',
         type: ControlType.NUMBER_FLAG,
         value: null,
-        placeholder: '就诊次数',
+        placeholder: '',
         prefix: '\u200c',
-        postfix: '_',
+        underline: true,
+        minWidth: 30,
+        postfix: '\u200c',
+        associationId: '123',
+        numberExclusiveOptions: {
+          min: 20,
+          max: 100,
+          calculatorDisabled: true
+        }
+      }
+    },
+    {
+      value: '\n就诊次数2222：'
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '',
+      control: {
+        conceptId: '77',
+        type: ControlType.NUMBER_FLAG,
+        value: null,
+        placeholder: '',
+        prefix: '\u200c',
+        underline: true,
+        minWidth: 30,
+        postfix: '\u200c',
+        associationId: '123',
+        numberExclusiveOptions: {
+          min: 20,
+          max: 100,
+          calculatorDisabled: true
+        }
+      }
+    },
+    {
+      value: '\n就诊次数33333：'
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '',
+      control: {
+        conceptId: '778',
+        type: ControlType.NUMBER_FLAG,
+        value: null,
+        placeholder: '',
+        prefix: '\u200c',
+        underline: true,
+        minWidth: 30,
+        postfix: '\u200c',
         numberExclusiveOptions: {
           min: 20,
           max: 100,

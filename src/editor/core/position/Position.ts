@@ -17,13 +17,13 @@ import {
   IPositionContext
 } from '../../interface/Position'
 import { Draw } from '../draw/Draw'
-import { EditorMode, EditorZone } from '../../dataset/enum/Editor'
+import { EditorMode, EditorZone, ControlRenderMode } from '../../dataset/enum/Editor'
 import { deepClone, isRectIntersect } from '../../utils'
 import { ImageDisplay } from '../../dataset/enum/Common'
 import { DeepRequired } from '../../interface/Common'
 import { EventBus } from '../event/eventbus/EventBus'
 import { EventBusMap } from '../../interface/EventBus'
-import { getIsBlockElement } from '../../utils/element'
+import { getElementIndexFromPositionListIndex, getIsBlockElement } from '../../utils/element'
 
 export class Position {
   private cursorPosition: IElementPosition | null
@@ -148,6 +148,55 @@ export class Position {
       const tablePreY = y
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
+        // 文本模式下跳过 PREFIX 和 POSTFIX 元素的位置计算
+        let isSkipElement = false
+        if (
+          this.draw.getControlRenderMode() === ControlRenderMode.TEXT &&
+          (element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX)
+        ) {
+          isSkipElement = true
+        }
+
+        // 文本模式下，不递增 index，因为这些元素不应该出现在 positionList 中
+        if (isSkipElement) {
+          continue
+        }
+        // 在文本模式下，需要重新计算 isFirstLetter 和 isLastLetter
+        // 因为跳过了 PREFIX，第一个实际显示的元素应该是 isFirstLetter
+        let isFirstLetter = j === 0
+        let isLastLetter = j === curRow.elementList.length - 1
+        if (this.draw.getControlRenderMode() === ControlRenderMode.TEXT) {
+          // 查找第一个非 PREFIX/POSTFIX 的元素
+          if (isFirstLetter && element.controlComponent === ControlComponent.PREFIX) {
+            isFirstLetter = false
+          }
+          // 向前查找是否有非 PREFIX/POSTFIX 的元素
+          for (let k = j - 1; k >= 0; k--) {
+            const preEl = curRow.elementList[k]
+            if (
+              preEl.controlComponent !== ControlComponent.PREFIX &&
+              preEl.controlComponent !== ControlComponent.POSTFIX
+            ) {
+              isFirstLetter = false
+              break
+            }
+          }
+          // 向后查找是否有非 PREFIX/POSTFIX 的元素
+          if (isLastLetter && element.controlComponent === ControlComponent.POSTFIX) {
+            isLastLetter = false
+          }
+          for (let k = j + 1; k < curRow.elementList.length; k++) {
+            const nextEl = curRow.elementList[k]
+            if (
+              nextEl.controlComponent !== ControlComponent.PREFIX &&
+              nextEl.controlComponent !== ControlComponent.POSTFIX
+            ) {
+              isLastLetter = false
+              break
+            }
+          }
+        }
         const metrics = element.metrics
         const offsetY =
           !element.hide &&
@@ -174,8 +223,8 @@ export class Position {
           left: element.left || 0,
           ascent: offsetY,
           lineHeight: curRow.height,
-          isFirstLetter: j === 0,
-          isLastLetter: j === curRow.elementList.length - 1,
+          isFirstLetter,
+          isLastLetter,
           coordinate: {
             leftTop: [x, y],
             leftBottom: [x, y + curRow.height],
@@ -216,7 +265,9 @@ export class Position {
           })
         }
         positionList.push(positionItem)
-        index++
+        if (!isSkipElement) {
+          index++
+        }
         x += metrics.width
         // 计算表格内元素位置
         if (element.type === ElementType.TABLE && !element.hide) {
@@ -397,7 +448,14 @@ export class Position {
         leftBottom[1] >= y
       ) {
         let curPositionIndex = j
-        const element = elementList[j]
+        // 文本模式下 positionList 跳过了 PREFIX/POSTFIX/PLACEHOLDER 元素，
+        // 需要将 positionList 索引映射到 elementList 索引以获取正确元素
+        const isTextMode =
+          this.draw.getControlRenderMode() === ControlRenderMode.TEXT
+        const elementListIndex = isTextMode
+          ? getElementIndexFromPositionListIndex(elementList, j, true)
+          : j
+        const element = elementList[elementListIndex]
         // 表格被命中
         if (element.type === ElementType.TABLE) {
           for (let t = 0; t < element.trList!.length; t++) {
@@ -506,7 +564,7 @@ export class Position {
         }
         let hitLineStartIndex: number | undefined
         // 判断是否在文字中间前后
-        if (elementList[index].value !== ZERO) {
+        if (element.value !== ZERO) {
           const valueWidth = rightTop[0] - leftTop[0]
           if (x < leftTop[0] + valueWidth / 2) {
             curPositionIndex = j - 1

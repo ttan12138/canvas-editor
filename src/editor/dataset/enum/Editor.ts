@@ -49,3 +49,8 @@ export enum RenderMode {
   SPEED = 'speed',
   COMPATIBILITY = 'compatibility'
 }
+
+export enum ControlRenderMode {
+  CONTROL = 'control', // 控件模式：显示控件UI元素
+  TEXT = 'text' // 纯文本模式：只显示文本内容
+}

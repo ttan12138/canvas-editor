@@ -3,6 +3,7 @@ import {
   PUNCTUATION_LIST,
   METRICS_BASIS_TEXT
 } from '../../../dataset/constant/Common'
+import { ControlRenderMode } from '../../../dataset/enum/Editor'
 import { DeepRequired } from '../../../interface/Common'
 import { IRowElement } from '../../../interface/Row'
 import { ITextMetrics } from '../../../interface/Text'
@@ -132,12 +133,18 @@ export class TextParticle {
     y: number
   ) {
     this.ctx = ctx
+    // 纯文本模式下强制使用黑色
+    let color = element.color
+    if (this.draw.getControlRenderMode() === ControlRenderMode.TEXT) {
+      color = '#000000'
+    }
+
     // 兼容模式立即绘制
     if (this.options.renderMode === RenderMode.COMPATIBILITY) {
       this._setCurXY(x, y)
       this.text = element.value
       this.curStyle = element.style
-      this.curColor = element.color
+      this.curColor = color
       this.complete()
       return
     }
@@ -148,14 +155,14 @@ export class TextParticle {
     // 样式发生改变
     if (
       (this.curStyle && element.style !== this.curStyle) ||
-      element.color !== this.curColor
+      color !== this.curColor
     ) {
       this.complete()
       this._setCurXY(x, y)
     }
     this.text += element.value
     this.curStyle = element.style
-    this.curColor = element.color
+    this.curColor = color
   }
 
   private _setCurXY(x: number, y: number) {

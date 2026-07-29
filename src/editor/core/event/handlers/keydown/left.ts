@@ -1,6 +1,7 @@
-import { EditorMode } from '../../../..'
 import { ZERO } from '../../../../dataset/constant/Common'
+import { LocationPosition } from '../../../../dataset/enum/Common'
 import { ControlComponent } from '../../../../dataset/enum/Control'
+import { ControlRenderMode, EditorMode } from '../../../../dataset/enum/Editor'
 import { ElementType } from '../../../../dataset/enum/Element'
 import { MoveDirection } from '../../../../dataset/enum/Observer'
 import {
@@ -39,6 +40,7 @@ export function left(evt: KeyboardEvent, host: CanvasEvent) {
   }
   // 单词整体移动
   let moveCount = 1
+  const controlRenderMode = draw.getControlRenderMode()
   if (isApple ? evt.altKey : evt.ctrlKey) {
     const LETTER_REG = draw.getLetterReg()
     // 起始位置
@@ -50,6 +52,15 @@ export function left(evt: KeyboardEvent, host: CanvasEvent) {
       let i = moveStartIndex - 1
       while (i > 0) {
         const element = elementList[i]
+        // 文本模式下跳过 PREFIX/POSTFIX 元素
+        if (
+          controlRenderMode === ControlRenderMode.TEXT &&
+          (element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX)
+        ) {
+          i--
+          continue
+        }
         if (!LETTER_REG.test(element.value)) {
           break
         }
@@ -59,6 +70,17 @@ export function left(evt: KeyboardEvent, host: CanvasEvent) {
     }
   }
   const curIndex = startIndex - moveCount
+  // 调试日志：记录光标移动计算过程
+  console.log('[Left Arrow Debug]', {
+    startIndex,
+    endIndex,
+    moveCount,
+    curIndex,
+    isCollapsed,
+    controlRenderMode: draw.getControlRenderMode(),
+    'current element': elementList[startIndex]?.value,
+    'current controlComponent': elementList[startIndex]?.controlComponent
+  })
   // shift则缩放选区
   let anchorStartIndex = curIndex
   let anchorEndIndex = curIndex
@@ -151,8 +173,36 @@ export function left(evt: KeyboardEvent, host: CanvasEvent) {
   if (!~anchorStartIndex || !~anchorEndIndex) return
   // 隐藏元素跳过
   const newElementList = draw.getElementList()
-  anchorStartIndex = getNonHideElementIndex(newElementList, anchorStartIndex)
-  anchorEndIndex = getNonHideElementIndex(newElementList, anchorEndIndex)
+  const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
+
+  console.log('[Left Arrow Before getNonHideElementIndex]', {
+    anchorStartIndex,
+    anchorEndIndex,
+    isTextMode,
+    'anchorStartIndex element': newElementList[anchorStartIndex]?.value,
+    'anchorStartIndex controlComponent': newElementList[anchorStartIndex]?.controlComponent
+  })
+
+  anchorStartIndex = getNonHideElementIndex(
+    newElementList,
+    anchorStartIndex,
+    LocationPosition.BEFORE,
+    isTextMode
+  )
+  anchorEndIndex = getNonHideElementIndex(
+    newElementList,
+    anchorEndIndex,
+    LocationPosition.BEFORE,
+    isTextMode
+  )
+
+  console.log('[Left Arrow After getNonHideElementIndex]', {
+    finalAnchorStartIndex: anchorStartIndex,
+    finalAnchorEndIndex: anchorEndIndex,
+    'final element': newElementList[anchorStartIndex]?.value,
+    'final controlComponent': newElementList[anchorStartIndex]?.controlComponent
+  })
+
   // 设置上下文
   rangeManager.setRange(anchorStartIndex, anchorEndIndex)
   const isAnchorCollapsed = anchorStartIndex === anchorEndIndex

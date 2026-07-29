@@ -2,7 +2,7 @@ import { ElementType } from '../..'
 import { ZERO } from '../../dataset/constant/Common'
 import { TEXTLIKE_ELEMENT_TYPE } from '../../dataset/constant/Element'
 import { ControlComponent } from '../../dataset/enum/Control'
-import { EditorContext } from '../../dataset/enum/Editor'
+import { ControlRenderMode, EditorContext } from '../../dataset/enum/Editor'
 import { IControlContext } from '../../interface/Control'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
@@ -116,9 +116,21 @@ export class RangeManager {
     const { startIndex, endIndex } = this.range
     if (startIndex === endIndex) return null
     const elementList = this.draw.getElementList()
+    const isTextMode = this.draw.getControlRenderMode() === ControlRenderMode.TEXT
+
+    // 在文本模式下，需要将positionList索引映射到elementList索引
+    let actualStartIndex = startIndex
+    let actualEndIndex = endIndex
+
+    if (isTextMode) {
+      // 计算elementList中的实际索引
+      actualStartIndex = this.getActualElementIndex(startIndex)
+      actualEndIndex = this.getActualElementIndex(endIndex)
+    }
+
     return elementList.slice(
-      elementList[startIndex]?.value === ZERO ? startIndex : startIndex + 1,
-      endIndex + 1
+      elementList[actualStartIndex]?.value === ZERO ? actualStartIndex : actualStartIndex + 1,
+      actualEndIndex + 1
     )
   }
 
@@ -625,46 +637,26 @@ export class RangeManager {
             preElement.controlComponent === ControlComponent.PREFIX ||
             preElement.controlComponent === ControlComponent.PRE_TEXT
           ) {
-            range.startIndex = index
-            range.endIndex = index
+            range.startIndex = index + 1
+            range.endIndex = index + 1
             break
           }
           index--
         }
       }
     } else {
-      // 首、尾为占位符时，收缩到最后一个前缀字符后
       if (
-        startElement.controlComponent === ControlComponent.PLACEHOLDER ||
+        startElement.controlComponent === ControlComponent.PLACEHOLDER &&
         endElement.controlComponent === ControlComponent.PLACEHOLDER
       ) {
-        let index = endIndex - 1
-        while (index > 0) {
-          const preElement = elementList[index]
-          if (
-            preElement.controlId !== endElement.controlId ||
-            preElement.controlComponent === ControlComponent.PREFIX ||
-            preElement.controlComponent === ControlComponent.PRE_TEXT
-          ) {
-            range.startIndex = index
-            range.endIndex = index
-            return
-          }
-          index--
-        }
-      }
-      // 向右查找到第一个Value
-      if (startElement.controlComponent === ControlComponent.PREFIX) {
-        let index = startIndex + 1
+        // 起点向右查找到第一个非Placeholder
+        let index = startIndex
         while (index < elementList.length) {
           const nextElement = elementList[index]
           if (
             nextElement.controlId !== startElement.controlId ||
-            nextElement.controlComponent === ControlComponent.VALUE
-          ) {
-            range.startIndex = index - 1
-            break
-          } else if (
+            nextElement.controlComponent === ControlComponent.POSTFIX ||
+            nextElement.controlComponent === ControlComponent.POST_TEXT ||
             nextElement.controlComponent === ControlComponent.PLACEHOLDER
           ) {
             range.startIndex = index - 1
@@ -685,17 +677,57 @@ export class RangeManager {
           ) {
             range.startIndex = index
             break
-          } else if (
-            preElement.controlComponent === ControlComponent.PLACEHOLDER
-          ) {
-            range.startIndex = index
-            range.endIndex = index
-            return
           }
           index--
         }
       }
+      // 向右查找到第一个Value
+      if (endElement.controlComponent !== ControlComponent.VALUE) {
+        let index = endIndex + 1
+        while (index < elementList.length) {
+          const nextElement = elementList[index]
+          if (
+            nextElement.controlId !== endElement.controlId ||
+            nextElement.controlComponent === ControlComponent.VALUE
+          ) {
+            range.endIndex = index
+            break
+          }
+          index++
+        }
+      }
     }
+  }
+
+  /**
+   * 在文本模式下，将positionList索引转换为elementList索引
+   * 因为positionList跳过了PREFIX/POSTFIX元素，所以需要找到对应的elementList索引
+   */
+  private getActualElementIndex(positionIndex: number): number {
+    const elementList = this.draw.getElementList()
+
+    // 计算positionList索引对应的elementList索引
+    // 通过累加非PREFIX/POSTFIX元素的数量来匹配
+    let positionCount = 0
+
+    for (let i = 0; i < elementList.length; i++) {
+      const element = elementList[i]
+      // 只计算非PREFIX/POSTFIX元素
+      if (
+        element.controlComponent !== ControlComponent.PREFIX &&
+        element.controlComponent !== ControlComponent.POSTFIX
+      ) {
+        positionCount++
+      }
+
+      // 当计数匹配positionIndex时，返回当前elementIndex
+      if (positionCount > positionIndex) {
+        return i
+      }
+    }
+
+    // 如果找不到，返回最后一个有效的索引
+    return elementList.length - 1
   }
 
   public render(

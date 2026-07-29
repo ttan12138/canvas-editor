@@ -1,6 +1,8 @@
 import { ImageDisplay } from '../../../dataset/enum/Common'
 import { ControlComponent } from '../../../dataset/enum/Control'
+import { ControlRenderMode } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
+import { getElementIndexFromPositionListIndex } from '../../../utils/element'
 import { CanvasEvent } from '../CanvasEvent'
 
 export function mousemove(evt: MouseEvent, host: CanvasEvent) {
@@ -43,9 +45,12 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     host.isAllowDrop = true
     return
   }
+  // console.log('mousemove - isAllowSelection:', host.isAllowSelection, 'mouseDownStartPosition:', host.mouseDownStartPosition)
   if (!host.isAllowSelection || !host.mouseDownStartPosition) return
+  // console.log('mousemove - offsetX:', evt.offsetX, 'offsetY:', evt.offsetY)
   const target = evt.target as HTMLDivElement
   const pageIndex = target.dataset.index
+  // console.log('mousemove - target:', target, 'pageIndex:', pageIndex)
   // 设置pageNo
   if (pageIndex) {
     draw.setPageNo(Number(pageIndex))
@@ -56,6 +61,7 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     x: evt.offsetX,
     y: evt.offsetY
   })
+  // console.log('mousemove - positionResult.index:', positionResult.index)
   if (!~positionResult.index) return
   const {
     index,
@@ -75,6 +81,15 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     tableId: startTableId
   } = host.mouseDownStartPosition
   const endIndex = isTable ? tdValueIndex! : index
+  // 非表格文本模式下 endIndex 是 positionList 索引，需映射到 elementList 索引
+  let mappedEndIndex = endIndex
+  if (!isTable && draw.getControlRenderMode() === ControlRenderMode.TEXT) {
+    mappedEndIndex = getElementIndexFromPositionListIndex(
+      draw.getElementList(),
+      endIndex,
+      true
+    )
+  }
   // 判断是否是表格跨行/列
   const rangeManager = draw.getRange()
   if (
@@ -101,7 +116,7 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
       tableId
     })
   } else {
-    let end = ~endIndex ? endIndex : 0
+    let end = ~mappedEndIndex ? mappedEndIndex : 0
     // 开始或结束位置存在表格，但是非相同表格则忽略选区设置
     if ((startIsTable || isTable) && startTableId !== tableId) return
     // 开始位置

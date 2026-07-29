@@ -54,6 +54,19 @@ export interface IControlNumber {
   }
 }
 
+export interface IControlLabel {
+  valueA?: string
+  valueB?: string
+  useValueA?: boolean
+  labelStyle?: {
+    font?: string
+    size?: number
+    bold?: boolean
+    color?: string
+    italic?: boolean
+  }
+}
+
 export interface IControlHighlightRule {
   keyword: string
   alpha?: number
@@ -108,10 +121,15 @@ export type IControl = IControlBasic &
   Partial<IControlCheckbox> &
   Partial<IControlRadio> &
   Partial<IControlDate> &
-  Partial<IControlNumber>
+  Partial<IControlNumber> &
+  Partial<IControlLabel>
 
 export interface IControlOption {
   placeholderColor?: string
+  defaultValueColor?: string
+  selectValueColor?: string
+  highNumberColor?: string
+  lowNumberColor?: string
   bracketColor?: string
   prefix?: string
   postfix?: string
@@ -252,4 +270,20 @@ export interface IDestroyControlOption {
 export interface IRemoveControlOption {
   id?: string
   conceptId?: string
+}
+
+export interface ISetLabelValueOption {
+  id: string
+  useValueA: boolean
+}
+
+export interface ISetLabelStyleOption {
+  id: string
+  style: {
+    font?: string
+    size?: number
+    bold?: boolean
+    color?: string
+    italic?: boolean
+  }
 }

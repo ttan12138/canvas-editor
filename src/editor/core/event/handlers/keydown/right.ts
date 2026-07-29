@@ -1,7 +1,7 @@
 import { ZERO } from '../../../../dataset/constant/Common'
 import { LocationPosition } from '../../../../dataset/enum/Common'
 import { ControlComponent } from '../../../../dataset/enum/Control'
-import { EditorMode } from '../../../../dataset/enum/Editor'
+import { ControlRenderMode, EditorMode } from '../../../../dataset/enum/Editor'
 import { ElementType } from '../../../../dataset/enum/Element'
 import { MoveDirection } from '../../../../dataset/enum/Observer'
 import {
@@ -41,6 +41,7 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
   }
   // 单词整体移动
   let moveCount = 1
+  const controlRenderMode = draw.getControlRenderMode()
   if (isApple ? evt.altKey : evt.ctrlKey) {
     const LETTER_REG = draw.getLetterReg()
     // 起始位置
@@ -52,6 +53,15 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
       let i = moveStartIndex + 2
       while (i < elementList.length) {
         const element = elementList[i]
+        // 文本模式下跳过 PREFIX/POSTFIX 元素
+        if (
+          controlRenderMode === ControlRenderMode.TEXT &&
+          (element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX)
+        ) {
+          i++
+          continue
+        }
         if (!LETTER_REG.test(element.value)) {
           break
         }
@@ -61,6 +71,17 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
     }
   }
   const curIndex = endIndex + moveCount
+  // 调试日志：记录光标移动计算过程
+  console.log('[Right Arrow Debug]', {
+    startIndex,
+    endIndex,
+    moveCount,
+    curIndex,
+    isCollapsed,
+    controlRenderMode: draw.getControlRenderMode(),
+    'current element': elementList[endIndex]?.value,
+    'current controlComponent': elementList[endIndex]?.controlComponent
+  })
   // shift则缩放选区
   let anchorStartIndex = curIndex
   let anchorEndIndex = curIndex
@@ -159,16 +180,36 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
   }
   // 隐藏元素跳过
   const newElementList = draw.getElementList()
+  const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
+  
+  console.log('[Right Arrow Before getNonHideElementIndex]', {
+    anchorStartIndex,
+    anchorEndIndex,
+    isTextMode,
+    'anchorStartIndex element': newElementList[anchorStartIndex]?.value,
+    'anchorStartIndex controlComponent': newElementList[anchorStartIndex]?.controlComponent
+  })
+  
   anchorStartIndex = getNonHideElementIndex(
     newElementList,
     anchorStartIndex,
-    LocationPosition.AFTER
+    LocationPosition.AFTER,
+    isTextMode
   )
   anchorEndIndex = getNonHideElementIndex(
     newElementList,
     anchorEndIndex,
-    LocationPosition.AFTER
+    LocationPosition.AFTER,
+    isTextMode
   )
+  
+  console.log('[Right Arrow After getNonHideElementIndex]', {
+    finalAnchorStartIndex: anchorStartIndex,
+    finalAnchorEndIndex: anchorEndIndex,
+    'final element': newElementList[anchorEndIndex]?.value,
+    'final controlComponent': newElementList[anchorEndIndex]?.controlComponent
+  })
+  
   // 设置上下文
   rangeManager.setRange(anchorStartIndex, anchorEndIndex)
   const isAnchorCollapsed = anchorStartIndex === anchorEndIndex
