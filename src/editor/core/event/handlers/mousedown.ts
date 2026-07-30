@@ -1,5 +1,5 @@
 import { ImageDisplay } from '../../../dataset/enum/Common'
-import { ControlRenderMode, EditorMode } from '../../../dataset/enum/Editor'
+import { EditorMode } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
 import { MouseEventButton } from '../../../dataset/enum/Event'
 import { ControlComponent } from '../../../dataset/enum/Control'
@@ -7,7 +7,6 @@ import { ControlType } from '../../../dataset/enum/Control'
 import { IPreviewerDrawOption } from '../../../interface/Previewer'
 import { deepClone } from '../../../utils'
 import { isMod } from '../../../utils/hotkey'
-import { getElementIndexFromPositionListIndex } from '../../../utils/element'
 import { CheckboxControl } from '../../draw/control/checkbox/CheckboxControl'
 import { RadioControl } from '../../draw/control/radio/RadioControl'
 import { CanvasEvent } from '../CanvasEvent'
@@ -116,37 +115,29 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
   const elementList = draw.getElementList()
   const positionList = position.getPositionList()
   const positionIndex = isTable ? tdValueIndex! : index
-  // 文本模式下 positionIndex 是 positionList 索引（跳过 PREFIX/POSTFIX/PLACEHOLDER）
-  // 需要映射到 elementList 索引才能正确访问元素
-  const controlRenderMode = draw.getControlRenderMode()
-  const isTextMode = controlRenderMode === ControlRenderMode.TEXT
-  const curIndex = isTextMode
-    ? getElementIndexFromPositionListIndex(elementList, positionIndex, true)
-    : positionIndex
   // 记录选区开始位置
-  // 使用 curIndex（elementList 索引）确保拖选时 range 操作正确
   host.mouseDownStartPosition = {
     ...positionResult,
-    index: curIndex,
+    index: positionIndex,
     x: evt.offsetX,
     y: evt.offsetY
   }
-  const curElement = elementList[curIndex]
+  const curElement = elementList[positionIndex]
   // 绘制
   const isDirectHitImage = !!(isDirectHit && isImage)
   const isDirectHitCheckbox = !!(isDirectHit && isCheckbox)
   const isDirectHitRadio = !!(isDirectHit && isRadio)
   const isDirectHitLabel = !!(isDirectHit && isLabel)
   if (~index) {
-    let startIndex = curIndex
-    let endIndex = curIndex
+    let startIndex = positionIndex
+    let endIndex = positionIndex
     // shift激活时进行选区处理
     if (evt.shiftKey) {
       const { startIndex: oldStartIndex } = rangeManager.getRange()
       if (~oldStartIndex) {
         const newPositionContext = position.getPositionContext()
         if (newPositionContext.tdId === oldPositionContext.tdId) {
-          if (curIndex > oldStartIndex) {
+          if (positionIndex > oldStartIndex) {
             startIndex = oldStartIndex
           } else {
             endIndex = oldStartIndex
@@ -169,7 +160,7 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
         curElement.control?.type === ControlType.RADIO)
     ) {
       // 向左查找
-      let preIndex = curIndex
+      let preIndex = positionIndex
       while (preIndex > 0) {
         const preElement = elementList[preIndex]
         if (preElement.controlComponent === ControlComponent.CHECKBOX) {
@@ -183,7 +174,7 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
       }
     } else {
       draw.render({
-        curIndex,
+        curIndex: positionIndex,
         isCompute: false,
         isSubmitHistory: false,
         isSetCursor:

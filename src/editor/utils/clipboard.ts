@@ -70,15 +70,17 @@ export async function writeElementList(
   elementList: IElement[],
   options: DeepRequired<IEditorOption>
 ) {
-  const clipboardDom = createDomFromElementList(elementList, options)
+  // 先压缩控件元素（PREFIX/POSTFIX→CONTROL），避免DOM中重复渲染控件值
+  const zippedElementList = zipElementList(elementList)
+  const clipboardDom = createDomFromElementList(zippedElementList, options)
   // 写入剪贴板
   document.body.append(clipboardDom)
   const text = clipboardDom.innerText
   // 先追加后移除，否则innerText无法解析换行符
   clipboardDom.remove()
   const html = clipboardDom.innerHTML
-  if (!text && !html && !elementList.length) return
-  await writeClipboardItem(text, html, zipElementList(elementList))
+  if (!text && !html && !zippedElementList.length) return
+  await writeClipboardItem(text, html, zippedElementList)
 }
 
 export function getIsClipboardContainFile(clipboardData: DataTransfer) {

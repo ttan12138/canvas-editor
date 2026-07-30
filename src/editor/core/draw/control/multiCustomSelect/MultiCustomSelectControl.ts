@@ -16,18 +16,23 @@ import {
   IControlContext,
   IControlInstance,
   IControlRuleOption,
+  IControlSelectValue,
   IValueSet
 } from '../../../../interface/Control'
 import { IEditorOption } from '../../../../interface/Editor'
 import { IElement } from '../../../../interface/Element'
 import {
+  deepClone,
   isArrayEqual,
   isNonValue,
   omitObject,
   pickObject,
   splitText
 } from '../../../../utils'
-import { formatElementContext } from '../../../../utils/element'
+import {
+  applyTextDiffToStructSegments,
+  formatElementContext
+} from '../../../../utils/element'
 import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
@@ -161,6 +166,117 @@ export class MultiCustomSelectControl implements IControlInstance {
       .join('')
   }
 
+  // 依据选中 codes 重建 values（优先保留已有选项的 structValues）
+  private buildValuesFromCodes(codes: string[]): IControlSelectValue[] {
+    const control = this.element.control!
+    const valueSets = control.valueSets || []
+    const existingValues = control.values || []
+    const values: IControlSelectValue[] = []
+    codes.forEach(code => {
+      if (!code) return
+      const existing = existingValues.find(v => v.code === code)
+      if (existing) {
+        values.push({ ...existing })
+        return
+      }
+      const valueSet = valueSets.find(v => v.code === code)
+      if (valueSet) {
+        values.push({ value: valueSet.value, code: valueSet.code })
+      }
+    })
+    return values
+  }
+
+  // 文本模式编辑后，将 VALUE 元素列表中的文字同步回每个选项的 value / structValues
+  // 保持数据一致性：
+  // - 选项数量未变：按索引逐选项同步内部字符（保留 code 与 structValues 引用及属性）
+  // - 选项数量变化（增/删）：依据文字匹配重建选项，尽量保留原有 code 与 structValues，
+  //   避免按分隔符索引错位导致 value 与 code 错配
+  public syncValueWithStructValues(context: IControlContext = {}) {
+    const control = this.element.control
+    if (!control || !control.values?.length) return
+    const delimiter = control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    const newText = this.getValue(context)
+      .map(el => el.value)
+      .join('')
+    // 控件已清空：移除所有选项
+    if (!newText) {
+      this.control.setControlProperties(
+        { values: [], value: null },
+        context
+      )
+      return
+    }
+    // 旧文本：选项有 structValues 时用其文字，否则用 value 字段
+    const oldValues = control.values
+    const getOptionText = (v: IControlSelectValue) =>
+      v.structValues?.length
+        ? v.structValues.map(s => s.value).join('')
+        : v.value
+    const oldParts = oldValues.map(getOptionText)
+    const oldText = oldParts.join(delimiter)
+    if (newText === oldText) return
+    const newParts = newText.split(delimiter)
+    const newValues: IControlSelectValue[] = []
+    if (newParts.length === oldParts.length) {
+      // 选项数量未变：按索引逐选项同步内部字符（保留 code 与 structValues 引用）
+      newParts.forEach((partText, i) => {
+        const oldOption = oldValues[i]
+        const newOption: IControlSelectValue = { ...oldOption, value: partText }
+        if (oldOption.structValues?.length) {
+          const synced = applyTextDiffToStructSegments(
+            oldOption.structValues,
+            oldParts[i],
+            partText
+          )
+          // 移除 value 为空的 structValue 片段，保持数据一致性
+          newOption.structValues = synced.filter(sv => sv.value)
+        }
+        newValues.push(newOption)
+      })
+    } else {
+      // 选项数量变化（增/删）：依据文字匹配重建选项，尽量保留原有 code 与 structValues
+      newParts.forEach(partText => {
+        const matchedOld = oldValues.find(v => getOptionText(v) === partText)
+        if (matchedOld) {
+          const newOption: IControlSelectValue = { ...matchedOld, value: partText }
+          if (matchedOld.structValues?.length) {
+            const synced = applyTextDiffToStructSegments(
+              matchedOld.structValues,
+              getOptionText(matchedOld),
+              partText
+            )
+            // 移除 value 为空的 structValue 片段，保持数据一致性
+            newOption.structValues = synced.filter(sv => sv.value)
+          }
+          newValues.push(newOption)
+          return
+        }
+        const matchedValueSet = (control.valueSets || []).find(
+          vs => vs.value === partText
+        )
+        if (matchedValueSet) {
+          newValues.push({
+            value: matchedValueSet.value,
+            code: matchedValueSet.code
+          })
+          return
+        }
+        // 自由文本新增项（无匹配 code）
+        newValues.push({ value: partText, code: '' })
+      })
+    }
+    const code =
+      newValues
+        .map(v => v.code)
+        .filter(Boolean)
+        .join(delimiter) || null
+    this.control.setControlProperties(
+      { values: newValues, value: null, code },
+      context
+    )
+  }
+
   public setValue(
     data: IElement[],
     context: IControlContext = {},
@@ -194,11 +310,19 @@ export class MultiCustomSelectControl implements IControlInstance {
             ...CONTROL_STYLE_ATTR
           ])
         : omitObject(startElement, ['type'])
+    // 将多字符元素拆为单字符元素（粘贴数据可能来自zipElementList压缩）
+    const splitData: IElement[] = []
+    for (const item of data) {
+      const charList = splitText(item.value)
+      for (const char of charList) {
+        splitData.push({ ...item, value: char })
+      }
+    }
     const start = range.startIndex + 1
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < splitData.length; i++) {
       const newElement: IElement = {
         ...anchorElement,
-        ...data[i],
+        ...splitData[i],
         controlComponent: ControlComponent.VALUE,
         color: this.options.control.selectValueColor
       }
@@ -207,6 +331,8 @@ export class MultiCustomSelectControl implements IControlInstance {
       })
       draw.spliceElementList(elementList, start + i, 0, [newElement])
     }
+    // 同步 value / structValues，保持数据一致性
+    this.syncValueWithStructValues({ elementList, range })
     return start + data.length - 1
   }
 
@@ -231,6 +357,8 @@ export class MultiCustomSelectControl implements IControlInstance {
         if (!value.length) {
           this.control.addPlaceholder(startIndex)
         }
+        // 同步 value / structValues，保持数据一致性
+        this.syncValueWithStructValues()
         return startIndex
       } else {
         if (
@@ -247,6 +375,8 @@ export class MultiCustomSelectControl implements IControlInstance {
           if (!value.length) {
             this.control.addPlaceholder(startIndex - 1)
           }
+          // 同步 value / structValues，保持数据一致性
+          this.syncValueWithStructValues()
           return startIndex - 1
         }
       }
@@ -261,6 +391,8 @@ export class MultiCustomSelectControl implements IControlInstance {
         if (!value.length) {
           this.control.addPlaceholder(startIndex)
         }
+        // 同步 value / structValues，保持数据一致性
+        this.syncValueWithStructValues()
         return startIndex
       } else {
         const endNextElement = elementList[endIndex + 1]
@@ -279,6 +411,8 @@ export class MultiCustomSelectControl implements IControlInstance {
           if (!value.length) {
             this.control.addPlaceholder(startIndex)
           }
+          // 同步 value / structValues，保持数据一致性
+          this.syncValueWithStructValues()
           return startIndex
         }
       }
@@ -353,7 +487,9 @@ export class MultiCustomSelectControl implements IControlInstance {
     }
     this.control.setControlProperties(
       {
-        code: null
+        code: null,
+        value: null,
+        values: []
       },
       {
         elementList,
@@ -393,7 +529,9 @@ export class MultiCustomSelectControl implements IControlInstance {
     }
     const valueSets = control.valueSets
     if (!Array.isArray(valueSets) || !valueSets.length) return
-    const text = this.getText(newCodes)
+    // 依据选中 codes 重建 values（保留已有的 structValues），并据其拼接渲染文本
+    const values = this.buildValuesFromCodes(newCodes)
+    const text = values.map(v => v.value).join(delimiter) || null
     if (!text) {
       if (oldCode) {
         const prefixIndex = this.clearSelect(context, {
@@ -427,17 +565,53 @@ export class MultiCustomSelectControl implements IControlInstance {
       EDITOR_ELEMENT_STYLE_ATTR
     )
     const start = prefixIndex + 1
-    const data = splitText(text)
     const draw = this.control.getDraw()
-    for (let i = 0; i < data.length; i++) {
-      const newElement: IElement = {
-        ...styleElement,
-        ...propertyElement,
-        type: ElementType.TEXT,
-        value: data[i],
-        controlComponent: ControlComponent.VALUE,
-        color: this.options.control.selectValueColor
+    // 按选项逐段生成 VALUE 元素：选项有 structValues 时优先渲染片段（保留 groupIds、underline、highlight 等属性），
+    // 否则渲染整个 value 字段；选项间插入分隔符元素。与 formatElementList 渲染方式保持一致。
+    const valueElements: IElement[] = []
+    values.forEach((optionValue, optionIndex) => {
+      if (optionIndex > 0 && delimiter) {
+        const delimiterStrList = splitText(delimiter)
+        delimiterStrList.forEach(d => {
+          valueElements.push({
+            ...styleElement,
+            ...propertyElement,
+            type: ElementType.TEXT,
+            value: d,
+            controlComponent: ControlComponent.VALUE,
+            color: this.options.control.selectValueColor
+          })
+        })
       }
+      if (optionValue.structValues?.length) {
+        optionValue.structValues.forEach(sv => {
+          if (!sv.value) return
+          valueElements.push({
+            ...styleElement,
+            ...propertyElement,
+            ...deepClone(sv),
+            type: ElementType.TEXT,
+            controlComponent: ControlComponent.VALUE,
+            color: this.options.control.selectValueColor
+          })
+        })
+      } else {
+        // 无 structValues：按字符拆分渲染，确保光标可在字符间切换、可在选项内容内逐字修改
+        const charList = splitText(optionValue.value)
+        charList.forEach(char => {
+          valueElements.push({
+            ...styleElement,
+            ...propertyElement,
+            type: ElementType.TEXT,
+            value: char,
+            controlComponent: ControlComponent.VALUE,
+            color: this.options.control.selectValueColor
+          })
+        })
+      }
+    })
+    for (let i = 0; i < valueElements.length; i++) {
+      const newElement = valueElements[i]
       formatElementContext(elementList, [newElement], prefixIndex, {
         editorOptions: this.options
       })
@@ -445,14 +619,16 @@ export class MultiCustomSelectControl implements IControlInstance {
     }
     this.control.setControlProperties(
       {
-        code
+        code,
+        values,
+        value: null
       },
       {
         elementList,
         range: { startIndex: prefixIndex, endIndex: prefixIndex }
       }
     )
-    const newIndex = start + data.length - 1
+    const newIndex = start + valueElements.length - 1
     this.control.repaintControl({
       curIndex: newIndex
     })
@@ -898,7 +1074,8 @@ export class MultiCustomSelectControl implements IControlInstance {
       if (codesArray.length === 0 && valueSets.length > 0) {
         codesArray = [valueSets[0].code]
       }
-      this.setSelectWithInputValues(codesArray, inputValues, delimiter)
+      const delimiterChanged = delimiter !== currentDelimiter
+      this.setSelectWithInputValues(codesArray, inputValues, delimiter, delimiterChanged)
     }
     confirmBtn.onmouseenter = () => {
       confirmBtn.style.backgroundColor = '#66B1FF'
@@ -989,7 +1166,12 @@ export class MultiCustomSelectControl implements IControlInstance {
     inputs[nextIndex].select()
   }
 
-  private setSelectWithInputValues(codes: string[], inputValues: Map<string, string>, delimiter: string): void {
+  private setSelectWithInputValues(
+    codes: string[],
+    inputValues: Map<string, string>,
+    delimiter: string,
+    forceUpdate: boolean = false
+  ): void {
     const control = this.element.control!
     const valueSets = control.valueSets
     if (!Array.isArray(valueSets) || !valueSets.length) return
@@ -1033,15 +1215,13 @@ export class MultiCustomSelectControl implements IControlInstance {
     }
 
 
-    // 如果值有变化，需要强制更新正文
-    if (hasValueChanged) {
+    // 如果值有变化，或分隔符发生变化，需要强制更新正文
+    if (hasValueChanged || forceUpdate) {
       // 清除缓存，确保获取最新值
       this.valueSetCache.delete(this.element.controlId || '')
-      console.log('setSelectWithInputValues - 值有变化，调用 setSelect，valueSets:', control.valueSets)
       // 调用 setSelect 并强制更新
       this.setSelect(newCodesWithValues.join(delimiter), {}, { isForceUpdate: true })
     } else {
-      console.log('setSelectWithInputValues - 值无变化，调用 setSelect')
       this.setSelect(newCodesWithValues.join(delimiter))
     }
   }

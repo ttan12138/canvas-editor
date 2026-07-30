@@ -36,14 +36,309 @@
 支持设置一系列关键词，当用户输入内容命中关键词时，关键词高亮
 
 
-增加一个纯文本和控件自由切换的逻辑；
-1. 切换为文本模式以后，要求文字渲染都是黑色字
-2. 模式的回调通知，我期望实现参考 listener.contentChange
-3. 当前切换为文本模式以后，以前控件的很多内容还都在显示，比如前缀和后缀会变成空格，并且编辑时还会显示下拉列表
-4. 当前的实现是，控件模式下，光标处于控件尾部之后可以删除整个控件，文本模式与其基本一致，但是要求文本模式下，光标处于控件尾部之后，应该无感，删除键不应该删除控件，而是删除一个文字或符号
+; 增加一个纯文本和控件自由切换的逻辑；
+; 1. 切换为文本模式以后，要求文字渲染都是黑色字
+; 2. 模式的回调通知，我期望实现参考 listener.contentChange
+; 3. 当前切换为文本模式以后，以前控件的很多内容还都在显示，比如前缀和后缀会变成空格，并且编辑时还会显示下拉列表
+; 4. 当前的实现是，控件模式下，光标处于控件尾部之后可以删除整个控件，文本模式与其基本一致，但是要求文本模式下，光标处于控件尾部之后，应该无感，删除键不应该删除控件，而是删除一个文字或符号
 
 增加一种新的控件，控件有当前值A和替换值B
 1.提供一种方法可以根据控件Id直接设置当前使用的是A还是B,
 2. 提供一种方法可以获取全部的该种控件
 3. 该控件支持嵌套显示在其他控件中，文本模式和控件模式下有两种样式，文本模式显示下划线，控件模式显示正常文字
-4. 提供一种方法可以根据Id设置控件样式，更改样式不入history
+4. 提供一种方法可以根据Id设置控件样式，更改样式不计入history
+
+
+1.当前模式切换以后虽然入history 但是 ctrl+z 撤销模式的同时，会把控件的修改同时撤销一次，我期望模式切换作为一次单独的history记录，并ctrl+z以及ctrl+y时要求正常
+
+
+
+
+# MULTI_CUSTOM_SELECT 控件重构设计
+
+## 设计背景
+当前 MULTI_CUSTOM_SELECT 控件的设计存在割裂问题，需要重新设计数据结构以实现文本模式和控件模式的无缝切换。
+
+## 重构要点
+
+### 1. 移除 code 属性
+- 移除原有的 `control.code` 字段
+- 选中状态统一通过 `values` 数组管理
+
+### 2. 重构 values 数据结构
+
+`values` 为数组类型，每一项的结构：
+
+```typescript
+interface IMultiCustomSelectValue {
+  value: string;           // 选项的原始文本值（如："高血压测试重要异常丙丁"）
+  code: string;            // 选项的标识码（如："testSelectId-001"）
+  structValues?: IElement[]; // 可选：value 的结构化内容
+}
+```
+
+**示例：**
+
+```typescript
+{
+  value: "高血压测试重要异常丙丁",
+  code: "testSelectId-001",
+  structValues: [
+    { value: "高血", groupIds: ["testGroupId-001"], underline: true },
+    { value: "压测" },
+    { value: "试" },
+    {
+      type: ElementType.CONTROL,
+      value: '重要',
+      control: {
+        conceptId: 'label-001',
+        type: ControlType.LABEL,
+        valueA: '重要',
+        valueB: '一般',
+        useValueA: true,
+        prefix: '\u200c',
+        postfix: '\u200c'
+      }
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '异常',
+      control: {
+        conceptId: 'label-002',
+        type: ControlType.LABEL,
+        valueA: '正常',
+        valueB: '异常',
+        useValueA: false,
+        prefix: '\u200c',
+        postfix: '\u200c'
+      }
+    },
+    { value: "丙丁" }
+  ]
+}
+```
+
+### 3. 选中状态管理
+- 选中状态始终根据 `values` 数组中存在的 `code` 来判断
+- 不再依赖 `control.code` 字段
+
+### 4. 渲染逻辑
+**控件模式：**
+- 如果 `structValues` 存在：根据 `structValues` 数组渲染（支持嵌套控件、groupIds等）
+- 如果 `structValues` 不存在：直接渲染 `value` 字段
+
+**文本模式：**
+- 直接渲染 `values` 每一项的 `value` 字段
+- 编辑时需要同步更新 `values` 和 `structValues`
+
+### 5. 文本模式与控件模式切换
+- 文本模式编辑时，需要同步更新 `values` 数组
+- 特别注意：当 `structValues` 存在时，确保文本编辑能正确映射到结构化数据
+- 实现文本内容与控件数据的双向绑定，确保无感切换
+
+### 6. structValues 说明
+- `structValues` 是 `IElement[]` 类型的数组
+- 支持包含：普通文本元素、嵌套控件（如 LABEL）、带样式的文本等
+- 可以包含 `groupIds`、`underline`、`bold` 等样式属性
+
+; ### 7. 编辑的业务逻辑
+; 1. 测试数据[
+;     {
+;       value: '（可以手动在多选框中添加LABEL控件）'
+;     },{
+;       type: ElementType.CONTROL,
+;       value: '',
+;       control: {
+;         conceptId: '2',
+;         type: ControlType.CUSTOM_SELECT,
+;         value: '上海xxxxxxxxxx',
+;         code: '98175',
+;         structValues: [
+;           { value: '上海xx', groupIds: ['testGroupId-01-01'], underline: true },
+;           { value: 'xxxxxxxx', groupIds: ['testGroupId-01-02'], highlight: "#f00" },
+;         ],
+;         placeholder: '',
+;         prefix: '\u200c',
+;         postfix: '\u200c',
+;         valueSets: [
+;           {
+;             value: '上海xxxxxxxxxx',
+;             code: '98175'
+;           },
+;           {
+;             value: '北京yyyyyyyyyyyyy',
+;             code: '98176'
+;           },
+;           {
+;             value: '不详zzzzzzzzzzzzzzz',
+;             code: '98177'
+;           }
+;         ]
+;       }
+;     },{
+;       type: ElementType.CONTROL,
+;       value: '',
+;       control: {
+;         conceptId: 'nested-example-2',
+;         type: ControlType.MULTI_CUSTOM_SELECT,
+;         values: [
+;           {
+;             value: '高血压测试重要异常丙丁',
+;             code: "testSelectId-001",
+;             structValues: [
+;               { value: "高血", groupIds: ["testGroupId-02-01"], underline: true },
+;               { value: "压测" },
+;               { value: "试" },
+;               {
+;                 value: '重要',
+;                 groupIds: ["testGroupId-02-02"], underline: true
+;               },
+;               {
+;                 value: '异常',
+;                 groupIds: ["testGroupId-02-03"],
+;                 highlight: "#f00"
+;               },
+;               { value: "丙丁" }
+;             ]
+;           },
+;           {
+;            value: '乏力', code: 'testSelectId-004'
+;           }
+;         ],
+;         placeholder: '请选择症状',
+;         prefix: '\u200c',
+;         postfix: '\u200c',
+;         valueSets: [
+;           { value: '高血压测试重要异常丙丁', code: 'testSelectId-001' },
+;           { value: '甲乙丙丁', code: 'testSelectId-002' },
+;           { value: '头痛', code: 'testSelectId-003' },
+;           { value: '乏力', code: 'testSelectId-004' }
+;         ]
+;       }
+;     }]
+; 一共有三级
+; 第一级 文本组件、多选、单选、数字控件等
+; 第二级
+;   多选控件：
+;     values中每一项有三个值，其中必须的值为value,非必须为code和structValues
+;     code用来联动下拉列表中的选中状态,非必须
+;     value选项的文字,必须，文本模式显示该值
+;     structValues用来展示嵌套关系，共支持三种类型，普通文本元素、LABEL控件、带有groupIds的元素；非必须；存在该字段的时候，控件模式需要渲染该字段；没有该字段的时候，直接渲染value字段；
+;   单选控件：
+;     code用来联动下拉列表中的选中状态,非必须
+;     value选项的文字,必须，文本模式显示该值
+;     structValues用来展示嵌套关系，共支持三种类型，普通文本元素、LABEL控件、带有groupIds的元素；非必须；存在该字段的时候，控件模式需要渲染该字段；没有该字段的时候，直接渲染value字段；
+; 第三级 structValues下的普通文本元素、LABEL控件、带有groupIds的元素
+; 2. 编辑时，需要首先判断当前是什么模式：
+; 文本模式删除时，不要存在删除整个控件的逻辑；按下左右及上下移动光标时，不要卡在控件的边界上
+; 控件模式则不同，删除时，需要根据删除的位置，判断是删除控件还是删除文字或符号；按下左右及上下移动光标时，可以卡在控件的边界上
+; 在上述模式的基础功能上：
+; 需要注意 根据当前位置是哪一级控件有不同的处理逻辑
+; 如果当前位置处于第三级元素的尾部或者中间位置，
+; 第三级元素是文本元素，直接编辑普通文本元素的value字段中的文字，保持数据一致性；
+; 第三级元素是LABEL控件，直接编辑LABEL控件的value字段中的文字，同时更新useValueA字段的值，保持数据一致性；
+; 第三级元素是带有groupIds的元素，直接编辑带有groupIds的控件的value字段中的文字，同时更新useValueA字段的值，保持数据一致性；
+; 上述情况，属于更新了structValues字段，进而需要影响到structValues同级的value字段；
+; 如果编辑的第三级元素value字段为空，需要从structValues中删除该元素，需要影响到structValues同级的value字段，保持数据一致性；
+; 在上述基础上，如果此时编辑的的二级元素，
+; 多选控件，找到当前所处的values的哪一项，判断是否存在structValues，如果增加文字的话，注意在structValues增加文本元素，同步更新value字段，保持数据一致性；如果删除文字的话，注意在structValues中删除该元素，同步更新value字段，保持数据一致性；
+; 如果此时找不到structValues，直接在value字段中编辑文字，保持数据一致性；
+; 单选控件，直接判断是否存在structValues，如果增加文字的话，注意在structValues增加文本元素，同步更新value字段，保持数据一致性；如果删除文字的话，注意在structValues中删除该元素，同步更新value字段，保持数据一致性；
+; 如果此时找不到structValues，直接在value字段中编辑文字，保持数据一致性；
+
+; 其他优化项：
+; 只更新分隔符再点击确认，并不能实时更新渲染内容及数据
+
+
+
+
+
+1. 修改单选控件的渲染逻辑：
+控件模式 单选有structValues时，需要渲染structValues中的文字，否则渲染value字段中的文字
+文本模式 全程渲染value字段中的文字，但是要同步structValues中的文字，保持数据一致性
+structValues中的文字有很多属性，比如groupIds、underline、highlight等,不要丢失这些属性，保持数据一致性
+对于增加逻辑，增加的文字判断位置structValues中的文字，如果structValues中没有文字，直接在value字段中增加文字，保持数据一致性
+如果structValues中存在文字，根据文字的位置，判断文字是否需要增加对应的属性，保持数据一致性
+{
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: '2',
+    type: ControlType.CUSTOM_SELECT,
+    value: '上海xxxxxxxxxx',
+    code: '98175',
+    structValues: [
+      { value: '上海xx', groupIds: ['testGroupId-01-01'], underline: true },
+      { value: 'xxxxxxxx', groupIds: ['testGroupId-01-02'], highlight: "#f00" },
+    ],
+    placeholder: '',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    valueSets: [
+      {
+        value: '上海xxxxxxxxxx',
+        code: '98175'
+      },
+      {
+        value: '北京yyyyyyyyyyyyy',
+        code: '98176'
+      },
+      {
+        value: '不详zzzzzzzzzzzzzzz',
+        code: '98177'
+      }
+    ]
+  }
+}
+2.修改多选控件的渲染逻辑：
+移除value字段，使用values的join('')替换value字段
+控件模式 多选的每个选项的逻辑，选项如果有structValues时，需要渲染structValues中的文字，否则渲染value字段中的文字
+文本模式 全程渲染每个选项的value字段中的文字，但是要同步到每个选项的structValues中的文字，保持数据一致性
+structValues中的文字有很多属性，比如groupIds、underline、highlight等,不要丢失这些属性，保持数据一致性
+对于增加逻辑，增加的文字判断位置structValues中的文字，如果structValues中没有文字，直接在value字段中增加文字，保持数据一致性
+如果structValues中存在文字，根据文字的位置，判断文字是否需要增加对应的属性，保持数据一致性
+{
+  type: ElementType.CONTROL,
+  value: '',
+  control: {
+    conceptId: 'nested-example-2',
+    type: ControlType.MULTI_CUSTOM_SELECT,
+    values: [
+      {
+        value: '高血压测试重要异常丙丁',
+        code: "testSelectId-001",
+        structValues: [
+          { value: "高血", groupIds: ["testGroupId-02-01"], underline: true },
+          { value: "压测" },
+          { value: "试" },
+          {
+            value: '重要',
+            groupIds: ["testGroupId-02-02"], underline: true
+          },
+          {
+            value: '异常',
+            groupIds: ["testGroupId-02-03"],
+            highlight: "#f00"
+          },
+          { value: "丙丁" }
+        ]
+      },
+      {
+        value: '乏力', code: 'testSelectId-004'
+      }
+    ],
+    placeholder: '请选择症状',
+    prefix: '\u200c',
+    postfix: '\u200c',
+    valueSets: [
+      { value: '高血压测试重要异常丙丁', code: 'testSelectId-001' },
+      { value: '甲乙丙丁', code: 'testSelectId-002' },
+      { value: '头痛', code: 'testSelectId-003' },
+      { value: '乏力', code: 'testSelectId-004' }
+    ]
+  }
+}
+
+
+3. 移除ControlType.LABEL逻辑
+4. 多选控件的分隔符没有记录，需要补充；同时注意每次点击确定都要根据分隔符更新渲染，保持数据一致性

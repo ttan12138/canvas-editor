@@ -12,7 +12,7 @@ import {
 } from '../../dataset/constant/Title'
 import { defaultWatermarkOption } from '../../dataset/constant/Watermark'
 import { ImageDisplay, LocationPosition } from '../../dataset/enum/Common'
-import { ControlComponent } from '../../dataset/enum/Control'
+import { ControlComponent, ControlType } from '../../dataset/enum/Control'
 import {
   ControlRenderMode,
   EditorMode,
@@ -39,8 +39,7 @@ import {
   ISetControlHighlightOption,
   ISetControlProperties,
   ISetControlValueOption,
-  ISetLabelStyleOption,
-  ISetLabelValueOption
+  IGroupTextItem
 } from '../../interface/Control'
 import {
   IAppendElementListOption,
@@ -2275,6 +2274,233 @@ export class CommandAdapt {
     return this.draw.getWorkerManager().getGroupIds()
   }
 
+  // 计算单个元素在纯文本中贡献的长度
+  private getElementPlainText(element: IElement): string {
+    if (element.type === ElementType.TABLE) return ''
+    if (element.type === ElementType.TAB) return '\t'
+    if (
+      element.type === ElementType.HYPERLINK ||
+      element.type === ElementType.TITLE ||
+      element.type === ElementType.LIST ||
+      element.type === ElementType.DATE
+    ) {
+      return (element.valueList || []).map(v => v.value).join('')
+    }
+    if (element.type === ElementType.CONTROL) {
+      const rawControlValue = element.control?.value
+      const controlValue =
+        typeof rawControlValue === 'string'
+          ? rawControlValue
+          : rawControlValue?.[0]?.value || ''
+      return controlValue
+        ? `${element.control?.preText || ''}${controlValue}${
+            element.control?.postText || ''
+          }`
+        : ''
+    }
+    return element.value || ''
+  }
+
+  // 遍历数据的各级（主列表 + 表格单元格），按顺序返回元素
+  private walkElementList(
+    elementList: IElement[],
+    callback: (list: IElement[]) => void
+  ) {
+    callback(elementList)
+    for (let i = 0; i < elementList.length; i++) {
+      const element = elementList[i]
+      if (element.type === ElementType.TABLE) {
+        const trList = element.trList
+        if (!trList) continue
+        for (const tr of trList) {
+          for (const td of tr.tdList) {
+            this.walkElementList(td.value, callback)
+          }
+        }
+      }
+    }
+  }
+
+  // 需求1：遍历当前数据的各级，按 groupId 聚合连续文字片段，返回纯文本下标
+  public getGroupTexts(): IGroupTextItem[] {
+    const elementList = this.draw.getOriginalMainElementList()
+    const groupMap = new Map<string, IGroupTextItem>()
+    let offset = 0
+    let elementIndex = 0
+    // 每个 groupId 当前连续片段状态
+    const runState = new Map<
+      string,
+      { value: string; startIndex: number; endIndex: number; lastIndex: number }
+    >()
+    const closeRun = (gid: string) => {
+      const state = runState.get(gid)
+      if (!state) return
+      const item = groupMap.get(gid) || { groupId: gid, texts: [] }
+      item.texts.push({
+        value: state.value,
+        startIndex: state.startIndex,
+        endIndex: state.endIndex
+      })
+      groupMap.set(gid, item)
+      runState.delete(gid)
+    }
+    this.walkElementList(elementList, list => {
+      for (const element of list) {
+        if (element.type === ElementType.TABLE) {
+          // 表格容器：仅作分隔，不贡献文本、打断连续性
+          elementIndex++
+          continue
+        }
+        const text = this.getElementPlainText(element)
+        const len = text.length
+        const gids = element.groupIds
+        if (gids && gids.length) {
+          for (const gid of gids) {
+            const state = runState.get(gid)
+            if (state && state.lastIndex === elementIndex - 1) {
+              // 连续：拼接文字，扩展结束下标
+              state.value += text
+              state.endIndex = offset + len
+              state.lastIndex = elementIndex
+            } else {
+              if (state) closeRun(gid)
+              runState.set(gid, {
+                value: text,
+                startIndex: offset,
+                endIndex: offset + len,
+                lastIndex: elementIndex
+              })
+            }
+          }
+        }
+        offset += len
+        elementIndex++
+      }
+    })
+    // 关闭所有剩余片段
+    for (const gid of Array.from(runState.keys())) closeRun(gid)
+    return Array.from(groupMap.values())
+  }
+
+  // 将数组中相邻且同 groupId 的元素合并（文字拼接），并应用 options
+  private mergeGroupInArray<T extends {
+    value?: string
+    groupIds?: string[]
+    color?: string
+    underline?: boolean
+    highlight?: string
+  }>(
+    arr: T[],
+    groupId: string,
+    options: Partial<IElement>
+  ): T[] {
+    const isInGroup = (el?: IElement) => !!el?.groupIds?.includes(groupId)
+
+    // 样式属性不同时不应合并为同一元素
+    const isSameStyle = (a: T, b: T): boolean =>
+      a.color === b.color &&
+      a.underline === b.underline &&
+      a.highlight === b.highlight
+
+    // 第一阶段：合并相邻 isInGroup 且样式相同的元素（文字拼接）
+    const merged: T[] = []
+    let run: T | null = null
+    const finalizeMerge = () => {
+      if (run) merged.push(run)
+      run = null
+    }
+    for (let i = 0; i < arr.length; i++) {
+      const el = arr[i]
+      const inGroup = isInGroup(el as IElement)
+      if (inGroup) {
+        if (run && isSameStyle(run, el)) {
+          // 相邻同组且样式相同，拼接文字
+          run = {
+            ...(run as T),
+            value: `${run.value || ''}${el.value || ''}`
+          }
+        } else {
+          // 新片段：非相邻 / 样式不同（color、underline、highlight 不一致）
+          finalizeMerge()
+          run = { ...el } as T
+        }
+      } else {
+        finalizeMerge()
+        merged.push(el)
+      }
+    }
+    finalizeMerge()
+
+    // 第二阶段：对所有 isInGroup 元素应用 options
+    const result: T[] = []
+    for (const el of merged) {
+      if (isInGroup(el as IElement)) {
+        result.push({ ...el, ...options } as T)
+      } else {
+        result.push(el)
+      }
+    }
+    return result
+  }
+
+  // 需求2：根据 groupId 更新分组，合并相邻同组元素（单选/多选 structValues 内），向上同步 value/code
+  public updateGroup(groupId: string, options: Partial<IElement>): void {
+    if (!groupId) return
+    const controlList = this.draw.getControl().getList()
+    // 1. 处理控件 structValues（单选 / 多选）
+    for (const controlElement of controlList) {
+      const control = controlElement.control
+      if (!control) continue
+      if (
+        control.type === ControlType.CUSTOM_SELECT &&
+        control.structValues?.length
+      ) {
+        control.structValues = this.mergeGroupInArray(
+          control.structValues,
+          groupId,
+          options
+        )
+        // 向上更新 value 一级
+        control.value =
+          control.structValues.map(sv => sv.value).join('') || null
+      } else if (
+        control.type === ControlType.MULTI_CUSTOM_SELECT &&
+        control.values?.length
+      ) {
+        const delimiter = control.multiSelectDelimiter || ','
+        for (const option of control.values) {
+          if (!option.structValues?.length) continue
+          option.structValues = this.mergeGroupInArray(
+            option.structValues,
+            groupId,
+            options
+          )
+          // 向上更新选项 value
+          option.value =
+            option.structValues.map(sv => sv.value).join('') || ''
+        }
+        // 向上更新控件 value / code
+        const newCode =
+          control.values
+            .map(v => v.code)
+            .filter(Boolean)
+            .join(delimiter) || null
+        control.value = null
+        control.code = newCode
+      }
+    }
+    // 2. 同步更新主列表（及表格单元格）中带该 groupId 的元素（含控件派生 VALUE 元素），
+    //    合并相邻同组元素，保持画布显示与数据一致
+    const elementList = this.draw.getOriginalMainElementList()
+    this.walkElementList(elementList, list => {
+      const merged = this.mergeGroupInArray(list, groupId, options)
+      list.length = 0
+      for (const el of merged) list.push(el)
+    })
+    // 3. 重新渲染，保持数据一致性
+    this.draw.render({ isSetCursor: false })
+  }
+
   public locationGroup(groupId: string) {
     const elementList = this.draw.getOriginalMainElementList()
     const context = this.draw
@@ -2351,18 +2577,6 @@ export class CommandAdapt {
 
   public getControlList(): IElement[] {
     return this.draw.getControl().getList()
-  }
-
-  public setLabelValue(payload: ISetLabelValueOption) {
-    return this.draw.setLabelValue(payload.id, payload.useValueA)
-  }
-
-  public getLabelControls(): IElement[] {
-    return this.draw.getLabelControls()
-  }
-
-  public setLabelStyle(payload: ISetLabelStyleOption) {
-    return this.draw.setLabelStyle(payload.id, payload.style)
   }
 
   public locationControl(controlId: string, options?: ILocationControlOption) {

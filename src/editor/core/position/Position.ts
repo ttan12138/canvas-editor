@@ -23,7 +23,7 @@ import { ImageDisplay } from '../../dataset/enum/Common'
 import { DeepRequired } from '../../interface/Common'
 import { EventBus } from '../event/eventbus/EventBus'
 import { EventBusMap } from '../../interface/EventBus'
-import { getElementIndexFromPositionListIndex, getIsBlockElement } from '../../utils/element'
+import { getIsBlockElement } from '../../utils/element'
 
 export class Position {
   private cursorPosition: IElementPosition | null
@@ -148,55 +148,17 @@ export class Position {
       const tablePreY = y
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
-        // 文本模式下跳过 PREFIX 和 POSTFIX 元素的位置计算
-        let isSkipElement = false
+        // 文本模式下 PREFIX/POSTFIX 创建不可见 positionList 条目
+        // 保持 positionList 与 elementList 的索引一致
+        let isInvisibleElement = false
         if (
           this.draw.getControlRenderMode() === ControlRenderMode.TEXT &&
           (element.controlComponent === ControlComponent.PREFIX ||
             element.controlComponent === ControlComponent.POSTFIX)
         ) {
-          isSkipElement = true
+          isInvisibleElement = true
         }
 
-        // 文本模式下，不递增 index，因为这些元素不应该出现在 positionList 中
-        if (isSkipElement) {
-          continue
-        }
-        // 在文本模式下，需要重新计算 isFirstLetter 和 isLastLetter
-        // 因为跳过了 PREFIX，第一个实际显示的元素应该是 isFirstLetter
-        let isFirstLetter = j === 0
-        let isLastLetter = j === curRow.elementList.length - 1
-        if (this.draw.getControlRenderMode() === ControlRenderMode.TEXT) {
-          // 查找第一个非 PREFIX/POSTFIX 的元素
-          if (isFirstLetter && element.controlComponent === ControlComponent.PREFIX) {
-            isFirstLetter = false
-          }
-          // 向前查找是否有非 PREFIX/POSTFIX 的元素
-          for (let k = j - 1; k >= 0; k--) {
-            const preEl = curRow.elementList[k]
-            if (
-              preEl.controlComponent !== ControlComponent.PREFIX &&
-              preEl.controlComponent !== ControlComponent.POSTFIX
-            ) {
-              isFirstLetter = false
-              break
-            }
-          }
-          // 向后查找是否有非 PREFIX/POSTFIX 的元素
-          if (isLastLetter && element.controlComponent === ControlComponent.POSTFIX) {
-            isLastLetter = false
-          }
-          for (let k = j + 1; k < curRow.elementList.length; k++) {
-            const nextEl = curRow.elementList[k]
-            if (
-              nextEl.controlComponent !== ControlComponent.PREFIX &&
-              nextEl.controlComponent !== ControlComponent.POSTFIX
-            ) {
-              isLastLetter = false
-              break
-            }
-          }
-        }
         const metrics = element.metrics
         const offsetY =
           !element.hide &&
@@ -205,6 +167,38 @@ export class Position {
             element.type === ElementType.LATEX)
             ? curRow.ascent - metrics.height
             : curRow.ascent
+
+        // 不可见元素（文本模式下 PREFIX/POSTFIX）：
+        // 不参与布局计算（不推进 x），使用当前行的坐标创建占位条目
+        // 保持 positionList 与 elementList 的索引一一对应
+        if (isInvisibleElement) {
+          const invisiblePositionItem: IElementPosition = {
+            pageNo,
+            index,
+            value: element.value,
+            rowIndex: startRowIndex + i,
+            rowNo: i,
+            metrics,
+            left: 0,
+            ascent: offsetY,
+            lineHeight: curRow.height,
+            isFirstLetter: false,
+            isLastLetter: false,
+            isInvisible: true,
+            coordinate: {
+              leftTop: [x, y],
+              leftBottom: [x, y + curRow.height],
+              rightTop: [x, y],
+              rightBottom: [x, y + curRow.height]
+            }
+          }
+          positionList.push(invisiblePositionItem)
+          index++
+          continue
+        }
+
+        const isFirstLetter = j === 0
+        const isLastLetter = j === curRow.elementList.length - 1
         // 偏移量（内部计算使用）
         if (element.left) {
           x += element.left
@@ -265,9 +259,7 @@ export class Position {
           })
         }
         positionList.push(positionItem)
-        if (!isSkipElement) {
-          index++
-        }
+        index++
         x += metrics.width
         // 计算表格内元素位置
         if (element.type === ElementType.TABLE && !element.hide) {
@@ -436,10 +428,13 @@ export class Position {
         pageNo,
         left,
         isFirstLetter,
+        isInvisible,
         coordinate: { leftTop, rightTop, leftBottom }
       } = positionList[j]
       if (positionNo !== pageNo) continue
       if (pageNo > positionNo) break
+      // 跳过不可见元素（文本模式下 PREFIX/POSTFIX）
+      if (isInvisible) continue
       // 命中元素
       if (
         leftTop[0] - left <= x &&
@@ -448,14 +443,7 @@ export class Position {
         leftBottom[1] >= y
       ) {
         let curPositionIndex = j
-        // 文本模式下 positionList 跳过了 PREFIX/POSTFIX/PLACEHOLDER 元素，
-        // 需要将 positionList 索引映射到 elementList 索引以获取正确元素
-        const isTextMode =
-          this.draw.getControlRenderMode() === ControlRenderMode.TEXT
-        const elementListIndex = isTextMode
-          ? getElementIndexFromPositionListIndex(elementList, j, true)
-          : j
-        const element = elementList[elementListIndex]
+        const element = elementList[j]
         // 表格被命中
         if (element.type === ElementType.TABLE) {
           for (let t = 0; t < element.trList!.length; t++) {

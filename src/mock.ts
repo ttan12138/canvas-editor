@@ -102,19 +102,19 @@ while (index < textList.length) {
   index++
 }
 
-// 模拟文本控件
-elementList.splice(12, 0, {
-  type: ElementType.CONTROL,
-  value: '',
-  control: {
-    conceptId: '1',
-    type: ControlType.TEXT,
-    value: null,
-    placeholder: '其他补充',
-    prefix: '{',
-    postfix: '}'
-  }
-})
+// // 模拟文本控件
+// elementList.splice(12, 0, {
+//   type: ElementType.CONTROL,
+//   value: '',
+//   control: {
+//     conceptId: '1',
+//     type: ControlType.TEXT,
+//     value: null,
+//     placeholder: '其他补充',
+//     prefix: '{',
+//     postfix: '}'
+//   }
+// })
 
 // 模拟下拉控件
 elementList.splice(94, 0, {
@@ -429,7 +429,6 @@ elementList.splice(108, 0, {
     ]
   }
 })
-
 // // 模拟超链接
 // elementList.splice(116, 0, {
 //   type: ElementType.HYPERLINK,
@@ -840,6 +839,133 @@ elementList.push(
 //     }
 //   ]
 // )
+
+// ========== 嵌套LABEL控件示例 ==========
+
+// 示例1: MULTI_CUSTOM_SELECT 控件中包含部分文字有groupId
+elementList.push(
+  ...[
+    {
+      value: '\n\n示例1 - 多选文字带groupId：'
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '',
+      control: {
+        conceptId: 'nested-example-1',
+        type: ControlType.MULTI_CUSTOM_SELECT,
+        values: [
+          { value: '高血压', code: 'disease-001' },
+          { value: '糖尿病', code: 'disease-002', structValues: [{ value: '糖尿病', underline: true, groupIds: ['testGroupId-002'] }] },
+          { value: '冠心病', code: 'disease-003' },
+          { value: '高血脂', code: 'disease-004' }
+        ],
+        placeholder: '请选择疾病',
+        prefix: '\u200c',
+        postfix: '\u200c',
+        valueSets: [
+          { value: '高血压', code: 'disease-001' },
+          { value: '糖尿病', code: 'disease-002' },
+          { value: '冠心病', code: 'disease-003' },
+          { value: '高血脂', code: 'disease-004' },
+          { value: '脂肪肝', code: 'disease-005' }
+        ]
+      }
+    }
+  ]
+)
+
+
+// 示例2: MULTI_CUSTOM_SELECT 控件中包含LABEL控件
+elementList.push(
+  ...[
+    {
+      value: '\n示例2 - 多选文字：'
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '',
+      control: {
+        conceptId: 'nested-example-2',
+        type: ControlType.MULTI_CUSTOM_SELECT,
+        values: [
+          {
+            value: '高血压测试重要异常丙丁',
+            code: "testSelectId-001",
+            structValues: [
+              { value: "高血", groupIds: ["testGroupId-02-01"], underline: true },
+              { value: "压测", groupIds: ["testGroupId-02-01"] },
+              { value: "试" },
+              {
+                value: '重要',
+                groupIds: ["testGroupId-02-02"], underline: true
+              },
+              {
+                value: '异常',
+                groupIds: ["testGroupId-02-03"],
+                highlight: "#f00"
+              },
+              { value: "丙丁" }
+            ]
+          },
+          {
+            value: '乏力', code: 'testSelectId-004'
+          }
+        ],
+        placeholder: '请选择症状',
+        prefix: '\u200c',
+        postfix: '\u200c',
+        valueSets: [
+          { value: '高血压测试重要异常丙丁', code: 'testSelectId-001' },
+          { value: '甲乙丙丁', code: 'testSelectId-002' },
+          { value: '头痛', code: 'testSelectId-003' },
+          { value: '乏力', code: 'testSelectId-004' }
+        ]
+      }
+    },
+    {
+      value: '（可以手动在多选框中添加LABEL控件）'
+    }
+  ]
+)
+elementList.push(
+  ...[
+    {
+      value: '\n\n示例3 ：单选带groupId：'
+    },
+    {
+      type: ElementType.CONTROL,
+      value: '',
+      control: {
+        conceptId: '2',
+        type: ControlType.CUSTOM_SELECT,
+        value: '上海xxxxxxxxxx',
+        code: '98175',
+        structValues: [
+          { value: '上海xx', groupIds: ['testGroupId-01-01'], underline: true },
+          { value: 'xxxxxxxx', groupIds: ['testGroupId-01-01'], highlight: "#f00" },
+        ],
+        placeholder: '',
+        prefix: '\u200c',
+        postfix: '\u200c',
+        valueSets: [
+          {
+            value: '上海xxxxxxxxxx',
+            code: '98175'
+          },
+          {
+            value: '北京yyyyyyyyyyyyy',
+            code: '98176'
+          },
+          {
+            value: '不详zzzzzzzzzzzzzzz',
+            code: '98177'
+          }
+        ]
+      }
+    },
+  ]
+)
 
 export const data: IElement[] = elementList
 

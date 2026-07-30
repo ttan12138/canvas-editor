@@ -373,19 +373,36 @@ export function formatElementList(
         }
       }
       // 值
+      // CUSTOM_SELECT：存在 structValues 时优先渲染 structValues 中的文字
+      const singleStructValues =
+        type === ControlType.CUSTOM_SELECT && el.control.structValues?.length
+          ? el.control.structValues
+          : null
+      // MULTI_CUSTOM_SELECT：使用 values 渲染（每个选项优先使用 structValues）
+      const multiSelectValues =
+        type === ControlType.MULTI_CUSTOM_SELECT && el.control.values?.length
+          ? el.control.values
+          : null
       // 对于 CUSTOM_SELECT 和 MULTI_CUSTOM_SELECT：当 value 或 code 为 null 时，自动选择第一个选项
       const shouldAutoSelectFirst =
         (type === ControlType.CUSTOM_SELECT || type === ControlType.MULTI_CUSTOM_SELECT) &&
+        !singleStructValues &&
+        !multiSelectValues &&
         (value == null || code == null) &&
         Array.isArray(valueSets) &&
         valueSets.length > 0
       // MULTI_CUSTOM_SELECT 支持 code 包含多个值（逗号分隔）
-      const isMultiCustomSelectWithCode = type === ControlType.MULTI_CUSTOM_SELECT && code && (!value || !value.length)
+      const isMultiCustomSelectWithCode =
+        type === ControlType.MULTI_CUSTOM_SELECT &&
+        !multiSelectValues &&
+        code &&
+        (!value || !value.length)
       if (
         (value && value.length) ||
+        !!singleStructValues ||
+        !!multiSelectValues ||
         type === ControlType.CHECKBOX ||
         type === ControlType.RADIO ||
-        type === ControlType.LABEL ||
         (type === ControlType.SELECT && code && (!value || !value.length)) ||
         (type === ControlType.CUSTOM_SELECT && code && (!value || !value.length)) ||
         isMultiCustomSelectWithCode ||
@@ -393,20 +410,58 @@ export function formatElementList(
       ) {
         // 处理 value 可能是字符串的情况，转换为 IElement[] 格式
         let valueList: IElement[] = []
-        if (value) {
+        if (singleStructValues) {
+          // 单选控件：渲染 structValues 中的文字（保留 groupIds、underline、highlight 等属性）
+          valueList = singleStructValues.map(sv => ({
+            ...deepClone(sv),
+            color: editorOptions.control.selectValueColor
+          })) as IElement[]
+          // 同步 value 字段，保持数据一致性
+          el.control.value = singleStructValues.map(sv => sv.value).join('')
+        } else if (multiSelectValues) {
+          // 多选控件：渲染 values 中的每个选项（选项优先渲染 structValues）
+          const delimiter = el.control.multiSelectDelimiter ?? ','
+          multiSelectValues.forEach((optionValue, optionIndex) => {
+            // 选项间分隔符
+            if (optionIndex > 0 && delimiter) {
+              const delimiterStrList = splitText(delimiter)
+              delimiterStrList.forEach(d => {
+                valueList.push({
+                  value: d,
+                  color: editorOptions.control.selectValueColor
+                })
+              })
+            }
+            if (optionValue.structValues?.length) {
+              // 优先渲染 structValues 中的文字（保留 groupIds、underline、highlight 等属性）
+              // 注意：此处只读取数据生成元素，不修改原始 control.values，避免污染源数据
+              optionValue.structValues.forEach(sv => {
+                valueList.push({
+                  ...deepClone(sv),
+                  color: editorOptions.control.selectValueColor
+                } as IElement)
+              })
+            } else {
+              valueList.push({
+                value: optionValue.value,
+                color: editorOptions.control.selectValueColor
+              })
+            }
+          })
+          // 多选控件移除 value 字段，由 values 派生
+          el.control.value = null
+          // 同步 code 字段，保持数据一致性（使用记录的分隔符）
+          el.control.code =
+            multiSelectValues
+              .filter(v => v.code)
+              .map(v => v.code)
+              .join(delimiter) || null
+        } else if (value) {
           if (Array.isArray(value)) {
             valueList = deepClone(value)
           } else if (typeof value === 'string') {
             // 字符串类型转换为 IElement 数组
             valueList = [{ value }]
-          }
-        }
-        // LABEL 控件：从 valueA/valueB 派生显示值
-        if (type === ControlType.LABEL && !value) {
-          const control = el.control
-          const displayValue = control.useValueA ? control.valueA : control.valueB
-          if (displayValue) {
-            valueList = [{ value: displayValue }]
           }
         }
         if (type === ControlType.CHECKBOX) {
@@ -944,7 +999,19 @@ export function zipElementList(
             control,
             controlId
           }
-          controlElement.control!.value = zipElementList(valueList, options)
+          if (control.type === ControlType.CUSTOM_SELECT) {
+            // 单选控件：value 字段与 structValues 已同步维护（字符串形式）
+            if (typeof control.value !== 'string') {
+              controlElement.control!.value = valueList
+                .map(v => v.value)
+                .join('')
+            }
+          } else if (control.type === ControlType.MULTI_CUSTOM_SELECT) {
+            // 多选控件：移除 value 字段，由 values 派生
+            controlElement.control!.value = null
+          } else {
+            controlElement.control!.value = zipElementList(valueList, options)
+          }
           element = pickElementAttr(controlElement, { extraPickAttrs })
           // 控件元素数量 - 1（当前元素）
           e += start - e - 1
@@ -995,6 +1062,105 @@ export function zipElementList(
     zipElementListData.push(pickElement)
   }
   return zipElementListData
+}
+
+// 依据新旧文本差异，将变更同步到结构化片段列表（保留 groupIds、underline、highlight 等属性）
+// 插入的文字根据位置归属对应片段：位于片段内部或紧邻片段尾部时继承该片段属性
+export function applyTextDiffToStructSegments<T extends { value: string }>(
+  segments: T[],
+  oldText: string,
+  newText: string,
+  canInsert?: (segment: T) => boolean
+): T[] {
+  if (oldText === newText) {
+    return segments.map(segment => ({ ...segment }))
+  }
+  // 计算公共前缀长度
+  let prefixLen = 0
+  const maxPrefix = Math.min(oldText.length, newText.length)
+  while (prefixLen < maxPrefix && oldText[prefixLen] === newText[prefixLen]) {
+    prefixLen++
+  }
+  // 计算公共后缀长度
+  let suffixLen = 0
+  const maxSuffix = Math.min(oldText.length, newText.length) - prefixLen
+  while (
+    suffixLen < maxSuffix &&
+    oldText[oldText.length - 1 - suffixLen] ===
+      newText[newText.length - 1 - suffixLen]
+  ) {
+    suffixLen++
+  }
+  // 删除区间与插入文字
+  const deleteStart = prefixLen
+  const deleteEnd = oldText.length - suffixLen
+  const insertText = newText.slice(prefixLen, newText.length - suffixLen)
+  // 计算每个片段删除后保留的左右部分
+  const parts: {
+    keepLeft: string
+    keepRight: string
+    segStart: number
+    segEnd: number
+  }[] = []
+  let cursor = 0
+  for (const segment of segments) {
+    const segStart = cursor
+    const segEnd = cursor + segment.value.length
+    cursor = segEnd
+    const leftEnd = Math.max(segStart, Math.min(segEnd, deleteStart))
+    const rightStart = Math.max(segStart, Math.min(segEnd, deleteEnd))
+    parts.push({
+      keepLeft: segment.value.slice(0, leftEnd - segStart),
+      keepRight: segment.value.slice(rightStart - segStart),
+      segStart,
+      segEnd
+    })
+  }
+  // 查找插入目标片段
+  let insertIndex = -1
+  if (insertText) {
+    const insertable = (i: number) => !canInsert || canInsert(segments[i])
+    // 优先：插入点位于片段内部
+    for (let i = 0; i < parts.length; i++) {
+      if (deleteStart > parts[i].segStart && deleteStart < parts[i].segEnd) {
+        insertIndex = i
+        break
+      }
+    }
+    // 其次：插入点紧邻片段尾部（继承前一片段属性）
+    if (!~insertIndex) {
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i].segEnd === deleteStart && insertable(i)) {
+          insertIndex = i
+          break
+        }
+      }
+    }
+    // 最后：插入点紧邻片段头部
+    if (!~insertIndex) {
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].segStart === deleteStart && insertable(i)) {
+          insertIndex = i
+          break
+        }
+      }
+    }
+  }
+  // 重建片段列表（删除后为空的片段移除）
+  const result: T[] = []
+  segments.forEach((segment, i) => {
+    const { keepLeft, keepRight } = parts[i]
+    const newValue =
+      i === insertIndex ? keepLeft + insertText + keepRight : keepLeft + keepRight
+    if (newValue) {
+      result.push({ ...segment, value: newValue })
+    }
+  })
+  // 兜底：无法定位插入位置时追加纯文本片段
+  if (insertText && !~insertIndex) {
+    result.push({ value: insertText } as T)
+  }
+  return result
 }
 
 export function convertTextAlignToRowFlex(node: HTMLElement) {
@@ -1435,8 +1601,12 @@ export function createDomFromElementList(
         clipboardDom.append(tab)
       } else if (element.type === ElementType.CONTROL) {
         const controlElement = document.createElement('span')
-        const childDom = buildDom(element.control?.value || [])
-        controlElement.innerHTML = childDom.innerHTML
+        const controlValue = element.control?.value
+        const plainText =
+          typeof controlValue === 'string'
+            ? controlValue
+            : (controlValue || []).map(v => v.value).join('')
+        controlElement.innerText = `${element.control?.preText || ''}${plainText}${element.control?.postText || ''}`
         clipboardDom.append(controlElement)
       } else if (element.type === ElementType.PAGE_BREAK) {
         const pageBreakElement = document.createElement('div')
@@ -1856,7 +2026,11 @@ export function getTextFromElementList(elementList: IElement[]) {
       ) {
         let textLike = ''
         if (element.type === ElementType.CONTROL) {
-          const controlValue = element.control!.value?.[0]?.value || ''
+          const rawControlValue = element.control!.value
+          const controlValue =
+            typeof rawControlValue === 'string'
+              ? rawControlValue
+              : (rawControlValue || []).map(v => v.value).join('')
           textLike = controlValue
             ? `${element.control?.preText || ''}${controlValue}${
                 element.control?.postText || ''
@@ -1973,40 +2147,6 @@ export function getNonHideElementIndex(
 
   // 非文本模式或当前元素不是 PREFIX/POSTFIX，直接返回原索引
   return index
-}
-
-/**
- * 根据 positionList 的数组索引获取对应的 elementList 索引
- * 在文本模式下 positionList 跳过了 PREFIX/POSTFIX/PLACEHOLDER 元素，
- * 因此 positionList 索引与 elementList 索引不再一一对应
- * @param elementList 完整元素列表（包含 PREFIX/POSTFIX/PLACEHOLDER）
- * @param positionListIndex positionList 数组中的索引
- * @param isTextMode 是否为文本模式
- * @returns elementList 中对应的元素索引
- */
-export function getElementIndexFromPositionListIndex(
-  elementList: IElement[],
-  positionListIndex: number,
-  isTextMode: boolean
-): number {
-  if (!isTextMode) return positionListIndex
-
-  let count = 0
-  for (let i = 0; i < elementList.length; i++) {
-    const element = elementList[i]
-    if (
-      element.controlComponent !== ControlComponent.PREFIX &&
-      element.controlComponent !== ControlComponent.POSTFIX &&
-      element.controlComponent !== ControlComponent.PLACEHOLDER
-    ) {
-      if (count === positionListIndex) {
-        return i
-      }
-      count++
-    }
-  }
-  // 未找到匹配项，返回最后一个有效元素索引
-  return elementList.length - 1
 }
 
 /**

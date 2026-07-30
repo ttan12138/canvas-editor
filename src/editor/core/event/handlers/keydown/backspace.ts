@@ -2,7 +2,7 @@ import { ZERO } from '../../../../dataset/constant/Common'
 import { LocationPosition } from '../../../../dataset/enum/Common'
 import { ControlComponent } from '../../../../dataset/enum/Control'
 import { ControlRenderMode } from '../../../../dataset/enum/Editor'
-import { getNonHideElementIndex, getElementIndexFromPositionListIndex, removeControlIfEmpty } from '../../../../utils/element'
+import { getNonHideElementIndex, removeControlIfEmpty } from '../../../../utils/element'
 import { CanvasEvent } from '../../CanvasEvent'
 
 // 删除光标前隐藏元素
@@ -98,16 +98,7 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
       const cursorPosition = draw.getPosition().getCursorPosition()
       if (!cursorPosition) return
       const elementList = draw.getElementList()
-      const positionList = draw.getPosition().getPositionList()
-      // cursorPosition 是 positionList 中的引用，找到其在 positionList 中的索引
-      const positionListIndex = positionList.indexOf(cursorPosition)
-      if (positionListIndex === -1) return
-      // 将 positionList 索引映射到 elementList 索引
-      const elementIndex = getElementIndexFromPositionListIndex(
-        elementList,
-        positionListIndex,
-        true
-      )
+      const elementIndex = cursorPosition.index
       const element = elementList[elementIndex]
 
       // 检查是否需要跳过 PREFIX/POSTFIX/PLACEHOLDER
@@ -146,17 +137,8 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
     // 普通元素删除
     const cursorPosition = draw.getPosition().getCursorPosition()
     if (!cursorPosition) return
-    const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
     const elementList = draw.getElementList()
-    // 文本模式下 cursorPosition.index 不是 elementList 索引
-    // positionList 跳过了 PREFIX/POSTFIX/PLACEHOLDER 元素
-    const positionIndex = isTextMode
-      ? getElementIndexFromPositionListIndex(
-          elementList,
-          draw.getPosition().getPositionList().indexOf(cursorPosition),
-          true
-        )
-      : cursorPosition.index
+    const positionIndex = cursorPosition.index
     const isCollapsed = rangeManager.getIsCollapsed()
     // 判断是否允许删除
     if (isCollapsed && positionIndex === 0) {
@@ -207,9 +189,9 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
       draw.spliceElementList(elementList, startIndex + 1, endIndex - startIndex)
       curIndex = startIndex
     } else {
-      // 文本模式下，检查是否需要跳过 PREFIX/POSTFIX/PLACEHOLDER
-      // positionIndex 已在 else 分支顶部通过映射计算为正确的 elementList 索引
       const element = elementList[positionIndex]
+      const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
+      // 文本模式下，跳过 PLACEHOLDER 元素
       if (
         isTextMode &&
         element.controlComponent === ControlComponent.PLACEHOLDER

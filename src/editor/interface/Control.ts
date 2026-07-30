@@ -18,11 +18,61 @@ export interface IValueSet {
   code: string
 }
 
+// 选择类控件结构化值（保留 groupIds、underline、highlight 等属性）
+export interface IControlStructValue {
+  value: string
+  groupIds?: string[]
+  underline?: boolean
+  highlight?: string
+  bold?: boolean
+  italic?: boolean
+  strikeout?: boolean
+  color?: string
+  font?: string
+  size?: number
+  extension?: unknown
+  [key: string]: unknown
+}
+
+// 多选控件选项值
+export interface IControlSelectValue {
+  value: string
+  code: string
+  structValues?: IControlStructValue[]
+}
+
+// 按 groupId 聚合：连续文字片段
+export interface IGroupTextSpan {
+  value: string
+  // 在纯文本中的起始下标
+  startIndex: number
+  // 在纯文本中的结束下标（不含）
+  endIndex: number
+}
+
+// 按 groupId 聚合返回项
+export interface IGroupTextItem {
+  groupId: string
+  texts: IGroupTextSpan[]
+}
+
+// 更新指定 groupId 分组入参
+export interface IUpdateGroupOption {
+  // 目标 groupId
+  groupId: string
+  // 合并后应用于元素的属性（如 value、underline、highlight 等）
+  options: Partial<IElement>
+}
+
 export interface IControlSelect {
   code: string | null
   valueSets: IValueSet[]
   isMultiSelect?: boolean
   multiSelectDelimiter?: string
+  // 单选控件结构化值
+  structValues?: IControlStructValue[]
+  // 多选控件选项值列表
+  values?: IControlSelectValue[]
   selectExclusiveOptions?: {
     inputAble?: boolean
   }
@@ -54,19 +104,6 @@ export interface IControlNumber {
   }
 }
 
-export interface IControlLabel {
-  valueA?: string
-  valueB?: string
-  useValueA?: boolean
-  labelStyle?: {
-    font?: string
-    size?: number
-    bold?: boolean
-    color?: string
-    italic?: boolean
-  }
-}
-
 export interface IControlHighlightRule {
   keyword: string
   alpha?: number
@@ -88,7 +125,7 @@ export interface IControlRule {
 
 export interface IControlBasic {
   type: ControlType
-  value: IElement[] | null
+  value?: IElement[] | string | null
   placeholder?: string
   conceptId?: string
   groupId?: string
@@ -121,8 +158,7 @@ export type IControl = IControlBasic &
   Partial<IControlCheckbox> &
   Partial<IControlRadio> &
   Partial<IControlDate> &
-  Partial<IControlNumber> &
-  Partial<IControlLabel>
+  Partial<IControlNumber>
 
 export interface IControlOption {
   placeholderColor?: string
@@ -270,20 +306,4 @@ export interface IDestroyControlOption {
 export interface IRemoveControlOption {
   id?: string
   conceptId?: string
-}
-
-export interface ISetLabelValueOption {
-  id: string
-  useValueA: boolean
-}
-
-export interface ISetLabelStyleOption {
-  id: string
-  style: {
-    font?: string
-    size?: number
-    bold?: boolean
-    color?: string
-    italic?: boolean
-  }
 }

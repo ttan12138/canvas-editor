@@ -7,8 +7,7 @@ export enum ControlType {
   NUMBER = 'number',
   NUMBER_FLAG = 'numberFlag',
   CUSTOM_SELECT = 'customSelect',
-  MULTI_CUSTOM_SELECT = 'multiCustomSelect',
-  LABEL = 'label'
+  MULTI_CUSTOM_SELECT = 'multiCustomSelect'
 }
 
 export enum ControlComponent {

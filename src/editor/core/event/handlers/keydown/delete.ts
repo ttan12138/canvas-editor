@@ -1,7 +1,7 @@
 import { ControlComponent } from '../../../../dataset/enum/Control'
 import { ControlRenderMode } from '../../../../dataset/enum/Editor'
 import { LocationPosition } from '../../../../dataset/enum/Common'
-import { getNonHideElementIndex, getElementIndexFromPositionListIndex, removeControlIfEmpty } from '../../../../utils/element'
+import { getNonHideElementIndex, removeControlIfEmpty } from '../../../../utils/element'
 import { CanvasEvent } from '../../CanvasEvent'
 
 // 删除光标后隐藏元素
@@ -87,16 +87,7 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
       const cursorPosition = position.getCursorPosition()
       if (!cursorPosition) return
       const elementList = draw.getElementList()
-      const positionList = position.getPositionList()
-      // cursorPosition 是 positionList 中的引用，找到其在 positionList 中的索引
-      const positionListIndex = positionList.indexOf(cursorPosition)
-      if (positionListIndex === -1) return
-      // 将 positionList 索引映射到 elementList 索引
-      const elementIndex = getElementIndexFromPositionListIndex(
-        elementList,
-        positionListIndex,
-        true
-      )
+      const elementIndex = cursorPosition.index
       const nextElement = elementList[elementIndex + 1]
 
       // 检查是否需要跳过 PREFIX/POSTFIX/PLACEHOLDER
@@ -140,16 +131,7 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
       const position = draw.getPosition()
       const cursorPosition = position.getCursorPosition()
       if (!cursorPosition) return
-      const positionList = position.getPositionList()
-      // cursorPosition 是 positionList 中的引用，找到其在 positionList 中的索引
-      const positionListIndex = positionList.indexOf(cursorPosition)
-      if (positionListIndex === -1) return
-      // 将 positionList 索引映射到 elementList 索引
-      const elementIndex = getElementIndexFromPositionListIndex(
-        elementList,
-        positionListIndex,
-        true
-      )
+      const elementIndex = cursorPosition.index
       const isCollapsed = rangeManager.getIsCollapsed()
 
       if (!isCollapsed) {
@@ -189,14 +171,7 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
       const position = draw.getPosition()
       const cursorPosition = position.getCursorPosition()
       if (!cursorPosition) return
-      // 文本模式下 cursorPosition.index 不是 elementList 索引，
-      // 需要将 positionList 索引映射到 elementList 索引
-      const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
-      const positionList = position.getPositionList()
-      const positionListIndex = positionList.indexOf(cursorPosition)
-      const elementIndex = isTextMode && positionListIndex !== -1
-        ? getElementIndexFromPositionListIndex(elementList, positionListIndex, true)
-        : cursorPosition.index
+      const elementIndex = cursorPosition.index
       // 命中图片直接删除
       const positionContext = position.getPositionContext()
       if (positionContext.isDirectHit && positionContext.isImage) {

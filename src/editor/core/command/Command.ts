@@ -118,8 +118,6 @@ export class Command {
   public executeConvertToText: CommandAdapt['convertToText']
   public executeConvertToControl: CommandAdapt['convertToControl']
   public executeSetControlRenderMode: CommandAdapt['setControlRenderMode']
-  public executeSetLabelValue: CommandAdapt['setLabelValue']
-  public executeSetLabelStyle: CommandAdapt['setLabelStyle']
   public executeUpdateOptions: CommandAdapt['updateOptions']
   public executeInsertTitle: CommandAdapt['insertTitle']
   public executeFocus: CommandAdapt['focus']
@@ -146,9 +144,10 @@ export class Command {
   public getSearchNavigateInfo: CommandAdapt['getSearchNavigateInfo']
   public getLocale: CommandAdapt['getLocale']
   public getGroupIds: CommandAdapt['getGroupIds']
+  public getGroupTexts: CommandAdapt['getGroupTexts']
+  public updateGroup: CommandAdapt['updateGroup']
   public getControlValue: CommandAdapt['getControlValue']
   public getControlList: CommandAdapt['getControlList']
-  public getLabelControls: CommandAdapt['getLabelControls']
   public getContainer: CommandAdapt['getContainer']
   public getTitleValue: CommandAdapt['getTitleValue']
   public getPositionContextByEvent: CommandAdapt['getPositionContextByEvent']
@@ -300,6 +299,8 @@ export class Command {
     this.getSearchNavigateInfo = adapt.getSearchNavigateInfo.bind(adapt)
     this.getLocale = adapt.getLocale.bind(adapt)
     this.getGroupIds = adapt.getGroupIds.bind(adapt)
+    this.getGroupTexts = adapt.getGroupTexts.bind(adapt)
+    this.updateGroup = adapt.updateGroup.bind(adapt)
     this.getContainer = adapt.getContainer.bind(adapt)
     this.getTitleValue = adapt.getTitleValue.bind(adapt)
     this.getPositionContextByEvent = adapt.getPositionContextByEvent.bind(adapt)
@@ -314,11 +315,8 @@ export class Command {
     this.executeSetControlPropertiesList =
       adapt.setControlPropertiesList.bind(adapt)
     this.executeSetControlHighlight = adapt.setControlHighlight.bind(adapt)
-    this.executeSetLabelValue = adapt.setLabelValue.bind(adapt)
-    this.executeSetLabelStyle = adapt.setLabelStyle.bind(adapt)
     this.getControlValue = adapt.getControlValue.bind(adapt)
     this.getControlList = adapt.getControlList.bind(adapt)
-    this.getLabelControls = adapt.getLabelControls.bind(adapt)
     this.executeLocationControl = adapt.locationControl.bind(adapt)
     this.executeInsertControl = adapt.insertControl.bind(adapt)
     this.executeJumpControl = adapt.jumpControl.bind(adapt)
@@ -356,6 +354,8 @@ export class Command {
     this.getSearchNavigateInfo = adapt.getSearchNavigateInfo.bind(adapt)
     this.getLocale = adapt.getLocale.bind(adapt)
     this.getGroupIds = adapt.getGroupIds.bind(adapt)
+    this.getGroupTexts = adapt.getGroupTexts.bind(adapt)
+    this.updateGroup = adapt.updateGroup.bind(adapt)
     this.getContainer = adapt.getContainer.bind(adapt)
     this.getTitleValue = adapt.getTitleValue.bind(adapt)
     this.getPositionContextByEvent = adapt.getPositionContextByEvent.bind(adapt)

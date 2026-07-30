@@ -117,7 +117,6 @@ import { WhiteSpaceParticle } from './particle/WhiteSpaceParticle'
 import { NumberFlagParticle } from './particle/number/NumberFlagParticle'
 import { CustomSelectParticle } from './particle/customSelect/CustomSelectParticle'
 import { MultiCustomSelectParticle } from './particle/multiCustomSelect/MultiCustomSelectParticle'
-import { LabelParticle as LabelControlParticle } from './particle/label/LabelParticle'
 import { MouseObserver } from '../observer/MouseObserver'
 import { LineNumber } from './frame/LineNumber'
 import { PageBorder } from './frame/PageBorder'
@@ -192,7 +191,6 @@ export class Draw {
   private numberFlagParticle: NumberFlagParticle
   private customSelectParticle: CustomSelectParticle
   private multiCustomSelectParticle: MultiCustomSelectParticle
-  private labelControlParticle: LabelControlParticle
   private control: Control
   private pageBorder: PageBorder
   private workerManager: WorkerManager
@@ -282,7 +280,6 @@ export class Draw {
     this.numberFlagParticle = new NumberFlagParticle(this)
     this.customSelectParticle = new CustomSelectParticle(this)
     this.multiCustomSelectParticle = new MultiCustomSelectParticle(this)
-    this.labelControlParticle = new LabelControlParticle(this)
     this.control = new Control(this)
     this.pageBorder = new PageBorder(this)
     this.graffiti = new Graffiti(this, data.graffiti)
@@ -480,111 +477,6 @@ export class Draw {
       isSubmitHistory: false,
       isSetCursor: false
     })
-  }
-
-  /**
-   * 设置 LABEL 控件当前显示值（A 还是 B）
-   * @param id 控件 ID
-   * @param useValueA true=显示 valueA, false=显示 valueB
-   */
-  public setLabelValue(id: string, useValueA: boolean): boolean {
-    const elementList = this.elementList
-    const labelElements = this.scanLabelValueElements(elementList, id)
-    if (labelElements.length === 0) return false
-
-    for (const { element } of labelElements) {
-      const control = element.control!
-      const targetValue = useValueA ? control.valueA || '' : control.valueB || ''
-      element.value = targetValue
-      control.useValueA = useValueA
-    }
-
-    this.render({ isSubmitHistory: true })
-    return true
-  }
-
-  /**
-   * 获取所有 LABEL 类型的控件元素
-   * @returns 包含 LABEL 控件的元素列表
-   */
-  public getLabelControls(): IElement[] {
-    const result: IElement[] = []
-    const elementList = this.elementList
-    for (const element of elementList) {
-      if (
-        element.control?.type === ControlType.LABEL &&
-        element.controlComponent === ControlComponent.VALUE
-      ) {
-        result.push(element)
-      }
-    }
-    return result
-  }
-
-  /**
-   * 设置 LABEL 控件样式（不计入 history）
-   * @param id 控件 ID
-   * @param style 样式属性
-   */
-  public setLabelStyle(
-    id: string,
-    style: {
-      font?: string
-      size?: number
-      bold?: boolean
-      color?: string
-      italic?: boolean
-    }
-  ): boolean {
-    const elementList = this.elementList
-    const labelElements = this.scanLabelValueElements(elementList, id)
-    if (labelElements.length === 0) return false
-
-    for (const { element } of labelElements) {
-      const control = element.control!
-      // 同时更新 labelStyle（用于 LabelParticle 下划线渲染）
-      // 和 element 自身样式属性（用于 TextParticle 文本渲染）
-      control.labelStyle = { ...control.labelStyle, ...style }
-      if (style.font !== undefined) {
-        element.font = style.font
-      }
-      if (style.size !== undefined) {
-        element.size = style.size
-      }
-      if (style.bold !== undefined) {
-        element.bold = style.bold
-      }
-      if (style.color !== undefined) {
-        element.color = style.color
-      }
-      if (style.italic !== undefined) {
-        element.italic = style.italic
-      }
-    }
-
-    this.render({ isSubmitHistory: false })
-    return true
-  }
-
-  /**
-   * 扫描 elementList 中属于指定 ID 的 LABEL VALUE 元素
-   */
-  private scanLabelValueElements(
-    elementList: IElement[],
-    controlId: string
-  ): { element: IElement; index: number }[] {
-    const result: { element: IElement; index: number }[] = []
-    for (let i = 0; i < elementList.length; i++) {
-      const element = elementList[i]
-      if (
-        element.control?.type === ControlType.LABEL &&
-        element.controlComponent === ControlComponent.VALUE &&
-        element.controlId === controlId
-      ) {
-        result.push({ element, index: i })
-      }
-    }
-    return result
   }
 
   public getOriginalWidth(): number {
@@ -2336,37 +2228,13 @@ export class Draw {
     const highlightMarginHeight = this.getHighlightMarginHeight()
     for (let i = 0; i < rowList.length; i++) {
       const curRow = rowList[i]
-      // 文本模式下计算正确的 positionIndex
-      let positionIndex: number
-      if (this.controlRenderMode === ControlRenderMode.TEXT) {
-        // 在文本模式下，positionIndex 是 positionList 的数组索引
-        // 需要计算当前行之前有多少个非 PREFIX/POSTFIX 元素
-        positionIndex = 0
-        for (let r = 0; r < i; r++) {
-          const row = rowList[r]
-          for (let e = 0; e < row.elementList.length; e++) {
-            const el = row.elementList[e]
-            if (
-              el.controlComponent !== ControlComponent.PREFIX &&
-              el.controlComponent !== ControlComponent.POSTFIX
-            ) {
-              positionIndex++
-            }
-          }
-        }
-      } else {
-        // 控件模式下，positionIndex 等于 row.startIndex
-        positionIndex = curRow.startIndex
-      }
+      let positionIndex = curRow.startIndex
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const preElement = curRow.elementList[j - 1]
-        // 文本模式下跳过 PREFIX 和 POSTFIX
-        if (
-          this.controlRenderMode === ControlRenderMode.TEXT &&
-          (element.controlComponent === ControlComponent.PREFIX ||
-            element.controlComponent === ControlComponent.POSTFIX)
-        ) {
+        // 不可见元素（文本模式下 PREFIX/POSTFIX）跳过高亮渲染
+        if (positionList[positionIndex]?.isInvisible) {
+          positionIndex++
           continue
         }
         // 高亮配置：元素 > 控件配置
@@ -2443,38 +2311,15 @@ export class Draw {
         height: 0
       }
       let tableRangeElement: IElement | null = null
-      // 文本模式下计算正确的 positionIndex
-      let positionIndex: number
-      if (this.controlRenderMode === ControlRenderMode.TEXT) {
-        // 在文本模式下，positionIndex 是 positionList 的数组索引
-        // 需要计算当前行之前有多少个非 PREFIX/POSTFIX 元素
-        positionIndex = 0
-        for (let r = 0; r < i; r++) {
-          const row = rowList[r]
-          for (let e = 0; e < row.elementList.length; e++) {
-            const el = row.elementList[e]
-            if (
-              el.controlComponent !== ControlComponent.PREFIX &&
-              el.controlComponent !== ControlComponent.POSTFIX
-            ) {
-              positionIndex++
-            }
-          }
-        }
-      } else {
-        // 控件模式下，positionIndex 等于 row.startIndex
-        positionIndex = curRow.startIndex
-      }
+      let positionIndex = curRow.startIndex
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const metrics = element.metrics
-        // 元素绘制
-        // 纯文本模式下跳过控件前缀和后缀
-        if (
-          this.controlRenderMode === ControlRenderMode.TEXT &&
-          (element.controlComponent === ControlComponent.PREFIX ||
-            element.controlComponent === ControlComponent.POSTFIX)
-        ) {
+        // 不可见元素（文本模式下 PREFIX/POSTFIX）跳过绘制
+        // 但 positionIndex 和 index 都必须递增以保持索引对齐
+        if (positionList[positionIndex]?.isInvisible) {
+          positionIndex++
+          index++
           continue
         }
         // 当前元素位置信息
@@ -2670,20 +2515,6 @@ export class Draw {
         ) {
           this.textParticle.complete()
           this.multiCustomSelectParticle.render({
-            ctx,
-            x,
-            y,
-            row: curRow,
-            index: j
-          })
-        }
-        // LABEL 控件渲染（TEXT 模式下绘制下划线）
-        if (
-          element.controlComponent === ControlComponent.VALUE &&
-          element.control?.type === ControlType.LABEL
-        ) {
-          this.textParticle.complete()
-          this.labelControlParticle.render({
             ctx,
             x,
             y,
@@ -3264,17 +3095,6 @@ export class Draw {
   public setCursor(curIndex: number | undefined) {
     const positionContext = this.position.getPositionContext()
     const positionList = this.position.getPositionList()
-    const isTextMode = this.controlRenderMode === ControlRenderMode.TEXT
-
-    // 调试日志：记录光标设置前的索引信息
-    if (isTextMode && curIndex !== undefined) {
-      console.log('[setCursor Before]', {
-        curIndex,
-        positionListLength: positionList.length,
-        'curIndex < positionList.length': curIndex < positionList.length,
-        'positionList[curIndex]': positionList[curIndex]?.value
-      })
-    }
 
     if (positionContext.isTable) {
       const { index, trIndex, tdIndex } = positionContext
@@ -3287,18 +3107,8 @@ export class Draw {
       const tablePosition = tablePositionList?.[curIndex!]
       this.position.setCursorPosition(tablePosition || null)
     } else {
-      // 在文本模式下，需要将 elementList 的索引映射到 positionList 的索引
-      let actualCurIndex = curIndex
-      if (isTextMode && curIndex !== undefined) {
-        actualCurIndex = this.getActualPositionIndex(curIndex)
-        console.log('[setCursor After Mapping]', {
-          originalCurIndex: curIndex,
-          actualCurIndex,
-          'positionList[actualCurIndex]': positionList[actualCurIndex]?.value
-        })
-      }
       this.position.setCursorPosition(
-        actualCurIndex !== undefined ? positionList[actualCurIndex] : null
+        curIndex !== undefined ? positionList[curIndex] : null
       )
     }
     // 定位到图片元素并且位置发生变化
@@ -3320,33 +3130,6 @@ export class Draw {
       isShow: isShowCursor
     })
     return curIndex
-  }
-
-  /**
-   * 在文本模式下，将 elementList 的索引映射到 positionList 的索引
-   * 因为 positionList 跳过了 PREFIX/POSTFIX 元素
-   */
-  private getActualPositionIndex(elementListIndex: number): number {
-    const elementList = this.getElementList()
-    const positionList = this.position.getPositionList()
-
-    let positionIndex = 0
-    for (let i = 0; i < elementList.length; i++) {
-      const element = elementList[i]
-      // 只计算非 PREFIX/POSTFIX 元素
-      if (
-        element.controlComponent !== ControlComponent.PREFIX &&
-        element.controlComponent !== ControlComponent.POSTFIX
-      ) {
-        if (i === elementListIndex) {
-          return positionIndex
-        }
-        positionIndex++
-      }
-    }
-
-    // 如果找不到，返回最后一个有效的索引
-    return positionList.length - 1
   }
 
   public submitHistory(curIndex: number | undefined) {

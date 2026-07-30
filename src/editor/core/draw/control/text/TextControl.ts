@@ -12,7 +12,7 @@ import {
 } from '../../../../interface/Control'
 import { IEditorOption } from '../../../../interface/Editor'
 import { IElement } from '../../../../interface/Element'
-import { omitObject, pickObject } from '../../../../utils'
+import { omitObject, pickObject, splitText } from '../../../../utils'
 import { formatElementContext } from '../../../../utils/element'
 import { Control } from '../Control'
 
@@ -122,12 +122,20 @@ export class TextControl implements IControlInstance {
             ...CONTROL_STYLE_ATTR
           ])
         : omitObject(startElement, ['type'])
+    // 将多字符元素拆为单字符元素（粘贴数据可能来自zipElementList压缩）
+    const splitData: IElement[] = []
+    for (const item of data) {
+      const charList = splitText(item.value)
+      for (const char of charList) {
+        splitData.push({ ...item, value: char })
+      }
+    }
     // 插入起始位置
     const start = range.startIndex + 1
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < splitData.length; i++) {
       const newElement: IElement = {
         ...anchorElement,
-        ...data[i],
+        ...splitData[i],
         controlComponent: ControlComponent.VALUE
       }
       formatElementContext(elementList, [newElement], startIndex, {
@@ -135,7 +143,7 @@ export class TextControl implements IControlInstance {
       })
       draw.spliceElementList(elementList, start + i, 0, [newElement])
     }
-    return start + data.length - 1
+    return start + splitData.length - 1
   }
 
   public clearValue(

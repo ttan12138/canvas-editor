@@ -1,4 +1,6 @@
+import { ControlComponent } from '../../../dataset/enum/Control'
 import { ElementType } from '../../../dataset/enum/Element'
+import { CONTROL_STYLE_ATTR } from '../../../dataset/constant/Element'
 import { IElement } from '../../../interface/Element'
 import { ICopyOption } from '../../../interface/Event'
 import { ITr } from '../../../interface/table/Tr'
@@ -59,6 +61,32 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
     copyElementList = rangeManager.getIsCollapsed()
       ? rangeManager.getRangeRowElementList()
       : rangeManager.getSelectionElementList()
+  }
+  // 粘贴单选/多选/数字等控件内容时，仅保留 VALUE 文本内容（含选项间分隔符），
+  // 移除控件前缀/后缀（PREFIX/PRE_TEXT/POST_TEXT/POSTFIX），
+  // 并剥离 VALUE 元素继承的全部文字样式
+  if (copyElementList?.length) {
+    copyElementList = copyElementList
+      .filter(el => el.controlComponent === undefined ||
+        el.controlComponent === ControlComponent.VALUE)
+      .map(el => {
+        if (el.controlComponent === ControlComponent.VALUE) {
+          const plain: IElement = { ...el, type: ElementType.TEXT }
+          delete plain.control
+          delete plain.controlId
+          delete plain.controlComponent
+          delete plain.groupIds
+          // 删除控件继承的样式（font/size/bold/highlight/italic/strikeout）
+          // 及控件专有样式（underline/color）
+          CONTROL_STYLE_ATTR.forEach(key => {
+            delete (plain as IElement)[key]
+          })
+          delete plain.underline
+          delete plain.color
+          return plain
+        }
+        return el
+      })
   }
   if (options?.isPlainText && copyElementList?.length) {
     copyElementList = [

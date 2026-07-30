@@ -75,6 +75,7 @@ export function pasteHTML(host: CanvasEvent, htmlText: string) {
     item.color = undefined
     item.size = undefined
     item.bold = false
+    item.underline = false
   })
 
   pasteElement(host, elementList)

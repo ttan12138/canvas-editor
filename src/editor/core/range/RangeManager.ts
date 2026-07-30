@@ -2,7 +2,7 @@ import { ElementType } from '../..'
 import { ZERO } from '../../dataset/constant/Common'
 import { TEXTLIKE_ELEMENT_TYPE } from '../../dataset/constant/Element'
 import { ControlComponent } from '../../dataset/enum/Control'
-import { ControlRenderMode, EditorContext } from '../../dataset/enum/Editor'
+import { EditorContext } from '../../dataset/enum/Editor'
 import { IControlContext } from '../../interface/Control'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
@@ -116,21 +116,10 @@ export class RangeManager {
     const { startIndex, endIndex } = this.range
     if (startIndex === endIndex) return null
     const elementList = this.draw.getElementList()
-    const isTextMode = this.draw.getControlRenderMode() === ControlRenderMode.TEXT
-
-    // 在文本模式下，需要将positionList索引映射到elementList索引
-    let actualStartIndex = startIndex
-    let actualEndIndex = endIndex
-
-    if (isTextMode) {
-      // 计算elementList中的实际索引
-      actualStartIndex = this.getActualElementIndex(startIndex)
-      actualEndIndex = this.getActualElementIndex(endIndex)
-    }
-
+    // positionList与elementList已对齐（isInvisible条目），直接使用索引
     return elementList.slice(
-      elementList[actualStartIndex]?.value === ZERO ? actualStartIndex : actualStartIndex + 1,
-      actualEndIndex + 1
+      elementList[startIndex]?.value === ZERO ? startIndex : startIndex + 1,
+      endIndex + 1
     )
   }
 
@@ -155,7 +144,10 @@ export class RangeManager {
     const selection = this.getSelection()
     if (!selection) return null
     return selection.filter(
-      s => !s.type || TEXTLIKE_ELEMENT_TYPE.includes(s.type)
+      s =>
+        (!s.type || TEXTLIKE_ELEMENT_TYPE.includes(s.type)) &&
+        s.controlComponent !== ControlComponent.PREFIX &&
+        s.controlComponent !== ControlComponent.POSTFIX
     )
   }
 
@@ -163,7 +155,10 @@ export class RangeManager {
     const selection = this.getSelectionElementList()
     if (!selection) return null
     return selection.filter(
-      s => !s.type || TEXTLIKE_ELEMENT_TYPE.includes(s.type)
+      s =>
+        (!s.type || TEXTLIKE_ELEMENT_TYPE.includes(s.type)) &&
+        s.controlComponent !== ControlComponent.PREFIX &&
+        s.controlComponent !== ControlComponent.POSTFIX
     )
   }
 
@@ -697,37 +692,6 @@ export class RangeManager {
         }
       }
     }
-  }
-
-  /**
-   * 在文本模式下，将positionList索引转换为elementList索引
-   * 因为positionList跳过了PREFIX/POSTFIX元素，所以需要找到对应的elementList索引
-   */
-  private getActualElementIndex(positionIndex: number): number {
-    const elementList = this.draw.getElementList()
-
-    // 计算positionList索引对应的elementList索引
-    // 通过累加非PREFIX/POSTFIX元素的数量来匹配
-    let positionCount = 0
-
-    for (let i = 0; i < elementList.length; i++) {
-      const element = elementList[i]
-      // 只计算非PREFIX/POSTFIX元素
-      if (
-        element.controlComponent !== ControlComponent.PREFIX &&
-        element.controlComponent !== ControlComponent.POSTFIX
-      ) {
-        positionCount++
-      }
-
-      // 当计数匹配positionIndex时，返回当前elementIndex
-      if (positionCount > positionIndex) {
-        return i
-      }
-    }
-
-    // 如果找不到，返回最后一个有效的索引
-    return elementList.length - 1
   }
 
   public render(

@@ -2102,4 +2102,61 @@ window.onload = function () {
       }
     }
   ])
+
+  let isTextMode = false
+  const btnTextMode = document.querySelector<HTMLButtonElement>('#btn-text-mode')
+  if (btnTextMode) {
+    btnTextMode.onclick = function() {
+      isTextMode = !isTextMode
+      const mode = isTextMode ? 'text' : 'control'
+      instance.command.executeSetControlRenderMode(mode as any)
+      console.log(`已切换为${isTextMode ? '文本模式' : '控件模式'}`)
+    }
+  }
+
+  const btnGetValue = document.querySelector<HTMLButtonElement>('#btn-get-value')
+  if (btnGetValue) {
+    btnGetValue.onclick = function() {
+      const value = instance.command.getValue()
+      console.log(value.data.main)
+    }
+  }
+  const btnGetInstance = document.querySelector<HTMLButtonElement>('#btn-get-instance')
+  if (btnGetInstance) {
+    btnGetInstance.onclick = function() {
+      console.log(instance)
+    }
+  }
+
+  const btnGetGroupTexts = document.querySelector<HTMLButtonElement>('#btn-GetGroupTexts')
+  if (btnGetGroupTexts) {
+    btnGetGroupTexts.onclick = function() {
+      const groupTexts = instance.command.getGroupTexts()
+      console.log(groupTexts)
+    }
+  }
+  const btnUpdateGroup1 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup1')
+  if (btnUpdateGroup1) {
+    btnUpdateGroup1.onclick = function() {
+      instance.command.updateGroup('testGroupId-01-01', { value: '新文字1111', underline: true })
+    }
+  }
+  const btnUpdateGroup2 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup2')
+  if (btnUpdateGroup2) {
+    btnUpdateGroup2.onclick = function() {
+      instance.command.updateGroup('testGroupId-01-02', { value: '新文字2222', highlight: "#ff0" })
+    }
+  }
+  const btnUpdateGroup3 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup3')
+  if (btnUpdateGroup3) {
+    btnUpdateGroup3.onclick = function() {
+      instance.command.updateGroup('testGroupId-02-01', { value: '新文字1111', underline: true })
+    }
+  }
+  const btnUpdateGroup4 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup4')
+  if (btnUpdateGroup4) {
+    btnUpdateGroup4.onclick = function() {
+      instance.command.updateGroup('testGroupId-02-02', { value: '新文字2222', highlight: "#ff0" })
+    }
+  }
 }

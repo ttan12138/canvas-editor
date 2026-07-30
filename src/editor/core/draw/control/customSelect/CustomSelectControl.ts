@@ -13,6 +13,7 @@ import { ElementType } from '../../../../dataset/enum/Element'
 import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import { DeepRequired } from '../../../../interface/Common'
 import {
+  IControl,
   IControlContext,
   IControlInstance,
   IControlRuleOption,
@@ -27,7 +28,10 @@ import {
   pickObject,
   splitText
 } from '../../../../utils'
-import { formatElementContext } from '../../../../utils/element'
+import {
+  applyTextDiffToStructSegments,
+  formatElementContext
+} from '../../../../utils/element'
 import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
@@ -163,6 +167,32 @@ export class CustomSelectControl implements IControlInstance {
       .join('')
   }
 
+  // 同步控件 value 字段与 structValues，保持数据一致性
+  // structValues 存在时：依据文字位置将增删同步到对应片段（保留 groupIds、underline、highlight 等属性）
+  // structValues 不存在时：仅同步 value 字段
+  public syncValueWithStructValues(context: IControlContext = {}) {
+    const control = this.element.control
+    if (!control) return
+    const newText = this.getValue(context)
+      .map(el => el.value)
+      .join('')
+    const oldText =
+      typeof control.value === 'string'
+        ? control.value
+        : control.structValues?.map(sv => sv.value).join('') || ''
+    const properties: Partial<IControl> = { value: newText }
+    if (control.structValues?.length) {
+      const synced = applyTextDiffToStructSegments(
+        control.structValues,
+        oldText,
+        newText
+      )
+      // 移除 value 为空的 structValue 片段，保持数据一致性
+      properties.structValues = synced.filter(sv => sv.value)
+    }
+    this.control.setControlProperties(properties, context)
+  }
+
   public setValue(
     data: IElement[],
     context: IControlContext = {},
@@ -200,12 +230,20 @@ export class CustomSelectControl implements IControlInstance {
             ...CONTROL_STYLE_ATTR
           ])
         : omitObject(startElement, ['type'])
+    // 将多字符元素拆为单字符元素（粘贴数据可能来自zipElementList压缩）
+    const splitData: IElement[] = []
+    for (const item of data) {
+      const charList = splitText(item.value)
+      for (const char of charList) {
+        splitData.push({ ...item, value: char })
+      }
+    }
     // 插入起始位置
     const start = range.startIndex + 1
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < splitData.length; i++) {
       const newElement: IElement = {
         ...anchorElement,
-        ...data[i],
+        ...splitData[i],
         controlComponent: ControlComponent.VALUE,
         color: this.options.control.selectValueColor
       }
@@ -214,7 +252,9 @@ export class CustomSelectControl implements IControlInstance {
       })
       draw.spliceElementList(elementList, start + i, 0, [newElement])
     }
-    return start + data.length - 1
+    // 同步 value 字段与 structValues，保持数据一致性
+    this.syncValueWithStructValues({ elementList, range })
+    return start + splitData.length - 1
   }
 
   public keydown(evt: KeyboardEvent): number | null {
@@ -241,6 +281,8 @@ export class CustomSelectControl implements IControlInstance {
         if (!value.length) {
           this.control.addPlaceholder(startIndex)
         }
+        // 同步 value 字段与 structValues，保持数据一致性
+        this.syncValueWithStructValues()
         return startIndex
       } else {
         if (
@@ -257,6 +299,8 @@ export class CustomSelectControl implements IControlInstance {
           if (!value.length) {
             this.control.addPlaceholder(startIndex - 1)
           }
+          // 同步 value 字段与 structValues，保持数据一致性
+          this.syncValueWithStructValues()
           return startIndex - 1
         }
       }
@@ -272,6 +316,8 @@ export class CustomSelectControl implements IControlInstance {
         if (!value.length) {
           this.control.addPlaceholder(startIndex)
         }
+        // 同步 value 字段与 structValues，保持数据一致性
+        this.syncValueWithStructValues()
         return startIndex
       } else {
         const endNextElement = elementList[endIndex + 1]
@@ -290,6 +336,8 @@ export class CustomSelectControl implements IControlInstance {
           if (!value.length) {
             this.control.addPlaceholder(startIndex)
           }
+          // 同步 value 字段与 structValues，保持数据一致性
+          this.syncValueWithStructValues()
           return startIndex
         }
       }
@@ -370,7 +418,9 @@ export class CustomSelectControl implements IControlInstance {
     }
     this.control.setControlProperties(
       {
-        code: null
+        code: null,
+        value: '',
+        structValues: undefined
       },
       {
         elementList,
@@ -471,10 +521,12 @@ export class CustomSelectControl implements IControlInstance {
       })
       draw.spliceElementList(elementList, start + i, 0, [newElement])
     }
-    // 设置状态
+    // 设置状态：同步 value 字段；选择新选项后原结构化标注失效，清空 structValues
     this.control.setControlProperties(
       {
-        code
+        code,
+        value: text,
+        structValues: undefined
       },
       {
         elementList,
