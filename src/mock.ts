@@ -123,19 +123,21 @@ elementList.splice(94, 0, {
   control: {
     conceptId: '2',
     type: ControlType.CUSTOM_SELECT,
-
-    value: null,
-    code: null,
+    structValues: [
+      { value: '异', underline: true, groupIds: ['testGroupId-005'] },
+      { value: '常', underline: true, groupIds: ['testGroupId-006'] }
+    ],
+    code: '98176',
     placeholder: '有无',
     prefix: '\u200c',
     postfix: '\u200c',
     valueSets: [
       {
-        value: '有',
+        value: '正常',
         code: '98175'
       },
       {
-        value: '无',
+        value: '异常',
         code: '98176'
       },
       {
@@ -153,8 +155,16 @@ elementList.splice(96, 0, {
   control: {
     conceptId: '10',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
+    values: [
+      {
+        value: '上海',
+        code: '1002',
+        structValues: [
+          { value: '上', underline: true, groupIds: ['testGroupId-003'] },
+          { value: '海', underline: true }
+        ]
+      }
+    ],
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -187,8 +197,16 @@ elementList.splice(98, 0, {
   control: {
     conceptId: '11',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
+    values: [
+      {
+        value: '上海',
+        code: '1002',
+        structValues: [
+          { value: '上', underline: true, groupIds: ['testGroupId-003'] },
+          { value: '海', underline: true }
+        ]
+      }
+    ],
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -222,8 +240,6 @@ elementList.splice(100, 0, {
   control: {
     conceptId: '12',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: [{ value: '上海' }],
-    code: '1002',
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -256,8 +272,6 @@ elementList.splice(102, 0, {
   control: {
     conceptId: '13',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: [{ value: '上海' }],
-    code: '1002',
     placeholder: '请选择城市',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -290,8 +304,6 @@ elementList.splice(104, 0, {
   control: {
     conceptId: 'unit-test-001',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
     placeholder: '请选择检查项目',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -320,8 +332,6 @@ elementList.splice(105, 0, {
   control: {
     conceptId: 'unit-test-001',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
     placeholder: '同步检查项目',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -350,8 +360,6 @@ elementList.splice(106, 0, {
   control: {
     conceptId: 'unit-test-002',
     type: ControlType.CUSTOM_SELECT,
-    value: null,
-    code: null,
     placeholder: '选择测量值',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -378,8 +386,6 @@ elementList.splice(107, 0, {
   control: {
     conceptId: 'unit-test-002',
     type: ControlType.CUSTOM_SELECT,
-    value: null,
-    code: null,
     placeholder: '选择测量值',
     prefix: '\u200c',
     postfix: '\u200c',
@@ -408,8 +414,6 @@ elementList.splice(108, 0, {
   control: {
     conceptId: 'unit-test-003',
     type: ControlType.MULTI_CUSTOM_SELECT,
-    value: null,
-    code: null,
     placeholder: '独立测量项目',
     prefix: '\u200c',
     postfix: '\u200c',

@@ -1,4 +1,5 @@
-import { ControlType } from '../../../../dataset/enum/Control'
+import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
+import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import { AssociationStateManager } from '../association/AssociationStateManager'
 import {
   IControlContext,
@@ -54,6 +55,55 @@ export class NumberFlagControl extends NumberControl {
     }
 
     return result
+  }
+
+  public keydown(evt: KeyboardEvent): number | null {
+    const result = super.keydown(evt)
+    // 删除操作后同步联动控件
+    if (
+      result !== null &&
+      (evt.key === KeyMap.Backspace || evt.key === KeyMap.Delete)
+    ) {
+      this._syncAssociationAfterDeletion()
+    }
+    return result
+  }
+
+  public cut(): number {
+    const result = super.cut()
+    if (result !== -1) {
+      this._syncAssociationAfterDeletion()
+    }
+    return result
+  }
+
+  // 删除/剪切后根据当前值同步联动控件
+  private _syncAssociationAfterDeletion(): void {
+    const associationId = this.element.control?.associationId
+    if (!associationId || !this.element.controlId) return
+    // 从元素列表中提取当前控件的值（不依赖 range，避免控件被整体移除后越界）
+    const elementList = this.control.getElementList()
+    const controlId = this.element.controlId
+    let controlExists = false
+    let text = ''
+    for (const el of elementList) {
+      if (el.controlId === controlId) {
+        controlExists = true
+        if (el.controlComponent === ControlComponent.VALUE) {
+          text += el.value
+        }
+      }
+    }
+    // 控件被整体移除时不触发同步
+    if (!controlExists) return
+    const value: string | number = text ? Number(text) : ''
+    this.associationStateManager.setValue(
+      associationId,
+      value,
+      ControlType.NUMBER_FLAG,
+      this.control.getDraw(),
+      controlId
+    )
   }
 
   public destroy(): void {
