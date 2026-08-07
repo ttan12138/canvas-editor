@@ -43,6 +43,7 @@ export interface IEditorData {
 }
 
 export interface IEditorOption {
+  isPlainText?: boolean
   mode?: EditorMode
   locale?: string
   defaultType?: string

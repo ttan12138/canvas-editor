@@ -45,6 +45,7 @@ import {
   formatElementContext,
   formatElementList,
   getNonHideElementIndex,
+  inferMultiSelectDelimiter,
   pickElementAttr,
   zipElementList
 } from '../../../utils/element'
@@ -1070,14 +1071,25 @@ export class Control {
           type === ControlType.CUSTOM_SELECT ||
           type === ControlType.MULTI_CUSTOM_SELECT
         ) {
+          // 多选控件支持自定义分隔符（可从 code 推断）
+          const delimiter =
+            type === ControlType.MULTI_CUSTOM_SELECT
+              ? inferMultiSelectDelimiter(
+                  code,
+                  valueSets,
+                  element.control.multiSelectDelimiter
+                )
+              : ','
           const innerText = code
-            ?.split(',')
+            ?.split(delimiter)
             .map(
               selectCode =>
-                valueSets?.find(valueSet => valueSet.code === selectCode)?.value
+                valueSets?.find(
+                  valueSet => valueSet.code === selectCode?.trim()
+                )?.value
             )
             .filter(Boolean)
-            .join('')
+            .join(delimiter)
           result.push({
             ...element.control,
             zone,

@@ -72,6 +72,8 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     evt.button === MouseEventButton.RIGHT &&
     (range.isCrossRowCol || !rangeManager.getIsCollapsed())
   ) {
+    // 关闭弹窗类控件，避免下拉列表与右键菜单同时显示
+    draw.getControl().destroyControl({ isEmitEvent: false })
     return
   }
   // 是否是选区拖拽
@@ -147,6 +149,10 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     }
     rangeManager.setRange(startIndex, endIndex)
     position.setCursorPosition(positionList[positionIndex])
+    // 右键点击时关闭弹窗类控件，避免下拉列表与右键菜单同时显示
+    if (evt.button === MouseEventButton.RIGHT) {
+      draw.getControl().destroyControl({ isEmitEvent: false })
+    }
     // 更新只读状态
     isReadonly = draw.isReadonly()
     // 复选框

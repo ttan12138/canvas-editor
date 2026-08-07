@@ -23,6 +23,7 @@ export interface IControlStructValue {
   value: string
   groupIds?: string[]
   underline?: boolean
+  underlineColor?: string
   highlight?: string
   bold?: boolean
   italic?: boolean

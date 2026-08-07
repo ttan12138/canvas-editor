@@ -154,6 +154,9 @@ export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
       break
     }
   }
+  if(isHTML && typeof draw.getOptions()?.isPlainText != 'undefined'){
+    isHTML = !draw.getOptions()?.isPlainText
+  }
   for (let i = 0; i < clipboardData.items.length; i++) {
     const item = clipboardData.items[i]
     if (item.kind === 'string') {
@@ -180,7 +183,7 @@ export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
   }
 }
 
-export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
+export async function pasteByApi(host: CanvasEvent, options?: IPasteOption, pasteData?: string) {
   const draw = host.getDraw()
   if (draw.isReadonly() || draw.isDisabled()) return
   const { paste } = draw.getOverride()
@@ -189,16 +192,57 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
     if ((<IOverrideResult>overrideResult)?.preventDefault !== false) return
   }
 
-  let clipboardText = ''
+  let clipboardText = pasteData || ''
   let readClipboardSuccess = false
 
-  try {
-    clipboardText = await navigator.clipboard.readText()
+  // pasteData不为空时，直接使用传入数据，跳过系统剪贴板读取
+  if (pasteData) {
     readClipboardSuccess = true
-  } catch (e) {
-    console.warn('Failed to read clipboard text:', e)
+    // 激活光标
+    const cursor = draw.getCursor()
+    cursor.focus()
+    // 如果有选区，激活选区（确保光标位置已设置）
+    const rangeManager = draw.getRange()
+    const { startIndex, endIndex } = rangeManager.getRange()
+    if (~startIndex && ~endIndex) {
+      const position = draw.getPosition()
+      if (!position.getCursorPosition()) {
+        const positionList = position.getPositionList()
+        const cursorIndex = rangeManager.getIsCollapsed()
+          ? startIndex
+          : endIndex
+        if (positionList[cursorIndex]) {
+          position.setCursorPosition(positionList[cursorIndex])
+        } else {
+          // positionList中没有对应索引，尝试用setRange重新激活
+          rangeManager.setRange(startIndex, endIndex)
+          draw.render({
+            curIndex: endIndex,
+            isSubmitHistory: false
+          })
+        }
+      }
+    } else {
+      // range无效，尝试恢复到文档末尾
+      const positionList = draw.getPosition().getPositionList()
+      if (positionList.length) {
+        const lastIdx = positionList.length - 1
+        rangeManager.setRange(lastIdx, lastIdx)
+        draw.getPosition().setCursorPosition(positionList[lastIdx])
+      }
+    }
+  } else {
+    try {
+      if(navigator?.clipboard?.readText){
+        clipboardText = await navigator.clipboard.readText()
+      }
+      if(clipboardText){
+        readClipboardSuccess = true
+      }
+    } catch (e) {
+      console.warn('Failed to read clipboard text:', e)
+    }
   }
-
   const editorClipboardData = getClipboardData()
 
   if (editorClipboardData) {
@@ -206,7 +250,6 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
       pasteElement(host, editorClipboardData.elementList)
       return
     }
-
     if (normalizeLineBreak(clipboardText) === normalizeLineBreak(editorClipboardData.text)) {
       pasteElement(host, editorClipboardData.elementList)
       return
@@ -217,38 +260,45 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption) {
 
   if (options?.isPlainText) {
     if (clipboardText) {
-      console.log("clipboardText", clipboardText)
       host.input(clipboardText)
     }
   } else {
     try {
-      const clipboardData = await navigator.clipboard.read()
-      let isHTML = false
-      for (const item of clipboardData) {
-        if (item.types.includes('text/html')) {
-          isHTML = true
-          break
+      let clipboardData
+      if(navigator?.clipboard?.read){
+        clipboardData = await navigator.clipboard.read()
+        let isHTML = false
+        for (const item of clipboardData) {
+          if (item.types.includes('text/html')) {
+            isHTML = true
+            break
+          }
+        }
+        for (const item of clipboardData) {
+          if (item.types.includes('text/plain') && !isHTML) {
+            const textBlob = await item.getType('text/plain')
+            const text = await textBlob.text()
+            if (text) {
+              host.input(text)
+            }
+          } else if (item.types.includes('text/html') && isHTML) {
+            const htmlTextBlob = await item.getType('text/html')
+            const htmlText = await htmlTextBlob.text()
+            if (htmlText) {
+              pasteHTML(host, htmlText)
+            }
+          } else if (item.types.some(type => type.startsWith('image/'))) {
+            const type = item.types.find(type => type.startsWith('image/'))!
+            const imageBlob = await item.getType(type)
+            pasteImage(host, imageBlob)
+          }
+        }
+      }else{
+        if (clipboardText) {
+          host.input(clipboardText)
         }
       }
-      for (const item of clipboardData) {
-        if (item.types.includes('text/plain') && !isHTML) {
-          const textBlob = await item.getType('text/plain')
-          const text = await textBlob.text()
-          if (text) {
-            host.input(text)
-          }
-        } else if (item.types.includes('text/html') && isHTML) {
-          const htmlTextBlob = await item.getType('text/html')
-          const htmlText = await htmlTextBlob.text()
-          if (htmlText) {
-            pasteHTML(host, htmlText)
-          }
-        } else if (item.types.some(type => type.startsWith('image/'))) {
-          const type = item.types.find(type => type.startsWith('image/'))!
-          const imageBlob = await item.getType(type)
-          pasteImage(host, imageBlob)
-        }
-      }
+
     } catch (e) {
       console.warn('Failed to read clipboard data:', e)
       if (clipboardText) {

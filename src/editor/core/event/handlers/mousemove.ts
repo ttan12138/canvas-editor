@@ -128,6 +128,10 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     rangeManager.setRange(start, end)
   }
   // 绘制
+  // 右键拖拽时关闭弹窗类控件，避免下拉列表与右键菜单同时显示
+  if (evt.buttons === 2) {
+    draw.getControl().destroyControl({ isEmitEvent: false })
+  }
   draw.render({
     isSubmitHistory: false,
     isSetCursor: false,

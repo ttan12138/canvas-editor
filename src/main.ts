@@ -1833,6 +1833,10 @@ window.onload = function () {
     console.log('elementList: ', payload)
   }
 
+  instance.listener.controlRenderModeChange = function (payload) {
+    console.log('controlRenderModeChange:', payload)
+  }
+
   // 9. 右键菜单注册
   instance.register.contextMenuList([
     {
@@ -2125,6 +2129,12 @@ window.onload = function () {
   if (btnGetInstance) {
     btnGetInstance.onclick = function() {
       console.log(instance)
+    }
+  }
+    const btnGetText = document.querySelector<HTMLButtonElement>('#btn-get-TEXT')
+  if (btnGetText) {
+    btnGetText.onclick = function() {
+      console.log(instance.command.getText())
     }
   }
 

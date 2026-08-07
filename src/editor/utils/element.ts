@@ -46,13 +46,57 @@ import { RowFlex } from '../dataset/enum/Row'
 import { TableBorder, TdBorder } from '../dataset/enum/table/Table'
 import { VerticalAlign } from '../dataset/enum/VerticalAlign'
 import { DeepRequired } from '../interface/Common'
-import { IControlSelect } from '../interface/Control'
+import { IControlSelect, IControlSelectValue, IValueSet } from '../interface/Control'
 import { IEditorOption } from '../interface/Editor'
 import { IElement } from '../interface/Element'
 import { IRowElement } from '../interface/Row'
 import { ITd } from '../interface/table/Td'
 import { ITr } from '../interface/table/Tr'
 import { mergeOption } from './option'
+
+// 多选分隔符候选列表（按优先级排序）
+const MULTI_SELECT_DELIMITER_CANDIDATES = [
+  ',',
+  '，',
+  ';',
+  '；',
+  '|',
+  '、',
+  '/',
+  '\\',
+  '\n',
+  '\t',
+  ' '
+]
+
+/**
+ * 从 code 取值中推断多选分隔符
+ * 当 multiSelectDelimiter 未显式设置时，通过尝试常见分隔符，
+ * 找到能让所有拆分部分都匹配 valueSets 中 code 的分隔符
+ */
+export function inferMultiSelectDelimiter(
+  code: string | null | undefined,
+  valueSets: IValueSet[] | undefined,
+  explicitDelimiter?: string
+): string {
+  // 1. 优先使用显式指定的分隔符
+  if (explicitDelimiter) return explicitDelimiter
+  // 2. 没有 code 或 valueSets 时使用默认逗号
+  if (!code || !valueSets?.length) return ','
+  // 3. 尝试常见分隔符，找到能让所有拆分部分都匹配 valueSets 的分隔符
+  const codeSet = new Set(valueSets.map(v => v.code))
+  for (const delimiter of MULTI_SELECT_DELIMITER_CANDIDATES) {
+    // code 中不包含该分隔符则跳过
+    if (!code.includes(delimiter)) continue
+    const parts = code.split(delimiter).map(p => p.trim())
+    // 所有部分都必须匹配 valueSets 中的 code，且至少有两个部分
+    if (parts.length > 1 && parts.every(p => codeSet.has(p))) {
+      return delimiter
+    }
+  }
+  // 4. 未找到匹配的分隔符，使用默认逗号
+  return ','
+}
 
 export function unzipElementList(elementList: IElement[]): IElement[] {
   const result: IElement[] = []
@@ -414,13 +458,19 @@ export function formatElementList(
           // 单选控件：渲染 structValues 中的文字（保留 groupIds、underline、highlight 等属性）
           valueList = singleStructValues.map(sv => ({
             ...deepClone(sv),
-            color: editorOptions.control.selectValueColor
+            color: sv.color ?? editorOptions.control.selectValueColor
           })) as IElement[]
           // 同步 value 字段，保持数据一致性
           el.control.value = singleStructValues.map(sv => sv.value).join('')
         } else if (multiSelectValues) {
           // 多选控件：渲染 values 中的每个选项（选项优先渲染 structValues）
-          const delimiter = el.control.multiSelectDelimiter ?? ','
+          // 分隔符优先从 code 推断，并回写到 control 以保证后续一致性
+          const delimiter = inferMultiSelectDelimiter(
+            el.control.code,
+            el.control.valueSets,
+            el.control.multiSelectDelimiter
+          )
+          el.control.multiSelectDelimiter = delimiter
           multiSelectValues.forEach((optionValue, optionIndex) => {
             // 选项间分隔符
             if (optionIndex > 0 && delimiter) {
@@ -438,7 +488,7 @@ export function formatElementList(
               optionValue.structValues.forEach(sv => {
                 valueList.push({
                   ...deepClone(sv),
-                  color: editorOptions.control.selectValueColor
+                  color: sv.color ?? editorOptions.control.selectValueColor
                 } as IElement)
               })
             } else {
@@ -576,11 +626,20 @@ export function formatElementList(
                 // 更新 control.code 为第一个选项的 code
                 el.control!.code = firstValueSet.code
               } else if (code) {
-                // MULTI_CUSTOM_SELECT: code 可以包含多个值（逗号分隔）
+                // MULTI_CUSTOM_SELECT: code 可以包含多个值（分隔符可从 code 推断）
                 if (type === ControlType.MULTI_CUSTOM_SELECT) {
-                  const delimiter = el.control?.multiSelectDelimiter || ','
+                  const delimiter = inferMultiSelectDelimiter(
+                    code,
+                    valueSets,
+                    el.control?.multiSelectDelimiter
+                  )
+                  // 回写推断出的分隔符，保证后续取值一致性
+                  if (el.control) {
+                    el.control.multiSelectDelimiter = delimiter
+                  }
                   const codes = code.split(delimiter)
                   const values: IElement[] = []
+                  const controlValues: IControlSelectValue[] = []
                   codes.forEach(c => {
                     const valueSet = valueSets.find(v => v.code === c.trim())
                     if (valueSet) {
@@ -588,10 +647,16 @@ export function formatElementList(
                         value: valueSet.value,
                         color: editorOptions.control.selectValueColor
                       })
+                      controlValues.push({
+                        value: valueSet.value,
+                        code: valueSet.code
+                      })
                     }
                   })
                   if (values.length > 0) {
                     valueList = values
+                    // 同步 values 字段，确保 getValueById / zipElementList 能正确派生显示文本
+                    el.control!.values = controlValues
                   }
                 } else {
                   // 其他控件：根据 code 查找对应的值
@@ -1002,13 +1067,15 @@ export function zipElementList(
           if (control.type === ControlType.CUSTOM_SELECT) {
             // 单选控件：value 字段与 structValues 已同步维护（字符串形式）
             if (typeof control.value !== 'string') {
-              controlElement.control!.value = valueList
-                .map(v => v.value)
-                .join('')
+              const displayText = valueList.map(v => v.value).join('')
+              controlElement.control!.value = displayText
+              controlElement.value = displayText
             }
           } else if (control.type === ControlType.MULTI_CUSTOM_SELECT) {
-            // 多选控件：移除 value 字段，由 values 派生
-            controlElement.control!.value = null
+            // 多选控件：value 设为显示文本，code/values 保留用于数据交互
+            const displayText = valueList.map(v => v.value).join('')
+            controlElement.control!.value = displayText
+            controlElement.value = displayText
           } else {
             controlElement.control!.value = zipElementList(valueList, options)
           }
@@ -2011,7 +2078,7 @@ export function getTextFromElementList(elementList: IElement[]) {
         }
         listElementListMap.forEach((listElementList, listIndex) => {
           const isLast = listElementListMap.size - 1 === listIndex
-          text += `\n${ulListStyleText || `${listIndex + 1}.`}${buildText(
+          text += `${text.endsWith('\n') ? '' : '\n'}${ulListStyleText || `${listIndex + 1}\uFEFF.`}${buildText(
             listElementList
           )}${isLast ? `\n` : ``}`
         })

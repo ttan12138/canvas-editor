@@ -453,28 +453,14 @@ export class Draw {
     // 模式相同时不执行
     if (this.controlRenderMode === payload) return
 
-    const targetMode = payload
-    this.controlRenderMode = targetMode
-
-    // 记录历史（双向恢复函数：undo/redo 均可正确切换）
-    this.historyManager.execute(() => {
-      // 在 undo 流程中，该函数被弹出到 redoStack，实际由上一个
-      // submitHistory 快照恢复模式（快照已包含 controlRenderMode）
-      // 在 redo 流程中，该函数直接执行，将模式恢复到 targetMode
-      this.controlRenderMode = targetMode
-      this.listener.controlRenderModeChange?.(targetMode)
-      this.render({
-        isSubmitHistory: false,
-        isSetCursor: false
-      })
-    })
+    this.controlRenderMode = payload
 
     // 触发回调
-    this.listener.controlRenderModeChange?.(targetMode)
+    this.listener.controlRenderModeChange?.(payload)
 
-    // 重新渲染
+    // 重新渲染并提交历史（使用submitHistory创建完整快照，包含模式+元素状态）
     this.render({
-      isSubmitHistory: false,
+      isSubmitHistory: true,
       isSetCursor: false
     })
   }
@@ -2589,6 +2575,9 @@ export class Draw {
           // 联动状态优先级最高
           if (isAssociationFocused) {
             color = this.options.control.selectValueColor
+          } else if (element.underlineColor) {
+            // 元素自定义下划线颜色优先
+            color = element.underlineColor
           } else if (element.control?.underline) {
             color = this.options.underlineColor
           } else {
@@ -3149,7 +3138,11 @@ export class Draw {
     this.historyManager.execute(() => {
       this.zone.setZone(zone)
       this.setPageNo(pageNo)
-      this.controlRenderMode = oldControlRenderMode
+      // 模式变化时触发回调，确保撤销/重做时外部UI同步
+      if (this.controlRenderMode !== oldControlRenderMode) {
+        this.controlRenderMode = oldControlRenderMode
+        this.listener.controlRenderModeChange?.(oldControlRenderMode)
+      }
       this.position.setPositionContext(deepClone(oldPositionContext))
       this.header.setElementList(deepClone(oldHeaderElementList))
       this.footer.setElementList(deepClone(oldFooterElementList))

@@ -31,7 +31,8 @@ import {
 } from '../../../../utils'
 import {
   applyTextDiffToStructSegments,
-  formatElementContext
+  formatElementContext,
+  inferMultiSelectDelimiter
 } from '../../../../utils/element'
 import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
@@ -76,7 +77,7 @@ export class MultiCustomSelectControl implements IControlInstance {
 
   public getCodes(): string[] {
     if (!this.element?.control?.code) return []
-    const delimiter = this.element.control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    const delimiter = this.getEffectiveDelimiter()
     return this.element.control.code.split(delimiter)
   }
 
@@ -96,12 +97,27 @@ export class MultiCustomSelectControl implements IControlInstance {
     return cacheMap
   }
 
+  // 获取有效的多选分隔符：优先显式设置，否则从 code 与 valueSets 推断并回写
+  private getEffectiveDelimiter(): string {
+    const control = this.element?.control
+    if (!control) return this.DEFAULT_MULTI_SELECT_DELIMITER
+    const delimiter = inferMultiSelectDelimiter(
+      control.code,
+      control.valueSets,
+      control.multiSelectDelimiter
+    )
+    // 回写以保证后续取值一致性
+    if (control.multiSelectDelimiter !== delimiter) {
+      control.multiSelectDelimiter = delimiter
+    }
+    return delimiter
+  }
+
   public getText(codes: string[]): string | null {
     if (!this.element?.control) return null
     const control = this.element.control
     if (!control.valueSets?.length) return null
-    const multiSelectDelimiter =
-      control?.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    const multiSelectDelimiter = this.getEffectiveDelimiter()
     const valueSetMap = this.getValueSetMap()
     const valueList: string[] = []
     codes.forEach(code => {
@@ -195,7 +211,7 @@ export class MultiCustomSelectControl implements IControlInstance {
   public syncValueWithStructValues(context: IControlContext = {}) {
     const control = this.element.control
     if (!control || !control.values?.length) return
-    const delimiter = control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    const delimiter = this.getEffectiveDelimiter()
     const newText = this.getValue(context)
       .map(el => el.value)
       .join('')
@@ -513,8 +529,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     const elementList = context.elementList || this.control.getElementList()
     const range = context.range || this.control.getRange()
     const control = this.element.control!
-    // 使用当前设置的分隔符，而不是固定的 VALUE_DELIMITER
-    const delimiter = control.multiSelectDelimiter || this.DEFAULT_MULTI_SELECT_DELIMITER
+    // 使用当前有效的分隔符（可从 code 推断），而不是固定的 VALUE_DELIMITER
+    const delimiter = this.getEffectiveDelimiter()
     const newCodes = code?.split(delimiter) || []
     const oldCode = control.code
     const oldCodes = control.code?.split(delimiter) || []
@@ -668,7 +684,7 @@ export class MultiCustomSelectControl implements IControlInstance {
         ControlType.MULTI_CUSTOM_SELECT,
         this.draw,
         this.element.controlId,
-        control.multiSelectDelimiter,
+        this.getEffectiveDelimiter(),
         control.valueSets
       )
     }
@@ -1006,7 +1022,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     delimiterContainer.appendChild(delimiterLabel)
 
     const delimiters = [',', ';', '，']
-    const currentDelimiter = control.multiSelectDelimiter || ','
+    const currentDelimiter = this.getEffectiveDelimiter()
     delimiters.forEach(delim => {
       const delimBtn = document.createElement('button')
       delimBtn.textContent = delim
@@ -1059,7 +1075,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       })
 
       const delimiter = (selectPopupContainer as any).currentDelimiter || ','
-      const currentDelimiter = control.multiSelectDelimiter || ','
+      const currentDelimiter = this.getEffectiveDelimiter()
       if (delimiter !== currentDelimiter) {
         const elementList = this.control.getElementList()
         const range = this.control.getRange()

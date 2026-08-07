@@ -255,6 +255,7 @@ export function mergeOption(
     label: labelOptions,
     imgCaption: imgCaptionOptions,
     list: listOptions,
-    magnifier: magnifierOptions
+    magnifier: magnifierOptions,
+    isPlainText: options.isPlainText ?? false,
   }
 }

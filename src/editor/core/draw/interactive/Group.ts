@@ -81,6 +81,7 @@ export class Group {
     underline?: boolean,
     highlight?: string,
     color?: string,
+    underlineColor?: string,
     all?: boolean
   }){
     // 仅主体内容可以成组
@@ -93,20 +94,32 @@ export class Group {
         ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
+        styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
       }else{
         delete element.highlight
         delete element.underline
-        delete element.color
+        if(
+          element?.color != this.options.control.selectValueColor
+          && element?.color != this.options.control.defaultValueColor
+        ){
+          delete element.color
+        }
         ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
+        styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
       }
     }
     elementList.forEach(el => {
       if(!el?.groupIds){
         delete el.highlight
         delete el.underline
-        delete el.color
+        if(
+          el?.color != this.options.control.selectValueColor
+          && el?.color != this.options.control.defaultValueColor
+        ){
+          delete el.color
+        }
       }
       // 开放此处会导致组丢失
       // if(!el?.underline && !el?.highlight && !el?.color){
@@ -117,7 +130,12 @@ export class Group {
         if(targetValue && !targetValue.includes(el.value)){
           delete el.highlight
           delete el.underline
-          delete el.color
+          if(
+            el?.color != this.options.control.selectValueColor
+            && el?.color != this.options.control.defaultValueColor
+          ){
+            delete el.color
+          }
           delete el.groupIds
         }
       }

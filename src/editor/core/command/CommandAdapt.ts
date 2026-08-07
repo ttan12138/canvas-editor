@@ -105,6 +105,7 @@ import {
   createDomFromElementList,
   formatElementContext,
   formatElementList,
+  inferMultiSelectDelimiter,
   isTextLikeElement,
   pickElementAttr,
   getElementListByHTML,
@@ -1182,7 +1183,6 @@ export class CommandAdapt {
       delete element.hyperlinkId
       delete element.underline
       element.color = '#000000'
-      console.log(element)
     }
     this.draw.getHyperlinkParticle().clearHyperlinkPopup()
     // 重置画布
@@ -2467,7 +2467,12 @@ export class CommandAdapt {
         control.type === ControlType.MULTI_CUSTOM_SELECT &&
         control.values?.length
       ) {
-        const delimiter = control.multiSelectDelimiter || ','
+        const delimiter = inferMultiSelectDelimiter(
+          control.code,
+          control.valueSets,
+          control.multiSelectDelimiter
+        )
+        control.multiSelectDelimiter = delimiter
         for (const option of control.values) {
           if (!option.structValues?.length) continue
           option.structValues = this.mergeGroupInArray(

@@ -34,6 +34,7 @@ export interface IElementStyle {
   highlight?: string
   italic?: boolean
   underline?: boolean
+  underlineColor?: string
   strikeout?: boolean
   rowFlex?: RowFlex
   rowMargin?: number
