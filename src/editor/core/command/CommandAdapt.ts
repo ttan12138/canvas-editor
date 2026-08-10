@@ -187,10 +187,10 @@ export class CommandAdapt {
     await this.canvasEvent.copy(payload)
   }
 
-  public paste(payload?: IPasteOption) {
+  public paste(payload?: IPasteOption, pasteData?: string) {
     const isDisabled = this.draw.isReadonly() || this.draw.isDisabled()
     if (isDisabled) return
-    pasteByApi(this.canvasEvent, payload)
+    pasteByApi(this.canvasEvent, payload, pasteData)
   }
 
   public selectAll() {

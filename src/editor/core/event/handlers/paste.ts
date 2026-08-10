@@ -191,7 +191,6 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption, past
     const overrideResult = paste()
     if ((<IOverrideResult>overrideResult)?.preventDefault !== false) return
   }
-
   let clipboardText = pasteData || ''
   let readClipboardSuccess = false
 
