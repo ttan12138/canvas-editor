@@ -82,6 +82,7 @@ export class Group {
     highlight?: string,
     color?: string,
     underlineColor?: string,
+    size?: number,
     all?: boolean
   }){
     // 仅主体内容可以成组
@@ -95,6 +96,7 @@ export class Group {
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
         styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
+        styleFlag?.size && (element.size = styleFlag.size)
       }else{
         delete element.highlight
         delete element.underline
@@ -108,6 +110,7 @@ export class Group {
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
         styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
+        styleFlag?.size && (element.size = styleFlag.size)
       }
     }
     elementList.forEach(el => {
@@ -141,9 +144,11 @@ export class Group {
       }
     })
 
+    // 字号变化需要重新计算位置和行高
+    const isCompute = !!styleFlag?.size
     this.draw.render({
       isSetCursor: false,
-      isCompute: false,
+      isCompute,
       isSubmitHistory: false
     })
   }

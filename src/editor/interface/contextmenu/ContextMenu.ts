@@ -27,6 +27,7 @@ export interface IRegisterContextMenu {
   name?: string
   shortCut?: string
   disable?: boolean
+  disabled?: (payload: IContextMenuContext) => boolean
   when?: (payload: IContextMenuContext) => boolean
   callback?: (command: Command, context: IContextMenuContext) => void
   childMenus?: IRegisterContextMenu[]

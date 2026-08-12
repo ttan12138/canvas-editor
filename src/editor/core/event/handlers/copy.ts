@@ -6,6 +6,7 @@ import { ICopyOption } from '../../../interface/Event'
 import { ITr } from '../../../interface/table/Tr'
 import { writeElementList } from '../../../utils/clipboard'
 import { getTextFromElementList, zipElementList } from '../../../utils/element'
+import { deepClone } from '../../../utils'
 import { IOverrideResult } from '../../override/Override'
 import { CanvasEvent } from '../CanvasEvent'
 
@@ -75,7 +76,6 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
           delete plain.control
           delete plain.controlId
           delete plain.controlComponent
-          delete plain.groupIds
           // 删除控件继承的样式（font/size/bold/highlight/italic/strikeout）
           // 及控件专有样式（underline/color）
           CONTROL_STYLE_ATTR.forEach(key => {
@@ -87,6 +87,19 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
         }
         return el
       })
+  }
+  // 逐级清除所有元素的 groupIds（含 valueList 嵌套结构）
+  if (copyElementList?.length) {
+    copyElementList = deepClone(copyElementList)
+    const clearGroupIds = (elements: IElement[]) => {
+      for (const el of elements) {
+        delete el.groupIds
+        if (el.valueList?.length) {
+          clearGroupIds(el.valueList)
+        }
+      }
+    }
+    clearGroupIds(copyElementList)
   }
   if (options?.isPlainText && copyElementList?.length) {
     copyElementList = [

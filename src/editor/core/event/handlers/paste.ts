@@ -257,7 +257,8 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption, past
     removeClipboardData()
   }
 
-  if (options?.isPlainText) {
+  // pasteData已提供时直接使用，跳过异步剪贴板读取避免光标失焦
+  if (options?.isPlainText || pasteData) {
     if (clipboardText) {
       host.input(clipboardText)
     }

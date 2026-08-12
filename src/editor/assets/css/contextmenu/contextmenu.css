@@ -40,6 +40,15 @@
   background: rgba(25, 55, 88, .04);
 }
 
+.ce-contextmenu-content .ce-contextmenu-item.ce-contextmenu-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ce-contextmenu-content .ce-contextmenu-item.ce-contextmenu-disabled span {
+  color: #a0a4ab;
+}
+
 .ce-contextmenu-content .ce-contextmenu-item span {
   max-width: 300px;
   font-size: 12px;

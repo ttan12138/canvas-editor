@@ -16,8 +16,24 @@ export function input(data: string, host: CanvasEvent) {
     return
   }
   const position = draw.getPosition()
-  const cursorPosition = position.getCursorPosition()
-  if (!data || !cursorPosition) {
+  let cursorPosition = position.getCursorPosition()
+  if (!data) return
+  // cursorPosition 为空时尝试从选区恢复（异步粘贴回调场景）
+  if (!cursorPosition) {
+    const cursor = draw.getCursor()
+    cursor.focus()
+    const rangeManager = draw.getRange()
+    const { startIndex, endIndex } = rangeManager.getRange()
+    if (~startIndex && ~endIndex) {
+      const positionList = position.getPositionList()
+      const cursorIndex = rangeManager.getIsCollapsed() ? startIndex : endIndex
+      if (positionList[cursorIndex]) {
+        position.setCursorPosition(positionList[cursorIndex])
+        cursorPosition = position.getCursorPosition()
+      }
+    }
+  }
+  if (!cursorPosition) {
     return
   }
   const isComposing = host.isComposing
@@ -113,6 +129,17 @@ export function input(data: string, host: CanvasEvent) {
     draw.render({
       curIndex,
       isSubmitHistory: !isComposing
+    })
+    // 确保异步粘贴回调后光标可见
+    requestAnimationFrame(() => {
+      const position = draw.getPosition()
+      if (!position.getCursorPosition()) {
+        const positionList = position.getPositionList()
+        if (positionList[curIndex]) {
+          position.setCursorPosition(positionList[curIndex])
+        }
+      }
+      draw.getCursor().drawCursor()
     })
   }
   if (isComposing && ~curIndex) {

@@ -230,6 +230,11 @@ export class ContextMenu {
       } else {
         const menuItem = document.createElement('div')
         menuItem.classList.add(`${EDITOR_PREFIX}-contextmenu-item`)
+        // 是否禁用
+        const isDisabled = !!menu.disabled?.(this.context!)
+        if (isDisabled) {
+          menuItem.classList.add(`${EDITOR_PREFIX}-contextmenu-disabled`)
+        }
         // 菜单事件
         if (menu.childMenus) {
           const childMenus = this._filterMenuList(menu.childMenus)
@@ -237,6 +242,7 @@ export class ContextMenu {
           if (isRegisterContextMenu) {
             menuItem.classList.add(`${EDITOR_PREFIX}-contextmenu-sub-item`)
             menuItem.onmouseenter = () => {
+              if (isDisabled) return
               this._setHoverStatus(menuItem, true)
               this._removeSubMenu(contextMenuContainer)
               // 子菜单
@@ -251,6 +257,7 @@ export class ContextMenu {
               })
             }
             menuItem.onmouseleave = evt => {
+              if (isDisabled) return
               // 移动到子菜单选项选中状态不变化
               if (
                 !childMenuContainer ||
@@ -262,13 +269,16 @@ export class ContextMenu {
           }
         } else {
           menuItem.onmouseenter = () => {
+            if (isDisabled) return
             this._setHoverStatus(menuItem, true)
             this._removeSubMenu(contextMenuContainer)
           }
           menuItem.onmouseleave = () => {
+            if (isDisabled) return
             this._setHoverStatus(menuItem, false)
           }
           menuItem.onclick = () => {
+            if (isDisabled) return
             if (menu.callback && this.context) {
               menu.callback(this.command, this.context)
             }

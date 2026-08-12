@@ -11,22 +11,14 @@ const {
 
 export const globalMenus: IRegisterContextMenu[] = [
   {
-    key: CUT,
-    i18nPath: 'contextmenu.global.cut',
-    shortCut: `${isApple ? '⌘' : 'Ctrl'} + X`,
-    when: payload => {
-      return !payload.isReadonly
-    },
-    callback: (command: Command) => {
-      command.executeCut()
-    }
-  },
-  {
     key: COPY,
     i18nPath: 'contextmenu.global.copy',
     shortCut: `${isApple ? '⌘' : 'Ctrl'} + C`,
-    when: payload => {
-      return payload.editorHasSelection || payload.isCrossRowCol
+    when: () => {
+      return true
+    },
+    disabled: (payload) => {
+      return !payload.editorHasSelection && !payload.isCrossRowCol
     },
     callback: (command: Command) => {
       command.executeCopy()
@@ -41,6 +33,17 @@ export const globalMenus: IRegisterContextMenu[] = [
     },
     callback: (command: Command) => {
       command.executePaste()
+    }
+  },
+  {
+    key: CUT,
+    i18nPath: 'contextmenu.global.cut',
+    shortCut: `${isApple ? '⌘' : 'Ctrl'} + X`,
+    when: payload => {
+      return !payload.isReadonly
+    },
+    callback: (command: Command) => {
+      command.executeCut()
     }
   },
   {

@@ -3002,6 +3002,8 @@ export class Draw {
     }
     // 清除光标等副作用
     this.imageObserver.clearAll()
+    // 记录渲染前光标状态（isSetCursor 为 false 时用于恢复）
+    const hadCursorBefore = !!this.position.getCursorPosition()
     this.cursor.recoveryCursor()
     // 创建纸张
     for (let i = 0; i < this.pageRowList.length; i++) {
@@ -3032,6 +3034,15 @@ export class Draw {
     } else if (this.range.getIsSelection()) {
       // 存在选区时仅定位避免事件无法捕获
       this.cursor.focus()
+    } else if (hadCursorBefore) {
+      // isSetCursor 为 false 时，若渲染前光标可见则恢复显示（避免意外隐藏光标）
+      const { startIndex, endIndex } = this.range.getRange()
+      const positionList = this.position.getPositionList()
+      const cursorIndex = startIndex === endIndex ? startIndex : endIndex
+      if (~cursorIndex && positionList[cursorIndex]) {
+        this.position.setCursorPosition(positionList[cursorIndex])
+        this.cursor.drawCursor()
+      }
     }
     // 历史记录用于undo、redo（非首次渲染内容变更 || 第一次存在光标时）
     if (
