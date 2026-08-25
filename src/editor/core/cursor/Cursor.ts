@@ -11,6 +11,7 @@ import { Draw } from '../draw/Draw'
 import { CanvasEvent } from '../event/CanvasEvent'
 import { Position } from '../position/Position'
 import { CursorAgent } from './CursorAgent'
+import { GlobalEvent } from '../event/GlobalEvent'
 
 export type IDrawCursorOption = ICursorOption & {
   isShow?: boolean
@@ -99,6 +100,8 @@ export class Cursor {
   public focus() {
     // 移动端只读模式禁用聚焦避免唤起输入法，web端允许聚焦避免事件无法捕获
     if (isMobile && this.draw.isReadonly()) return
+    // 多编辑器实例：聚焦当前实例前，先隐藏其他实例的光标，避免同时出现多个光标
+    GlobalEvent.blurOtherEditors(this.draw.getContainer())
     const agentCursorDom = this.cursorAgent.getAgentCursorDom()
     // 光标不聚焦时重新定位
     if (document.activeElement !== agentCursorDom) {
@@ -146,7 +149,20 @@ export class Cursor {
     const cursorHeight = metrics.height + increaseHeight * 2
     const agentCursorDom = this.cursorAgent.getAgentCursorDom()
     if (isFocus) {
+      // 多编辑器实例：在绘制光标（同步阶段）就先隐藏其他实例光标，
+      // 避免连续对多个实例 render 时多个光标 DOM 同时可见的竞态窗口
+      GlobalEvent.blurOtherEditors(this.draw.getContainer())
       setTimeout(() => {
+        // 多编辑器实例：如果其他编辑器已获得焦点，不抢回焦点并隐藏自身光标
+        const activeEl = document.activeElement as HTMLElement | null
+        if (
+          activeEl &&
+          activeEl !== agentCursorDom &&
+          activeEl.classList?.contains(`${EDITOR_PREFIX}-inputarea`)
+        ) {
+          this.recoveryCursor()
+          return
+        }
         this.focus()
       })
     }
@@ -196,6 +212,9 @@ export class Cursor {
   public recoveryCursor() {
     this.cursorDom.style.display = 'none'
     this._clearBlinkTimeout()
+    // 重置光标和代理光标的位置，避免旧top值撑开容器scrollHeight
+    this.cursorDom.style.top = '0px'
+    this.cursorAgent.getAgentCursorDom().style.top = '0px'
   }
 
   public moveCursorToVisible(payload: IMoveCursorToVisibleOption) {

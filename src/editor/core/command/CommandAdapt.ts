@@ -413,6 +413,30 @@ export class CommandAdapt {
     }
   }
 
+  // 同步控件PREFIX/POSTFIX元素的size与VALUE元素一致
+  private _syncControlParticleSize(
+    elementList: IElement[],
+    changeElementList: IElement[]
+  ) {
+    const controlIdSizeMap = new Map<string, number>()
+    changeElementList.forEach(el => {
+      if (el.controlId && el.size) {
+        controlIdSizeMap.set(el.controlId, el.size)
+      }
+    })
+    if (!controlIdSizeMap.size) return
+    elementList.forEach(el => {
+      if (
+        el.controlId &&
+        (el.controlComponent === ControlComponent.PREFIX ||
+          el.controlComponent === ControlComponent.POSTFIX) &&
+        controlIdSizeMap.has(el.controlId)
+      ) {
+        el.size = controlIdSizeMap.get(el.controlId)
+      }
+    })
+  }
+
   public size(payload: number, options?: IRichtextOption) {
     const { isIgnoreDisabledRule = false } = options || {}
     const isDisabled =
@@ -460,6 +484,10 @@ export class CommandAdapt {
       isExistUpdate = true
     })
     if (isExistUpdate) {
+      this._syncControlParticleSize(
+        this.draw.getElementList(),
+        changeElementList
+      )
       this.draw.render(renderOption)
     }
   }
@@ -515,6 +543,10 @@ export class CommandAdapt {
       isExistUpdate = true
     })
     if (isExistUpdate) {
+      this._syncControlParticleSize(
+        this.draw.getElementList(),
+        changeElementList
+      )
       this.draw.render(renderOption)
     }
   }
@@ -569,6 +601,10 @@ export class CommandAdapt {
       isExistUpdate = true
     })
     if (isExistUpdate) {
+      this._syncControlParticleSize(
+        this.draw.getElementList(),
+        changeElementList
+      )
       this.draw.render(renderOption)
     }
   }
@@ -3017,5 +3053,13 @@ export class CommandAdapt {
   // 将纯文本识别并转换为控件
   public convertToControl(options?: IConvertToControlOption) {
     this.convert.convertToControl(options)
+  }
+
+  // 设置默认字号
+  public setDefaultSize(size: number) {
+    const { minSize, maxSize } = this.options
+    if (size < minSize || size > maxSize) return
+    this.options.defaultSize = size
+    this.draw.render()
   }
 }

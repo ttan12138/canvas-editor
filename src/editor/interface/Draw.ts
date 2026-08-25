@@ -12,6 +12,9 @@ export interface IDrawOption {
   isInit?: boolean
   isSourceHistory?: boolean
   isFirstRender?: boolean
+  // 跳过光标聚焦（仅 changeGroupStyle 等场景使用），避免重新聚焦导致
+  // 输入法重建、滚动条乱跳
+  isSkipFocus?: boolean
 }
 
 export interface IForceUpdateOption {
@@ -66,6 +69,9 @@ export type IGetOriginValueOption = Omit<IGetValueOption, 'extraPickAttrs'>
 export interface IAppendElementListOption {
   isPrepend?: boolean
   isSubmitHistory?: boolean
+  // 跳过光标聚焦：批量灌内容（如多实例 setTemplate）时使用，
+  // 避免程序化 append 抢焦点导致多实例同时出现光标
+  isSkipFocus?: boolean
 }
 
 export interface IGetImageOption {

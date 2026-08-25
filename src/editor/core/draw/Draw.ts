@@ -849,7 +849,8 @@ export class Draw {
     this.range.setRange(curIndex, curIndex)
     this.render({
       curIndex,
-      isSubmitHistory
+      isSubmitHistory,
+      isSkipFocus: options.isSkipFocus
     })
   }
 
@@ -1320,6 +1321,7 @@ export class Draw {
     this.render({
       curIndex,
       isSetCursor,
+      isCompute: true,
       isFirstRender: true
     })
   }
@@ -1364,7 +1366,9 @@ export class Draw {
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
     canvas.style.display = 'block'
-    canvas.style.backgroundColor = '#ffffff'
+    // canvas 元素的 CSS 背景跟随 options.background.color，
+    // 避免页面间隙/背景图未加载/打印背景禁用时露出硬编码的白色
+    canvas.style.backgroundColor = this.options.background.color
     canvas.style.marginBottom = `${this.getPageGap()}px`
     canvas.setAttribute('data-index', String(pageNo))
     this.pageContainer.append(canvas)
@@ -2463,9 +2467,10 @@ export class Draw {
           const numericValue = parseFloat(controlValue)
           if (!isNaN(numericValue)) {
             const rowMargin = this.getElementRowMargin(element)
+            const size = element.size || this.options.defaultSize
             const arrowHeight = curRow.height - 2 * rowMargin
-            const arrowX = x + 4
-            const arrowY = y + rowMargin + arrowHeight * 0.6
+            const arrowX = x + size * 0.2
+            const arrowY = y + rowMargin + arrowHeight * 0.5
             this.numberFlagParticle.render({
               ctx,
               x: arrowX,
@@ -2543,14 +2548,19 @@ export class Draw {
           this.control.drawBorder(ctx)
         }
         // 下划线记录
-        // NUMBER_FLAG控件的值元素和占位符始终显示下划线
+        // NUMBER_FLAG控件的值元素和占位符仅在属于分组(groupIds)时才显示下划线
         const isNumberFlagValue =
           element.controlComponent === ControlComponent.VALUE &&
           element.control?.type === ControlType.NUMBER_FLAG
         const isNumberFlagPlaceholder =
           element.controlComponent === ControlComponent.PLACEHOLDER &&
           element.control?.type === ControlType.NUMBER_FLAG
-        if (element.underline || element.control?.underline || isNumberFlagValue || isNumberFlagPlaceholder) {
+        const isGrouped = !!element.groupIds?.length
+        if (
+          element.underline ||
+          element.control?.underline ||
+          (isGrouped && (isNumberFlagValue || isNumberFlagPlaceholder))
+        ) {
           // 下标元素下划线单独绘制
           if (
             preElement?.type === ElementType.SUBSCRIPT &&
@@ -2933,6 +2943,14 @@ export class Draw {
 
   public render(payload?: IDrawOption) {
     this.renderCount++
+    // 同步已存在 canvas 元素的 CSS 背景色，使其在页面间隙/边缘处
+    // 与 options.background.color 保持一致（运行时切换 background 也生效）
+    const cssBgColor = this.options.background.color
+    for (const canvas of this.pageList) {
+      if (canvas.style.backgroundColor !== cssBgColor) {
+        canvas.style.backgroundColor = cssBgColor
+      }
+    }
     const { header, footer } = this.options
     const {
       isSubmitHistory = true,
@@ -2941,7 +2959,8 @@ export class Draw {
       isLazy = true,
       isInit = false,
       isSourceHistory = false,
-      isFirstRender = false
+      isFirstRender = false,
+      isSkipFocus = false
     } = payload || {}
     let { curIndex } = payload || {}
     const innerWidth = this.getInnerWidth()
@@ -3031,6 +3050,10 @@ export class Draw {
     // 光标重绘
     if (isSetCursor) {
       curIndex = this.setCursor(curIndex)
+    } else if (isSkipFocus) {
+      // 仅 changeGroupStyle 等场景使用：isSetCursor 为 false 且不聚焦光标，
+      // 避免重新聚焦导致输入法重建、滚动条乱跳
+      this.cursor.drawCursor({ isFocus: false })
     } else if (this.range.getIsSelection()) {
       // 存在选区时仅定位避免事件无法捕获
       this.cursor.focus()
@@ -3082,6 +3105,16 @@ export class Draw {
       }
       // 文档内容改变
       if ((isSubmitHistory || isSourceHistory) && !isInit) {
+        // 反馈内容变更前，清除未分组元素的下划线与高亮样式
+        const cleared = this.clearUnGroupedStyle(this.getElementList())
+        // 仅有实际的清除发生时才重绘，保证画面与数据一致
+        if (cleared) {
+          this.render({
+            isSubmitHistory: false,
+            isSourceHistory: false,
+            isLazy: false
+          })
+        }
         if (this.listener.contentChange) {
           this.listener.contentChange()
         }
@@ -3090,6 +3123,59 @@ export class Draw {
         }
       }
     })
+  }
+
+  // 递归清除未分组元素的下划线与高亮样式（保留 groupIds 元素的质检样式）
+  // 返回是否实际发生了清除
+  private clearUnGroupedStyle(elementList: IElement[]): boolean {
+    let cleared = false
+    for (const element of elementList) {
+      if (!element.groupIds?.length) {
+        if (
+          element.underline !== undefined ||
+          element.underlineColor !== undefined ||
+          element.highlight !== undefined ||
+          (element.control && element.control.underline !== undefined)
+        ) {
+          cleared = true
+        }
+        element.underline = undefined
+        element.underlineColor = undefined
+        element.highlight = undefined
+        // 控件自身下划线（随元素）
+        if (element.control) {
+          element.control.underline = undefined
+        }
+      }
+      if (element.valueList?.length) {
+        if (this.clearUnGroupedStyle(element.valueList)) {
+          cleared = true
+        }
+      }
+      const control = element.control
+      if (control) {
+        if (Array.isArray(control.value)) {
+          if (this.clearUnGroupedStyle(control.value)) {
+            cleared = true
+          }
+        }
+        if (control.structValues?.length) {
+          if (this.clearUnGroupedStyle(control.structValues)) {
+            cleared = true
+          }
+        }
+        if (control.values?.length) {
+          control.values.forEach(v => {
+            if (v.structValues?.length) {
+              if (this.clearUnGroupedStyle(v.structValues)) {
+                cleared = true
+              }
+            }
+          })
+        }
+      }
+    }
+    return cleared
   }
 
   public setCursor(curIndex: number | undefined) {

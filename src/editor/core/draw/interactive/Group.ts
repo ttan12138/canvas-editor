@@ -149,7 +149,9 @@ export class Group {
     this.draw.render({
       isSetCursor: false,
       isCompute,
-      isSubmitHistory: false
+      isSubmitHistory: false,
+      // 不重新聚焦光标，避免内容过长时输入法重建、滚动条乱跳
+      isSkipFocus: true
     })
   }
 

@@ -109,5 +109,5 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
     ]
   }
   if (!copyElementList?.length) return
-  await writeElementList(copyElementList, draw.getOptions())
+  await writeElementList(copyElementList, draw.getOptions(), draw.getContainer())
 }

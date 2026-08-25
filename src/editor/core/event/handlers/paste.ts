@@ -61,6 +61,45 @@ export function pasteElement(host: CanvasEvent, elementList: IElement[]) {
       editorOptions: draw.getOptions()
     })
   }
+  // 粘贴内容优先使用localStorage中存储的字号
+  const FONT_SIZE_KEY = 'crealife_canvas_font_size'
+  const storedSize = parseInt(localStorage.getItem(FONT_SIZE_KEY) || '')
+  if (storedSize > 0) {
+    const applyFontSize = (list: IElement[]) => {
+      list.forEach(el => {
+        if (el.type !== ElementType.IMAGE && el.type !== ElementType.LATEX) {
+          el.size = storedSize
+        }
+        if (el.valueList?.length) {
+          applyFontSize(el.valueList)
+        }
+        // 控件内部文字字号
+        const control = el.control
+        if (control) {
+          control.size = storedSize
+          // control.value 为 IElement[] 时递归处理
+          if (Array.isArray(control.value)) {
+            applyFontSize(control.value)
+          }
+          // 单选结构化值
+          if (control.structValues?.length) {
+            control.structValues.forEach(sv => {
+              sv.size = storedSize
+            })
+          }
+          // 多选结构化值
+          if (control.values?.length) {
+            control.values.forEach(v => {
+              v.structValues?.forEach(sv => {
+                sv.size = storedSize
+              })
+            })
+          }
+        }
+      })
+    }
+    applyFontSize(elementList)
+  }
   draw.insertElementList(elementList)
 }
 
@@ -120,6 +159,7 @@ export function pasteImage(host: CanvasEvent, file: File | Blob) {
 
 export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
   const draw = host.getDraw()
+  console.log('[pasteByEvent] container:', draw.getContainer())
   if (draw.isReadonly() || draw.isDisabled()) return
   const clipboardData = evt.clipboardData
   if (!clipboardData) return
@@ -133,7 +173,7 @@ export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
   // 优先读取编辑器内部粘贴板数据（粘贴板不包含文件时）
   if (!getIsClipboardContainFile(clipboardData)) {
     const clipboardText = clipboardData.getData('text')
-    const editorClipboardData = getClipboardData()
+    const editorClipboardData = getClipboardData(draw.getContainer())
     // 不同系统间默认换行符不同 windows:\r\n mac:\n
     if (
       editorClipboardData &&
@@ -144,7 +184,7 @@ export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
       return
     }
   }
-  removeClipboardData()
+  removeClipboardData(draw.getContainer())
   // 从粘贴板提取数据
   let isHTML = false
   for (let i = 0; i < clipboardData.items.length; i++) {
@@ -242,7 +282,7 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption, past
       console.warn('Failed to read clipboard text:', e)
     }
   }
-  const editorClipboardData = getClipboardData()
+  const editorClipboardData = getClipboardData(draw.getContainer())
 
   if (editorClipboardData) {
     if (!readClipboardSuccess || !clipboardText) {
@@ -254,7 +294,7 @@ export async function pasteByApi(host: CanvasEvent, options?: IPasteOption, past
       return
     }
 
-    removeClipboardData()
+    removeClipboardData(draw.getContainer())
   }
 
   // pasteData已提供时直接使用，跳过异步剪贴板读取避免光标失焦

@@ -61,6 +61,7 @@ export class CursorAgent {
     if (isReadonly) return
     const clipboardData = evt.clipboardData
     if (!clipboardData) return
+    console.log('[CursorAgent._paste] container:', this.container, 'isReadonly:', isReadonly)
     pasteByEvent(this.canvasEvent, evt)
     evt.preventDefault()
   }

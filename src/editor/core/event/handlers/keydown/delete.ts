@@ -181,16 +181,19 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
         const isCollapsed = rangeManager.getIsCollapsed()
 
         if (!isCollapsed) {
+          // 选中状态下使用选区起点 startIndex 定位，而非光标位置
+          // （光标可能在选区末尾 endIndex，用其会导致删除选区之后的内容）
           draw.spliceElementList(
             elementList,
-            elementIndex + 1,
+            startIndex + 1,
             endIndex - startIndex
           )
+          curIndex = startIndex
         } else {
           if (!elementList[elementIndex + 1]) return
           draw.spliceElementList(elementList, elementIndex + 1, 1)
+          curIndex = elementIndex
         }
-        curIndex = elementIndex
       }
     }
   draw.getGlobalEvent().setCanvasEventAbility()

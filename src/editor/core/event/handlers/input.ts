@@ -99,9 +99,6 @@ export function input(data: string, host: CanvasEvent) {
           }
         })
       }
-      if (isComposing) {
-        newElement.underline = true
-      }
     }
     return newElement
   })

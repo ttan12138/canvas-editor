@@ -117,6 +117,7 @@ export class Command {
   public executeJumpControl: CommandAdapt['jumpControl']
   public executeConvertToText: CommandAdapt['convertToText']
   public executeConvertToControl: CommandAdapt['convertToControl']
+  public executeSetDefaultSize: CommandAdapt['setDefaultSize']
   public executeSetControlRenderMode: CommandAdapt['setControlRenderMode']
   public executeUpdateOptions: CommandAdapt['updateOptions']
   public executeInsertTitle: CommandAdapt['insertTitle']
@@ -323,6 +324,8 @@ export class Command {
     // 文本和控件转换
     this.executeConvertToText = adapt.convertToText.bind(adapt)
     this.executeConvertToControl = adapt.convertToControl.bind(adapt)
+    // 设置默认字号
+    this.executeSetDefaultSize = adapt.setDefaultSize.bind(adapt)
     // 控件渲染模式
     this.executeSetControlRenderMode = adapt.setControlRenderMode.bind(adapt)
     this.executeUpdateOptions = adapt.updateOptions.bind(adapt)

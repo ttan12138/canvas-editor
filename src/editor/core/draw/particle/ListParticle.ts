@@ -132,10 +132,51 @@ export class ListParticle {
   }
 
   private findStyledElement(elementList: IElement[]): IElement {
-    let styleElement = elementList[0]
-    for (let i = 1; i < elementList.length; i++) {
+    // 列表标记元素(value===ZERO)通常不带 size，从首个真实文字元素开始查找
+    const startIndex = elementList[0]?.value === ZERO ? 1 : 0
+    let styleElement = elementList[startIndex] || elementList[0]
+    for (let i = startIndex; i < elementList.length; i++) {
       const element = elementList[i]
-      if (element.font || element.size || element.bold || element.italic) {
+      // 控件元素：优先取structValues中首个有size的元素，其次取控件size，最后取localStorage
+      if (element.type === ElementType.CONTROL && element.control) {
+        const control = element.control
+        // 1. 单选structValues
+        let structSize: number | undefined
+        if (control.structValues?.length) {
+          structSize = control.structValues.find(sv => sv.size)?.size
+        }
+        // 2. 多选values[].structValues
+        if (!structSize && control.values?.length) {
+          for (const v of control.values) {
+            const found = v.structValues?.find(sv => sv.size)
+            if (found?.size) {
+              structSize = found.size
+              break
+            }
+          }
+        }
+        // 3. 控件自身的size
+        if (!structSize && control.size) {
+          structSize = control.size
+        }
+        // 4. localStorage中存储的size
+        if (!structSize) {
+          const FONT_SIZE_KEY = 'crealife_canvas_font_size'
+          const stored = parseInt(localStorage.getItem(FONT_SIZE_KEY) || '')
+          if (stored > 0) structSize = stored
+        }
+        if (structSize) {
+          styleElement = { ...element, size: structSize }
+          break
+        }
+      }
+      if (
+        element.font ||
+        element.size ||
+        element.bold ||
+        element.italic ||
+        element.actualSize
+      ) {
         styleElement = element
         break
       }
@@ -144,13 +185,30 @@ export class ListParticle {
   }
 
   private getListFontStyle(elementList: IElement[], scale: number): string {
+    const styleElement = this.findStyledElement(elementList)
     if (this.options.list.inheritStyle) {
-      const styleElement = this.findStyledElement(elementList)
       return this.draw.getElementFont(styleElement, scale)
     } else {
+      // 字号始终与列表文字保持一致，其他样式使用默认值
       const { defaultFont, defaultSize } = this.options
-      return `${defaultSize * scale}px ${defaultFont}`
+      const size = styleElement.actualSize || styleElement.size || defaultSize
+      return `${size * scale}px ${defaultFont}`
     }
+  }
+
+  // 列表序号颜色与同行文字保持一致；
+  // 排除控件默认/选中值色，避免列表序号因控件选中值而变成蓝色
+  private getListColor(elementList: IElement[]): string | undefined {
+    const styleElement = this.findStyledElement(elementList)
+    const color = styleElement.color
+    if (
+      color &&
+      color !== this.options.control.selectValueColor &&
+      color !== this.options.control.defaultValueColor
+    ) {
+      return color
+    }
+    return undefined
   }
 
   public getListStyleWidth(
@@ -248,6 +306,14 @@ export class ListParticle {
       if (!text) return
       ctx.save()
       ctx.font = this.getListFontStyle(elementList, scale)
+      // 序号颜色与同行文字保持一致（排除控件默认/选中值色，避免列表序号变蓝）
+      const listColor = this.getListColor(elementList)
+      if (listColor) {
+        ctx.fillStyle = listColor
+      }
+      // 与同行文字采用相同基线对齐：y = startY + ascent 即文字基线坐标
+      // （控件 UI 的基准是基线而非整行几何中心，故不能用 row.height/2）
+      ctx.textBaseline = 'alphabetic'
       ctx.fillText(text, x, y)
       ctx.restore()
     }

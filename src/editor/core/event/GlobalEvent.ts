@@ -51,6 +51,15 @@ export class GlobalEvent {
     GlobalEvent.editorInstances.set(draw.getContainer(), canvasEvent)
   }
 
+  // 多编辑器实例：让除当前编辑器外的其他编辑器隐藏光标
+  public static blurOtherEditors(currentContainer: Element) {
+    GlobalEvent.editorInstances.forEach((canvasEvent, container) => {
+      if (container !== currentContainer) {
+        canvasEvent.getDraw().getCursor().recoveryCursor()
+      }
+    })
+  }
+
   public register() {
     this.cursor = this.draw.getCursor()
     this.addEvent()

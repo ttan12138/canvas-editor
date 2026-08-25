@@ -1,4 +1,3 @@
-import { EDITOR_CLIPBOARD } from '../dataset/constant/Editor'
 import { DeepRequired } from '../interface/Common'
 import { IEditorOption } from '../interface/Editor'
 import { IElement } from '../interface/Element'
@@ -9,29 +8,31 @@ export interface IClipboardData {
   elementList: IElement[]
 }
 
-export function setClipboardData(data: IClipboardData) {
-  localStorage.setItem(
-    EDITOR_CLIPBOARD,
-    JSON.stringify({
-      text: data.text,
-      elementList: data.elementList
-    })
-  )
+// 每个编辑器实例独立的剪贴板数据（以容器DOM为key）
+const clipboardDataMap = new WeakMap<HTMLDivElement, IClipboardData>()
+
+export function setClipboardData(
+  data: IClipboardData,
+  container: HTMLDivElement
+) {
+  clipboardDataMap.set(container, data)
 }
 
-export function getClipboardData(): IClipboardData | null {
-  const clipboardText = localStorage.getItem(EDITOR_CLIPBOARD)
-  return clipboardText ? JSON.parse(clipboardText) : null
+export function getClipboardData(
+  container: HTMLDivElement
+): IClipboardData | null {
+  return clipboardDataMap.get(container) || null
 }
 
-export function removeClipboardData() {
-  localStorage.removeItem(EDITOR_CLIPBOARD)
+export function removeClipboardData(container: HTMLDivElement) {
+  clipboardDataMap.delete(container)
 }
 
 export async function writeClipboardItem(
   text: string,
   html: string,
-  elementList: IElement[]
+  elementList: IElement[],
+  container: HTMLDivElement
 ) {
   if (!text && !html && !elementList.length) return
   const plainText = new Blob([text], { type: 'text/plain' })
@@ -62,13 +63,14 @@ export async function writeClipboardItem(
     document.execCommand('copy')
     fakeElement.remove()
   }
-  // 编辑器结构化数据
-  setClipboardData({ text, elementList })
+  // 编辑器结构化数据（按编辑器实例隔离）
+  setClipboardData({ text, elementList }, container)
 }
 
 export async function writeElementList(
   elementList: IElement[],
-  options: DeepRequired<IEditorOption>
+  options: DeepRequired<IEditorOption>,
+  container: HTMLDivElement
 ) {
   // 先压缩控件元素（PREFIX/POSTFIX→CONTROL），避免DOM中重复渲染控件值
   const zippedElementList = zipElementList(elementList)
@@ -80,7 +82,7 @@ export async function writeElementList(
   clipboardDom.remove()
   const html = clipboardDom.innerHTML
   if (!text && !html && !zippedElementList.length) return
-  await writeClipboardItem(text, html, zippedElementList)
+  await writeClipboardItem(text, html, zippedElementList, container)
 }
 
 export function getIsClipboardContainFile(clipboardData: DataTransfer) {

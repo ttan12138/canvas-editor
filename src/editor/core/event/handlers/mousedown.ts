@@ -12,6 +12,7 @@ import { RadioControl } from '../../draw/control/radio/RadioControl'
 import { CanvasEvent } from '../CanvasEvent'
 import { IElement } from '../../../interface/Element'
 import { Draw } from '../../draw/Draw'
+import { GlobalEvent } from '../GlobalEvent'
 
 export function setRangeCache(host: CanvasEvent) {
   const draw = host.getDraw()
@@ -149,6 +150,9 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     }
     rangeManager.setRange(startIndex, endIndex)
     position.setCursorPosition(positionList[positionIndex])
+    // 多编辑器实例：让其他编辑器隐藏光标，再聚焦当前编辑器
+    GlobalEvent.blurOtherEditors(draw.getContainer())
+    draw.getCursor().focus()
     // 右键点击时关闭弹窗类控件，避免下拉列表与右键菜单同时显示
     if (evt.button === MouseEventButton.RIGHT) {
       draw.getControl().destroyControl({ isEmitEvent: false })

@@ -45,12 +45,12 @@ export class MultiCustomSelectParticle {
     const hasAssociation = !!associationId
 
     const metrics = element.metrics
-    const fontSize = metrics.height
-    const svgSize = fontSize * 0.8
-
+    const scale = this.options.scale
+    const svgSize = (element.size || metrics.height) * scale * 0.8
     const centerX = x + metrics.width / 2
-    const centerY = y + metrics.height / 2 + metrics.height * 0.7
-
+    // 与同行文字采用相同基线对齐：y 为元素顶边，row.ascent 是文字基线高，
+    // 图标中心置于基线向上半个图标处，与文字中心重合（控件 UI 基准是基线而非整行几何中心）
+    const centerY = y + row.ascent - svgSize / 2
     this.drawSelectArrow(ctx, centerX, centerY, svgSize, hasAssociation)
   }
 

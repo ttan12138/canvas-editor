@@ -32,7 +32,7 @@ export async function cut(host: CanvasEvent) {
   }
   const options = draw.getOptions()
   // 写入粘贴板
-  await writeElementList(elementList.slice(start + 1, end + 1), options)
+  await writeElementList(elementList.slice(start + 1, end + 1), options, draw.getContainer())
   const control = draw.getControl()
   let curIndex: number
   if (control.getActiveControl() && control.getIsRangeWithinControl()) {
