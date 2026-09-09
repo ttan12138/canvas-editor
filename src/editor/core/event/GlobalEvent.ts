@@ -1,4 +1,4 @@
-import { EDITOR_COMPONENT } from '../../dataset/constant/Editor'
+import { EDITOR_COMPONENT, EDITOR_PREFIX } from '../../dataset/constant/Editor'
 import { EditorComponent } from '../../dataset/enum/Editor'
 import { IEditorOption } from '../../interface/Editor'
 import { deepClone, findParent } from '../../utils'
@@ -58,6 +58,25 @@ export class GlobalEvent {
         canvasEvent.getDraw().getCursor().recoveryCursor()
       }
     })
+  }
+
+  // 多编辑器实例：根据 document.activeElement 归属判断当前真正聚焦的编辑器容器
+  public static getActiveEditorContainer(): Element | null {
+    let el = document.activeElement as Element | null
+    while (el) {
+      if (el.getAttribute(EDITOR_COMPONENT) === EditorComponent.MAIN) {
+        return el
+      }
+      el = el.parentElement
+    }
+    return null
+  }
+
+  // 多编辑器实例：当前焦点是否落在“其他”编辑器实例上
+  public static isActiveElementOtherEditor(currentContainer: Element): boolean {
+    const activeContainer = GlobalEvent.getActiveEditorContainer()
+    if (!activeContainer) return false
+    return activeContainer !== currentContainer
   }
 
   public register() {
@@ -125,6 +144,22 @@ export class GlobalEvent {
     )
     if (contextMenuDom) {
       return
+    }
+    // 前缀预输入：点击下拉外部时关闭
+    const prefixAutocomplete = this.draw.getPrefixAutocomplete()
+    if (prefixAutocomplete.getIsOpen()) {
+      const prefixDom = findParent(
+        target,
+        (node: Node & Element) =>
+          !!node &&
+          node.nodeType === 1 &&
+          node.getAttribute(EDITOR_COMPONENT) === EditorComponent.POPUP &&
+          node.classList.contains(`${EDITOR_PREFIX}-prefix-autocomplete`),
+        true
+      )
+      if (!prefixDom) {
+        prefixAutocomplete.close()
+      }
     }
 
     const pageList = this.draw.getPageList()
@@ -249,6 +284,9 @@ export class GlobalEvent {
     // console.log('[GLOBAL DRAG] drop, innerEditorDom found:', !!innerEditorDom, 'target:', target)
     if (innerEditorDom) {
       this.canvasEvent.drop(evt)
+      // 已在捕获阶段处理，阻止事件继续冒泡到 pageContainer 的 drop 监听，
+      // 避免同一落下被重复插入（如本编辑器内拖拽出现 “文字A文字A”）
+      evt.stopPropagation()
     }
   }
 

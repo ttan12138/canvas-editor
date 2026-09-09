@@ -125,6 +125,31 @@ export function formatElementList(
     isForceCompensation = false,
     editorOptions
   } = options
+  // 规范化换行符：文本元素 value 中内嵌的换行符需拆分为独立的段落元素（value === '\n'），
+  // 否则会被当作单个整体元素绘制成一行（多行文本被压成一行；setValue 后撤销/重做恢复同一份数据也会同样表现为一行）。
+  const __normalized: IElement[] = []
+  for (const __el of elementList) {
+    const __isPlainText = !__el.type || __el.type === ElementType.TEXT
+    if (
+      __isPlainText &&
+      typeof __el.value === 'string' &&
+      __el.value.includes('\n')
+    ) {
+      const __parts = __el.value.split('\n')
+      __parts.forEach((__part, __idx) => {
+        if (__part.length) {
+          __normalized.push({ ...__el, value: __part })
+        }
+        if (__idx !== __parts.length - 1) {
+          __normalized.push({ value: '\n' })
+        }
+      })
+    } else {
+      __normalized.push(__el)
+    }
+  }
+  elementList.length = 0
+  elementList.push(...__normalized)
   const startElement = elementList[0]
   // 非首字符零宽节点文本元素则补偿-列表元素内部会补偿此处忽略
   if (
@@ -458,13 +483,14 @@ export function formatElementList(
           // 单选控件：渲染 structValues 中的文字（保留 groupIds、underline、highlight 等属性）
           valueList = singleStructValues.map(sv => ({
             ...deepClone(sv),
-            color: sv.color ?? editorOptions.control.selectValueColor
+            color: sv.color ?? editorOptions.selector.customSelectValueColor
           })) as IElement[]
           // 同步 value 字段，保持数据一致性
           el.control.value = singleStructValues.map(sv => sv.value).join('')
         } else if (multiSelectValues) {
           // 多选控件：渲染 values 中的每个选项（选项优先渲染 structValues）
           // 分隔符优先从 code 推断，并回写到 control 以保证后续一致性
+          const multiSelectValueColor = editorOptions.selector.multiSelectValueColor
           const delimiter = inferMultiSelectDelimiter(
             el.control.code,
             el.control.valueSets,
@@ -478,7 +504,7 @@ export function formatElementList(
               delimiterStrList.forEach(d => {
                 valueList.push({
                   value: d,
-                  color: editorOptions.control.selectValueColor
+                  color: multiSelectValueColor
                 })
               })
             }
@@ -488,13 +514,13 @@ export function formatElementList(
               optionValue.structValues.forEach(sv => {
                 valueList.push({
                   ...deepClone(sv),
-                  color: sv.color ?? editorOptions.control.selectValueColor
+                  color: sv.color ?? multiSelectValueColor
                 } as IElement)
               })
             } else {
               valueList.push({
                 value: optionValue.value,
-                color: editorOptions.control.selectValueColor
+                color: multiSelectValueColor
               })
             }
           })
@@ -620,7 +646,10 @@ export function formatElementList(
                 valueList = [
                   {
                     value: firstValueSet.value,
-                    color: editorOptions.control.selectValueColor
+                    color:
+                      type === ControlType.MULTI_CUSTOM_SELECT
+                        ? editorOptions.selector.multiSelectValueColor
+                        : editorOptions.selector.customSelectValueColor
                   }
                 ]
                 // 更新 control.code 为第一个选项的 code
@@ -645,7 +674,7 @@ export function formatElementList(
                     if (valueSet) {
                       values.push({
                         value: valueSet.value,
-                        color: editorOptions.control.selectValueColor
+                        color: editorOptions.selector.multiSelectValueColor
                       })
                       controlValues.push({
                         value: valueSet.value,
@@ -665,7 +694,10 @@ export function formatElementList(
                     valueList = [
                       {
                         value: valueSet.value,
-                        color: editorOptions.control.selectValueColor
+                        color:
+                          type === ControlType.CUSTOM_SELECT
+                            ? editorOptions.selector.customSelectValueColor
+                            : editorOptions.selector.optionColor
                       }
                     ]
                   }

@@ -22,6 +22,16 @@ export class Group {
     this.fillRectMap = new Map()
   }
 
+  // 控件渲染色（选中值/默认值/单选值/多选值颜色），解组清理样式时应保留
+  private isControlRenderColor(color?: string): boolean {
+    return (
+      color === this.options.control.selectValueColor ||
+      color === this.options.control.defaultValueColor ||
+      color === this.options.selector.customSelectValueColor ||
+      color === this.options.selector.multiSelectValueColor
+    )
+  }
+
   public setGroup(): string | null {
     if (this.draw.getZone().getZone() !== EditorZone.MAIN) {
       return null
@@ -100,10 +110,7 @@ export class Group {
       }else{
         delete element.highlight
         delete element.underline
-        if(
-          element?.color != this.options.control.selectValueColor
-          && element?.color != this.options.control.defaultValueColor
-        ){
+        if(!this.isControlRenderColor(element?.color)){
           delete element.color
         }
         ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
@@ -117,10 +124,7 @@ export class Group {
       if(!el?.groupIds){
         delete el.highlight
         delete el.underline
-        if(
-          el?.color != this.options.control.selectValueColor
-          && el?.color != this.options.control.defaultValueColor
-        ){
+        if(!this.isControlRenderColor(el?.color)){
           delete el.color
         }
       }

@@ -5,7 +5,7 @@
   padding: 4px;
   overflow-x: hidden;
   overflow-y: auto;
-  background: #fff;
+  background: var(--ce-selector-popup-bg, #fff);
   box-shadow: 0 2px 12px 0 rgb(56 56 56 / 20%);
   border: 1px solid #e2e6ed;
   border-radius: 2px;
@@ -22,13 +22,15 @@
   width: 16px;
   height: 16px;
   right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   background: url(../../images/submenu-dropdown.svg);
 }
 
 .ce-contextmenu-content .ce-contextmenu-item {
   min-width: 140px;
   padding: 0 32px 0 16px;
-  height: 30px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   white-space: nowrap;
@@ -37,7 +39,11 @@
 }
 
 .ce-contextmenu-content .ce-contextmenu-item.hover {
-  background: rgba(25, 55, 88, .04);
+  background: var(--ce-selector-option-hover-bg, rgba(25, 55, 88, .04));
+}
+
+.ce-contextmenu-content .ce-contextmenu-item.active {
+  background: var(--ce-selector-active-bg, rgba(25, 55, 88, .04));
 }
 
 .ce-contextmenu-content .ce-contextmenu-item.ce-contextmenu-disabled {
@@ -52,10 +58,19 @@
 .ce-contextmenu-content .ce-contextmenu-item span {
   max-width: 300px;
   font-size: 12px;
-  color: #3d4757;
+  line-height: 18px;
+  color: var(--ce-selector-option-color, #3d4757);
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.ce-contextmenu-content .ce-contextmenu-item.hover span {
+  color: var(--ce-selector-option-hover-color, #3d4757);
+}
+
+.ce-contextmenu-content .ce-contextmenu-item.active span {
+  color: var(--ce-selector-active-color, #3d4757);
 }
 
 .ce-contextmenu-content .ce-contextmenu-item span.ce-shortcut {

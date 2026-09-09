@@ -3,7 +3,6 @@ import {
   PUNCTUATION_LIST,
   METRICS_BASIS_TEXT
 } from '../../../dataset/constant/Common'
-import { ControlRenderMode } from '../../../dataset/enum/Editor'
 import { DeepRequired } from '../../../interface/Common'
 import { IRowElement } from '../../../interface/Row'
 import { ITextMetrics } from '../../../interface/Text'
@@ -133,11 +132,8 @@ export class TextParticle {
     y: number
   ) {
     this.ctx = ctx
-    // 纯文本模式下强制使用黑色
-    let color = element.color
-    if (this.draw.getControlRenderMode() === ControlRenderMode.TEXT) {
-      color = '#000000'
-    }
+    // 文字颜色：元素自带 color 优先，否则跟随 options.defaultColor（含纯文本/控件文本模式）
+    const color = element.color || this.options.defaultColor
 
     // 兼容模式立即绘制
     if (this.options.renderMode === RenderMode.COMPATIBILITY) {

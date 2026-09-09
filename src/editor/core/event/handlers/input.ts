@@ -18,6 +18,19 @@ export function input(data: string, host: CanvasEvent) {
   const position = draw.getPosition()
   let cursorPosition = position.getCursorPosition()
   if (!data) return
+  // 前缀预输入：手动键入触发字符时，正常写入字符后打开下拉
+  const prefixAutocomplete = draw.getPrefixAutocomplete()
+  if (
+    !host.isComposing &&
+    data.length === 1 &&
+    prefixAutocomplete.hasPrefix(data)
+  ) {
+    // 先走正常输入写入触发字符，再打开下拉
+    prefixAutocomplete.markManualTrigger(data)
+  } else if (prefixAutocomplete.getIsOpen()) {
+    // 下拉打开时键入普通字符：关闭下拉，字符照常写入
+    prefixAutocomplete.handleInputFallback()
+  }
   // cursorPosition 为空时尝试从选区恢复（异步粘贴回调场景）
   if (!cursorPosition) {
     const cursor = draw.getCursor()
@@ -147,6 +160,11 @@ export function input(data: string, host: CanvasEvent) {
       endIndex: curIndex,
       defaultStyle
     }
+  }
+  // 前缀预输入：字符写入完成后打开下拉
+  const triggerPrefix = prefixAutocomplete.consumeManualTrigger()
+  if (triggerPrefix) {
+    prefixAutocomplete.open(triggerPrefix)
   }
 }
 

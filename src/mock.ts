@@ -895,21 +895,21 @@ elementList.push(
         values: [
           {
             value: '高血压测试重要异常丙丁',
-            code: "testSelectId-001",
+            code: 'testSelectId-001',
             structValues: [
-              { value: "高血", groupIds: ["testGroupId-02-01"], underline: true },
-              { value: "压测", groupIds: ["testGroupId-02-01"] },
-              { value: "试" },
+              { value: '高血', groupIds: ['testGroupId-02-01'], underline: true },
+              { value: '压测', groupIds: ['testGroupId-02-01'] },
+              { value: '试' },
               {
                 value: '重要',
-                groupIds: ["testGroupId-02-02"], underline: true
+                groupIds: ['testGroupId-02-02'], underline: true
               },
               {
                 value: '异常',
-                groupIds: ["testGroupId-02-03"],
-                highlight: "#f00"
+                groupIds: ['testGroupId-02-03'],
+                highlight: '#f00'
               },
-              { value: "丙丁" }
+              { value: '丙丁' }
             ]
           },
           {
@@ -947,7 +947,7 @@ elementList.push(
         code: '98175',
         structValues: [
           { value: '上海xx', groupIds: ['testGroupId-01-01'], underline: true },
-          { value: 'xxxxxxxx', groupIds: ['testGroupId-01-01'], highlight: "#f00" },
+          { value: 'xxxxxxxx', groupIds: ['testGroupId-01-01'], highlight: '#f00' },
         ],
         placeholder: '',
         prefix: '\u200c',

@@ -8,10 +8,17 @@ export async function cut(host: CanvasEvent) {
   if (!~startIndex && !~endIndex) return
   if (draw.isReadonly() || !rangeManager.getIsCanInput()) return
 
+  // 无选区（光标折叠）时不允许剪切；仅当处于控件内（如表格跨格选择）才继续
+  if (startIndex === endIndex) {
+    const control = draw.getControl()
+    const inControl =
+      control.getActiveControl() && control.getIsRangeWithinControl()
+    if (!inControl) return
+  }
   const elementList = draw.getElementList()
   let start = startIndex
   let end = endIndex
-  // 无选区则剪切一行
+  // 控件内（如表格跨格选中）仍按原逻辑计算选区
   if (startIndex === endIndex) {
     const position = draw.getPosition()
     const positionList = position.getPositionList()

@@ -16,6 +16,29 @@ import { end } from './end'
 export function keydown(evt: KeyboardEvent, host: CanvasEvent) {
   if (host.isComposing) return
   const draw = host.getDraw()
+  // 前缀预输入：下拉打开时优先处理导航与确认
+  const prefixAutocomplete = draw.getPrefixAutocomplete()
+  if (prefixAutocomplete.getIsOpen()) {
+    if (evt.key === KeyMap.Up) {
+      prefixAutocomplete.moveSelection(-1)
+      evt.preventDefault()
+      return
+    } else if (evt.key === KeyMap.Down) {
+      prefixAutocomplete.moveSelection(1)
+      evt.preventDefault()
+      return
+    } else if (evt.key === KeyMap.Enter) {
+      prefixAutocomplete.confirm()
+      evt.preventDefault()
+      return
+    } else if (evt.key === KeyMap.ESC) {
+      prefixAutocomplete.close()
+      evt.preventDefault()
+      return
+    }
+    // 其余按键（普通字符）交给 input 处理：关闭下拉并正常写入
+    prefixAutocomplete.handleInputFallback()
+  }
   // 键盘事件逻辑分发
   if (evt.key === KeyMap.Backspace) {
     backspace(evt, host)

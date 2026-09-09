@@ -71,17 +71,6 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
     }
   }
   const curIndex = endIndex + moveCount
-  // 调试日志：记录光标移动计算过程
-  console.log('[Right Arrow Debug]', {
-    startIndex,
-    endIndex,
-    moveCount,
-    curIndex,
-    isCollapsed,
-    controlRenderMode: draw.getControlRenderMode(),
-    'current element': elementList[endIndex]?.value,
-    'current controlComponent': elementList[endIndex]?.controlComponent
-  })
   // shift则缩放选区
   let anchorStartIndex = curIndex
   let anchorEndIndex = curIndex
@@ -182,13 +171,6 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
   const newElementList = draw.getElementList()
   const isTextMode = draw.getControlRenderMode() === ControlRenderMode.TEXT
   
-  console.log('[Right Arrow Before getNonHideElementIndex]', {
-    anchorStartIndex,
-    anchorEndIndex,
-    isTextMode,
-    'anchorStartIndex element': newElementList[anchorStartIndex]?.value,
-    'anchorStartIndex controlComponent': newElementList[anchorStartIndex]?.controlComponent
-  })
   
   anchorStartIndex = getNonHideElementIndex(
     newElementList,
@@ -203,12 +185,6 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
     isTextMode
   )
   
-  console.log('[Right Arrow After getNonHideElementIndex]', {
-    finalAnchorStartIndex: anchorStartIndex,
-    finalAnchorEndIndex: anchorEndIndex,
-    'final element': newElementList[anchorEndIndex]?.value,
-    'final controlComponent': newElementList[anchorEndIndex]?.controlComponent
-  })
   
   // 设置上下文
   rangeManager.setRange(anchorStartIndex, anchorEndIndex)
@@ -217,7 +193,8 @@ export function right(evt: KeyboardEvent, host: CanvasEvent) {
     curIndex: isAnchorCollapsed ? anchorStartIndex : undefined,
     isSetCursor: isAnchorCollapsed,
     isSubmitHistory: false,
-    isCompute: false
+    isCompute: false,
+    isMoveCursorToVisible: true
   })
   // 优化行首光标位置定位（自然换行元素定位到下一行的行首）
   if (isAnchorCollapsed) {

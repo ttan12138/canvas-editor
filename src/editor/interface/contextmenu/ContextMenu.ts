@@ -25,6 +25,8 @@ export interface IRegisterContextMenu {
   isDivider?: boolean
   icon?: string
   name?: string
+  // 为 true 时 name 按 HTML 渲染（innerHTML），否则按纯文本渲染（默认）
+  html?: boolean
   shortCut?: string
   disable?: boolean
   disabled?: (payload: IContextMenuContext) => boolean

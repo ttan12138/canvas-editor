@@ -499,6 +499,13 @@ export class SelectControl implements IControlInstance {
     const selectPopupContainer = document.createElement('div')
     selectPopupContainer.classList.add(`${EDITOR_PREFIX}-select-control-popup`)
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
+    // 阻止 mousedown/click 冒泡至 document，避免编辑器全局失焦逻辑/宿主页面的全局点击处理销毁弹窗
+    selectPopupContainer.addEventListener('mousedown', (e) => {
+      e.stopPropagation()
+    })
+    selectPopupContainer.addEventListener('click', (e) => {
+      e.stopPropagation()
+    })
     const ul = document.createElement('ul')
     let activeSelectDom: HTMLLIElement | null = null
     for (let v = 0; v < valueSets.length; v++) {
@@ -530,41 +537,58 @@ export class SelectControl implements IControlInstance {
       ul.append(li)
     }
     selectPopupContainer.append(ul)
+    // 注入 selector 配置的颜色（CSS 变量，select.css 中使用）
+    const selectorOption = this.control.getOptions().selector
+    if (selectorOption) {
+      const style = selectPopupContainer.style
+      style.setProperty('--ce-selector-popup-bg', selectorOption.popupBackgroundColor)
+      style.setProperty('--ce-selector-option-color', selectorOption.optionColor)
+      style.setProperty('--ce-selector-option-hover-bg', selectorOption.optionHoverBackgroundColor)
+      style.setProperty('--ce-selector-option-hover-color', selectorOption.optionHoverColor)
+      style.setProperty('--ce-selector-active-color', selectorOption.activeOptionColor)
+      style.setProperty('--ce-selector-active-bg', selectorOption.activeOptionBackgroundColor)
+      style.setProperty('--ce-selector-checkbox-bg', selectorOption.checkboxBackgroundColor)
+      style.setProperty('--ce-selector-divider', selectorOption.dividerColor)
+      style.setProperty('--ce-selector-checkbox-border', selectorOption.checkboxBorderColor)
+      style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
+      style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
+      style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
+    }
     // 定位
-    const {
-      coordinate: {
-        leftTop: [left, top]
-      },
-      lineHeight
-    } = position
-    const preY = this.control.getPreY()
-    // 追加至container
-    const container = this.control.getContainer()
-    container.append(selectPopupContainer)
+    // 打开前获取控件在视口中的位置，避免打开动作（插入 DOM / 重渲染）导致坐标漂移。
+    // 下拉归属于控件，故 X 锚定控件左缘、Y 取控件行底；与右键菜单、预输入下拉一致，
+    // 规避容器 transform/overflow 裁剪与滚动错位。
+    const controlXY = this.draw.getCursor().getPositionViewportXY(position)
+    document.body.append(selectPopupContainer)
+    // fixed 定位，使弹出层可超出编辑器区域展示（与右键菜单、预输入下拉一致）
+    selectPopupContainer.style.position = 'fixed'
 
-    // 边界检测：确保弹出框不超出编辑器容器
     const popupRect = selectPopupContainer.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
+    const popupW = popupRect.width
+    const popupH = popupRect.height
 
-    let finalLeft = left
-    let finalTop = top + preY + lineHeight
+    // 以控件位置为锚点：水平对齐控件左缘、垂直显示在控件正下方（仅 y 方向偏移约 5px）
+    let finalLeft = controlXY.x
+    let finalTop = controlXY.y + 5
 
-    // 检查右边界
-    if (finalLeft + popupRect.width > containerRect.width) {
-      finalLeft = containerRect.width - popupRect.width - 10
+    // document 层级贴边处理：保证弹出框始终落在视口内
+    // 1) 下方空间不足则翻转到控件上方
+    if (finalTop + popupH > window.innerHeight) {
+      finalTop = controlXY.y - popupH - 5
     }
-    // 检查左边界
-    if (finalLeft < 0) {
-      finalLeft = 10
-    }
-    // 检查下边界
-    if (finalTop + popupRect.height > containerRect.height) {
-      // 显示在上方
-      finalTop = top + preY - popupRect.height
-    }
-    // 检查上边界
+    // 2) 纵向兜底夹紧到视口
     if (finalTop < 0) {
-      finalTop = 10
+      finalTop = 0
+    }
+    if (finalTop + popupH > window.innerHeight) {
+      finalTop = Math.max(0, window.innerHeight - popupH)
+    }
+    // 3) 横向兜底夹紧到视口
+    if (finalLeft + popupW > window.innerWidth) {
+      finalLeft = Math.max(0, window.innerWidth - popupW)
+    }
+    if (finalLeft < 0) {
+      finalLeft = 0
     }
 
     selectPopupContainer.style.left = `${finalLeft}px`

@@ -33,7 +33,6 @@ window.onload = function () {
   const isApple =
     typeof navigator !== 'undefined' && /Mac OS X/.test(navigator.userAgent)
 
-  console.log("data", data)
   // 1. 初始化编辑器
   const container = document.querySelector<HTMLDivElement>('.editor')!
   const instance = new Editor(
@@ -43,7 +42,6 @@ window.onload = function () {
     },
     options
   )
-  console.log('实例: ', instance)
   // cypress使用
   Reflect.set(window, 'editor', instance)
   // canvas-editor-devtools使用
@@ -66,7 +64,6 @@ window.onload = function () {
   const undoDom = document.querySelector<HTMLDivElement>('.menu-item__undo')!
   undoDom.title = `撤销(${isApple ? '⌘' : 'Ctrl'}+Z)`
   undoDom.onclick = function () {
-    console.log('undo')
     instance.command.executeUndo()
   }
 
@@ -74,7 +71,6 @@ window.onload = function () {
   const redoDom = document.querySelector<HTMLDivElement>('.menu-item__redo')!
   redoDom.title = `重做(${isApple ? '⌘' : 'Ctrl'}+Y)`
   redoDom.onclick = function () {
-    console.log('redo')
     instance.command.executeRedo()
   }
 
@@ -88,7 +84,6 @@ window.onload = function () {
     if (isFirstClick) {
       isFirstClick = false
       painterTimeout = window.setTimeout(() => {
-        console.log('painter-click')
         isFirstClick = true
         instance.command.executePainter({
           isDblclick: false
@@ -100,7 +95,6 @@ window.onload = function () {
   }
 
   painterDom.ondblclick = function () {
-    console.log('painter-dblclick')
     isFirstClick = true
     window.clearTimeout(painterTimeout)
     instance.command.executePainter({
@@ -110,7 +104,6 @@ window.onload = function () {
 
   document.querySelector<HTMLDivElement>('.menu-item__format')!.onclick =
     function () {
-      console.log('format')
       instance.command.executeFormat()
     }
 
@@ -119,7 +112,6 @@ window.onload = function () {
   const fontSelectDom = fontDom.querySelector<HTMLDivElement>('.select')!
   const fontOptionDom = fontDom.querySelector<HTMLDivElement>('.options')!
   fontDom.onclick = function () {
-    console.log('font')
     fontOptionDom.classList.toggle('visible')
   }
   fontOptionDom.onclick = function (evt) {
@@ -132,7 +124,6 @@ window.onload = function () {
   const sizeOptionDom = sizeSetDom.querySelector<HTMLDivElement>('.options')!
   sizeSetDom.title = `设置字号`
   sizeSetDom.onclick = function () {
-    console.log('size')
     sizeOptionDom.classList.toggle('visible')
   }
   sizeOptionDom.onclick = function (evt) {
@@ -145,7 +136,6 @@ window.onload = function () {
   )!
   sizeAddDom.title = `增大字号(${isApple ? '⌘' : 'Ctrl'}+[)`
   sizeAddDom.onclick = function () {
-    console.log('size-add')
     instance.command.executeSizeAdd()
   }
 
@@ -154,14 +144,12 @@ window.onload = function () {
   )!
   sizeMinusDom.title = `减小字号(${isApple ? '⌘' : 'Ctrl'}+])`
   sizeMinusDom.onclick = function () {
-    console.log('size-minus')
     instance.command.executeSizeMinus()
   }
 
   const boldDom = document.querySelector<HTMLDivElement>('.menu-item__bold')!
   boldDom.title = `加粗(${isApple ? '⌘' : 'Ctrl'}+B)`
   boldDom.onclick = function () {
-    console.log('bold')
     instance.command.executeBold()
   }
 
@@ -169,7 +157,6 @@ window.onload = function () {
     document.querySelector<HTMLDivElement>('.menu-item__italic')!
   italicDom.title = `斜体(${isApple ? '⌘' : 'Ctrl'}+I)`
   italicDom.onclick = function () {
-    console.log('italic')
     instance.command.executeItalic()
   }
 
@@ -184,7 +171,6 @@ window.onload = function () {
       underlineOptionDom.classList.toggle('visible')
     }
   underlineDom.querySelector<HTMLElement>('i')!.onclick = function () {
-    console.log('underline')
     instance.command.executeUnderline()
     underlineOptionDom.classList.remove('visible')
   }
@@ -203,7 +189,6 @@ window.onload = function () {
     '.menu-item__strikeout'
   )!
   strikeoutDom.onclick = function () {
-    console.log('strikeout')
     instance.command.executeStrikeout()
   }
 
@@ -212,7 +197,6 @@ window.onload = function () {
   )!
   superscriptDom.title = `上标(${isApple ? '⌘' : 'Ctrl'}+Shift+,)`
   superscriptDom.onclick = function () {
-    console.log('superscript')
     instance.command.executeSuperscript()
   }
 
@@ -221,7 +205,6 @@ window.onload = function () {
   )!
   subscriptDom.title = `下标(${isApple ? '⌘' : 'Ctrl'}+Shift+.)`
   subscriptDom.onclick = function () {
-    console.log('subscript')
     instance.command.executeSubscript()
   }
 
@@ -232,7 +215,6 @@ window.onload = function () {
   const colorDom = document.querySelector<HTMLDivElement>('.menu-item__color')!
   const colorSpanDom = colorDom.querySelector('span')!
   colorDom.onclick = function () {
-    console.log('color')
     colorControlDom.click()
   }
 
@@ -246,7 +228,6 @@ window.onload = function () {
   )!
   const highlightSpanDom = highlightDom.querySelector('span')!
   highlightDom.onclick = function () {
-    console.log('highlight')
     highlightControlDom?.click()
   }
 
@@ -258,7 +239,6 @@ window.onload = function () {
   })
 
   titleDom.onclick = function () {
-    console.log('title')
     titleOptionDom.classList.toggle('visible')
   }
   titleOptionDom.onclick = function (evt) {
@@ -270,7 +250,6 @@ window.onload = function () {
   const leftDom = document.querySelector<HTMLDivElement>('.menu-item__left')!
   leftDom.title = `左对齐(${isApple ? '⌘' : 'Ctrl'}+L)`
   leftDom.onclick = function () {
-    console.log('left')
     instance.command.executeRowFlex(RowFlex.LEFT)
   }
 
@@ -278,14 +257,12 @@ window.onload = function () {
     document.querySelector<HTMLDivElement>('.menu-item__center')!
   centerDom.title = `居中对齐(${isApple ? '⌘' : 'Ctrl'}+E)`
   centerDom.onclick = function () {
-    console.log('center')
     instance.command.executeRowFlex(RowFlex.CENTER)
   }
 
   const rightDom = document.querySelector<HTMLDivElement>('.menu-item__right')!
   rightDom.title = `右对齐(${isApple ? '⌘' : 'Ctrl'}+R)`
   rightDom.onclick = function () {
-    console.log('right')
     instance.command.executeRowFlex(RowFlex.RIGHT)
   }
 
@@ -294,7 +271,6 @@ window.onload = function () {
   )!
   alignmentDom.title = `两端对齐(${isApple ? '⌘' : 'Ctrl'}+J)`
   alignmentDom.onclick = function () {
-    console.log('alignment')
     instance.command.executeRowFlex(RowFlex.ALIGNMENT)
   }
 
@@ -303,7 +279,6 @@ window.onload = function () {
   )!
   justifyDom.title = `分散对齐(${isApple ? '⌘' : 'Ctrl'}+Shift+J)`
   justifyDom.onclick = function () {
-    console.log('justify')
     instance.command.executeRowFlex(RowFlex.JUSTIFY)
   }
 
@@ -312,7 +287,6 @@ window.onload = function () {
   )!
   const rowOptionDom = rowMarginDom.querySelector<HTMLDivElement>('.options')!
   rowMarginDom.onclick = function () {
-    console.log('row-margin')
     rowOptionDom.classList.toggle('visible')
   }
   rowOptionDom.onclick = function (evt) {
@@ -324,7 +298,6 @@ window.onload = function () {
   listDom.title = `列表(${isApple ? '⌘' : 'Ctrl'}+Shift+U)`
   const listOptionDom = listDom.querySelector<HTMLDivElement>('.options')!
   listDom.onclick = function () {
-    console.log('list')
     listOptionDom.classList.toggle('visible')
   }
   listOptionDom.onclick = function (evt) {
@@ -380,7 +353,6 @@ window.onload = function () {
     tablePanelContainer.style.display = 'none'
   }
   tableDom.onclick = function () {
-    console.log('table')
     tablePanelContainer!.style.display = 'block'
   }
   tablePanel.onmousemove = function (evt) {
@@ -441,7 +413,6 @@ window.onload = function () {
     '.menu-item__hyperlink'
   )!
   hyperlinkDom.onclick = function () {
-    console.log('hyperlink')
     new Dialog({
       title: '超链接',
       data: [
@@ -483,7 +454,6 @@ window.onload = function () {
   const separatorOptionDom =
     separatorDom.querySelector<HTMLDivElement>('.options')!
   separatorDom.onclick = function () {
-    console.log('separator')
     separatorOptionDom.classList.toggle('visible')
   }
   separatorOptionDom.onmousedown = function (evt) {
@@ -503,7 +473,6 @@ window.onload = function () {
     '.menu-item__page-break'
   )!
   pageBreakDom.onclick = function () {
-    console.log('pageBreak')
     instance.command.executePageBreak()
   }
 
@@ -513,7 +482,6 @@ window.onload = function () {
   const watermarkOptionDom =
     watermarkDom.querySelector<HTMLDivElement>('.options')!
   watermarkDom.onclick = function () {
-    console.log('watermark')
     watermarkOptionDom.classList.toggle('visible')
   }
   watermarkOptionDom.onmousedown = function (evt) {
@@ -620,7 +588,6 @@ window.onload = function () {
     '.menu-item__codeblock'
   )!
   codeblockDom.onclick = function () {
-    console.log('codeblock')
     new Dialog({
       title: '代码块',
       data: [
@@ -671,7 +638,6 @@ window.onload = function () {
   )!
   const controlOptionDom = controlDom.querySelector<HTMLDivElement>('.options')!
   controlDom.onclick = function () {
-    console.log('control')
     controlOptionDom.classList.toggle('visible')
   }
   controlOptionDom.onmousedown = function (evt) {
@@ -697,7 +663,7 @@ window.onload = function () {
               placeholder: '请输入默认值'
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -747,7 +713,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -788,7 +754,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const valueSets = payload.find(p => p.name === 'valueSets')?.value
             if (!valueSets) return
             const code = payload.find(p => p.name === 'code')?.value
@@ -824,7 +790,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const valueSets = payload.find(p => p.name === 'valueSets')?.value
             if (!valueSets) return
             const code = payload.find(p => p.name === 'code')?.value
@@ -876,7 +842,7 @@ window.onload = function () {
               ]
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -921,7 +887,7 @@ window.onload = function () {
               placeholder: '请输入默认值'
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -954,7 +920,6 @@ window.onload = function () {
     '.menu-item__checkbox'
   )!
   checkboxDom.onclick = function () {
-    console.log('checkbox')
     instance.command.executeInsertElementList([
       {
         type: ElementType.CHECKBOX,
@@ -968,7 +933,6 @@ window.onload = function () {
 
   const radioDom = document.querySelector<HTMLDivElement>('.menu-item__radio')!
   radioDom.onclick = function () {
-    console.log('radio')
     instance.command.executeInsertElementList([
       {
         type: ElementType.RADIO,
@@ -982,7 +946,6 @@ window.onload = function () {
 
   const latexDom = document.querySelector<HTMLDivElement>('.menu-item__latex')!
   latexDom.onclick = function () {
-    console.log('LaTeX')
     new Dialog({
       title: 'LaTeX',
       data: [
@@ -1009,7 +972,6 @@ window.onload = function () {
   const dateDom = document.querySelector<HTMLDivElement>('.menu-item__date')!
   const dateDomOptionDom = dateDom.querySelector<HTMLDivElement>('.options')!
   dateDom.onclick = function () {
-    console.log('date')
     dateDomOptionDom.classList.toggle('visible')
     // 定位调整
     const bodyRect = document.body.getBoundingClientRect()
@@ -1056,7 +1018,6 @@ window.onload = function () {
 
   const blockDom = document.querySelector<HTMLDivElement>('.menu-item__block')!
   blockDom.onclick = function () {
-    console.log('block')
     new Dialog({
       title: '内容块',
       data: [
@@ -1175,7 +1136,6 @@ window.onload = function () {
     }
   }
   searchDom.onclick = function () {
-    console.log('search')
     searchCollapseDom.style.display = 'block'
     const bodyRect = document.body.getBoundingClientRect()
     const searchRect = searchDom.getBoundingClientRect()
@@ -1237,7 +1197,6 @@ window.onload = function () {
   const printDom = document.querySelector<HTMLDivElement>('.menu-item__print')!
   printDom.title = `打印(${isApple ? '⌘' : 'Ctrl'}+P)`
   printDom.onclick = function () {
-    console.log('print')
     instance.command.executePrint()
   }
 
@@ -1335,19 +1294,16 @@ window.onload = function () {
 
   document.querySelector<HTMLDivElement>('.page-scale-percentage')!.onclick =
     function () {
-      console.log('page-scale-recovery')
       instance.command.executePageScaleRecovery()
     }
 
   document.querySelector<HTMLDivElement>('.page-scale-minus')!.onclick =
     function () {
-      console.log('page-scale-minus')
       instance.command.executePageScaleMinus()
     }
 
   document.querySelector<HTMLDivElement>('.page-scale-add')!.onclick =
     function () {
-      console.log('page-scale-add')
       instance.command.executePageScaleAdd()
     }
 
@@ -1463,7 +1419,6 @@ window.onload = function () {
     fullscreenDom.classList.toggle('exist')
   })
   function toggleFullscreen() {
-    console.log('fullscreen')
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen()
     } else {
@@ -1829,12 +1784,10 @@ window.onload = function () {
   instance.listener.contentChange = debounce(handleContentChange, 200)
   handleContentChange()
 
-  instance.listener.saved = function (payload) {
-    console.log('elementList: ', payload)
+  instance.listener.saved = function () {
   }
 
-  instance.listener.controlRenderModeChange = function (payload) {
-    console.log('controlRenderModeChange:', payload)
+  instance.listener.controlRenderModeChange = function () {
   }
 
   // 9. 右键菜单注册
@@ -1874,39 +1827,38 @@ window.onload = function () {
           //     createdDate: new Date().toLocaleString()
           //   })
           // }
-          onConfirm: payload => {
+          onConfirm: () => {
             // const value = payload.find(p => p.name === 'value')?.value
             // if (!value) return
             // command.executeSetImageCaption({
             //   value
             // })
-            console.log(payload)
             command.executeSetValue({
               main: [{
-                "size": 16,
-                "value": "这是一段测试文字"
+                'size': 16,
+                'value': '这是一段测试文字'
               },
               {
-                  "value": "高密第影",
-                  "underline": true,
-                  "groupIds": [
-                      "1"
+                  'value': '高密第影',
+                  'underline': true,
+                  'groupIds': [
+                      '1'
                   ]
               },
               {
-                  "size": 16,
-                  "value": "，"
+                  'size': 16,
+                  'value': '，'
               },
               {
-                  "highlight": "#F2F27F",
-                  "value": "椎间盘突向",
-                  "groupIds": [
-                      "椎间盘突向~~椎间盘突出~~QC-S-006"
+                  'highlight': '#F2F27F',
+                  'value': '椎间盘突向',
+                  'groupIds': [
+                      '椎间盘突向~~椎间盘突出~~QC-S-006'
                   ]
               },
               {
-                  "size": 16,
-                  "value": "测试文字"
+                  'size': 16,
+                  'value': '测试文字'
               }]
             })
           }
@@ -1935,39 +1887,38 @@ window.onload = function () {
               placeholder: '请输入题注内容，使用{imageNo}表示图片序号'
             }
           ],
-          onConfirm: payload => {
+          onConfirm: () => {
             // const value = payload.find(p => p.name === 'value')?.value
             // if (!value) return
             // command.executeSetImageCaption({
             //   value
             // })
-            console.log(payload)
             command.executeSetValue({
               main: [{
-                "size": 16,
-                "value": "这是一段测试文字"
+                'size': 16,
+                'value': '这是一段测试文字'
               },
               {
-                  "highlight": "#F2F27F",
-                  "value": "高密第影",
-                  "groupIds": [
-                      "1"
+                  'highlight': '#F2F27F',
+                  'value': '高密第影',
+                  'groupIds': [
+                      '1'
                   ]
               },
               {
-                  "size": 16,
-                  "value": "，"
+                  'size': 16,
+                  'value': '，'
               },
               {
-                  "highlight": "#F2F27F",
-                  "value": "椎间盘突向",
-                  "groupIds": [
-                      "椎间盘突向~~椎间盘突出~~QC-S-006"
+                  'highlight': '#F2F27F',
+                  'value': '椎间盘突向',
+                  'groupIds': [
+                      '椎间盘突向~~椎间盘突出~~QC-S-006'
                   ]
               },
               {
-                  "size": 16,
-                  "value": "测试文字"
+                  'size': 16,
+                  'value': '测试文字'
               }]
             })
           }
@@ -1998,7 +1949,7 @@ window.onload = function () {
               placeholder: '请输入题注内容，使用{imageNo}表示图片序号'
             }
           ],
-          onConfirm: payload => {
+          onConfirm: (payload) => {
             const value = payload.find(p => p.name === 'value')?.value
             command.executeSetImageCaption({
               ...currentCaption,
@@ -2018,7 +1969,7 @@ window.onload = function () {
       },
       callback: (command: Command) => {
         new Signature({
-          onConfirm(payload) {
+          onConfirm() {
             // if (!payload) return
             // const { value, width, height } = payload
             // if (!value || !width || !height) return
@@ -2030,8 +1981,7 @@ window.onload = function () {
             //     type: ElementType.IMAGE
             //   }
             // ])
-            console.log(payload)
-            command.executeDeleteGroup("1")
+            command.executeDeleteGroup('1')
           }
         })
       }
@@ -2114,35 +2064,30 @@ window.onload = function () {
       isTextMode = !isTextMode
       const mode = isTextMode ? 'text' : 'control'
       instance.command.executeSetControlRenderMode(mode as any)
-      console.log(`已切换为${isTextMode ? '文本模式' : '控件模式'}`)
     }
   }
 
   const btnGetValue = document.querySelector<HTMLButtonElement>('#btn-get-value')
   if (btnGetValue) {
     btnGetValue.onclick = function() {
-      const value = instance.command.getValue()
-      console.log(value.data.main)
+      instance.command.getValue()
     }
   }
   const btnGetInstance = document.querySelector<HTMLButtonElement>('#btn-get-instance')
   if (btnGetInstance) {
     btnGetInstance.onclick = function() {
-      console.log(instance)
     }
   }
     const btnGetText = document.querySelector<HTMLButtonElement>('#btn-get-TEXT')
   if (btnGetText) {
     btnGetText.onclick = function() {
-      console.log(instance.command.getText())
     }
   }
 
   const btnGetGroupTexts = document.querySelector<HTMLButtonElement>('#btn-GetGroupTexts')
   if (btnGetGroupTexts) {
     btnGetGroupTexts.onclick = function() {
-      const groupTexts = instance.command.getGroupTexts()
-      console.log(groupTexts)
+      instance.command.getGroupTexts()
     }
   }
   const btnUpdateGroup1 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup1')
@@ -2154,7 +2099,7 @@ window.onload = function () {
   const btnUpdateGroup2 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup2')
   if (btnUpdateGroup2) {
     btnUpdateGroup2.onclick = function() {
-      instance.command.updateGroup('testGroupId-01-02', { value: '新文字2222', highlight: "#ff0" })
+      instance.command.updateGroup('testGroupId-01-02', { value: '新文字2222', highlight: '#ff0' })
     }
   }
   const btnUpdateGroup3 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup3')
@@ -2166,7 +2111,7 @@ window.onload = function () {
   const btnUpdateGroup4 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup4')
   if (btnUpdateGroup4) {
     btnUpdateGroup4.onclick = function() {
-      instance.command.updateGroup('testGroupId-02-02', { value: '新文字2222', highlight: "#ff0" })
+      instance.command.updateGroup('testGroupId-02-02', { value: '新文字2222', highlight: '#ff0' })
     }
   }
 }

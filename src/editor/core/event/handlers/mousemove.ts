@@ -3,6 +3,9 @@ import { ControlComponent } from '../../../dataset/enum/Control'
 import { ElementType } from '../../../dataset/enum/Element'
 import { CanvasEvent } from '../CanvasEvent'
 
+// 视为“单纯点击”的指针抖动容差（像素），小于该距离不进入拖拽扩选
+const CLICK_TOLERANCE = 3
+
 export function mousemove(evt: MouseEvent, host: CanvasEvent) {
   const draw = host.getDraw()
   // 是否是拖拽文字
@@ -45,6 +48,20 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
   }
   // console.log('mousemove - isAllowSelection:', host.isAllowSelection, 'mouseDownStartPosition:', host.mouseDownStartPosition)
   if (!host.isAllowSelection || !host.mouseDownStartPosition) return
+  // 防止“点击抖动”把光标定位到行/页边缘时误拉出一大段选区：
+  // 按下后指针几乎未移动（可视为一次单纯点击）时，不进入拖拽扩选逻辑，
+  // 保持 mousedown 已设置的闭合光标，避免 getPositionByXY 在折叠行附近
+  // 微小抖动下把起点/终点快照到相距很远的位置。
+  const start = host.mouseDownStartPosition
+  const { offsetX: moveX, offsetY: moveY } = evt
+  if (
+    typeof start.x === 'number' &&
+    typeof start.y === 'number' &&
+    Math.abs(moveX - start.x) < CLICK_TOLERANCE &&
+    Math.abs(moveY - start.y) < CLICK_TOLERANCE
+  ) {
+    return
+  }
   // console.log('mousemove - offsetX:', evt.offsetX, 'offsetY:', evt.offsetY)
   const target = evt.target as HTMLDivElement
   const pageIndex = target.dataset.index

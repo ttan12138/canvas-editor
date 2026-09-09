@@ -154,6 +154,7 @@ export class Command {
   public getPositionContextByEvent: CommandAdapt['getPositionContextByEvent']
   public getElementById: CommandAdapt['getElementById']
   public getControlRenderMode: CommandAdapt['getControlRenderMode']
+  public closeDropdowns: CommandAdapt['closeDropdowns']
 
   constructor(adapt: CommandAdapt) {
     // 全局命令
@@ -329,6 +330,8 @@ export class Command {
     // 控件渲染模式
     this.executeSetControlRenderMode = adapt.setControlRenderMode.bind(adapt)
     this.executeUpdateOptions = adapt.updateOptions.bind(adapt)
+    // 关闭所有下拉列表
+    this.closeDropdowns = adapt.closeDropdowns.bind(adapt)
     this.executeInsertTitle = adapt.insertTitle.bind(adapt)
     this.executeFocus = adapt.focus.bind(adapt)
     this.executeComputeElementListHeight =

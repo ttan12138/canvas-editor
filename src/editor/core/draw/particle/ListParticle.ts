@@ -20,6 +20,9 @@ export class ListParticle {
   private readonly UN_COUNT_STYLE_WIDTH = 20
   private readonly MEASURE_BASE_TEXT = '0'
   private readonly LIST_GAP = 10
+  // 列表 id → 基准样式元素 缓存，供序号统一渲染颜色/字号。
+  // 以 listId 为 key 覆盖写入，主区域与表格单元格的列表互不干扰。
+  private listStyleElementMap: Map<string, IElement> = new Map()
 
   constructor(draw: Draw) {
     this.draw = draw
@@ -103,6 +106,11 @@ export class ListParticle {
     elementList: IElement[]
   ): Map<string, number> {
     const listStyleMap = new Map<string, number>()
+    // 空列表保护：切换模式等场景下 elementList 可能为空，
+    // 直接读取 elementList[start].listId 会抛 Cannot read properties of undefined
+    if (!elementList || elementList.length === 0) {
+      return listStyleMap
+    }
     let start = 0
     let curListId = elementList[start].listId
     let curElementList: IElement[] = []
@@ -117,6 +125,12 @@ export class ListParticle {
           if (curElementList.length) {
             const width = this.getListStyleWidth(ctx, curElementList)
             listStyleMap.set(curListId!, width)
+            // 记录该列表的基准样式元素（首个有显式样式的元素），
+            // 供 drawListStyle 统一所有序号的颜色/字号，避免各行文字样式差异导致序号渲染不一致
+            this.listStyleElementMap.set(
+              curListId!,
+              this.findStyledElement(curElementList)
+            )
           }
           curListId = curElement.listId
           curElementList = curListId ? [curElement] : []
@@ -127,6 +141,10 @@ export class ListParticle {
     if (curElementList.length) {
       const width = this.getListStyleWidth(ctx, curElementList)
       listStyleMap.set(curListId!, width)
+      this.listStyleElementMap.set(
+        curListId!,
+        this.findStyledElement(curElementList)
+      )
     }
     return listStyleMap
   }
@@ -184,8 +202,14 @@ export class ListParticle {
     return styleElement
   }
 
-  private getListFontStyle(elementList: IElement[], scale: number): string {
-    const styleElement = this.findStyledElement(elementList)
+  private getListFontStyle(
+    elementList: IElement[],
+    scale: number,
+    listStyleElement?: IElement
+  ): string {
+    // 传入列表基准样式时优先使用，保证同列表序号字号一致；
+    // 否则回退到当前行内查找样式
+    const styleElement = listStyleElement || this.findStyledElement(elementList)
     if (this.options.list.inheritStyle) {
       return this.draw.getElementFont(styleElement, scale)
     } else {
@@ -196,19 +220,31 @@ export class ListParticle {
     }
   }
 
+  // 是否为控件渲染相关的系统默认色（选中值色/默认值色/选择器值色等）。
+  // 这些颜色代表"控件未自定义颜色"，不应作为列表序号的文字颜色。
+  private isControlRenderColor(color?: string): boolean {
+    if (!color) return false
+    const { control, selector } = this.options
+    return (
+      color === control.selectValueColor ||
+      color === control.defaultValueColor ||
+      color === selector.customSelectValueColor ||
+      color === selector.multiSelectValueColor ||
+      color === selector.optionColor
+    )
+  }
+
   // 列表序号颜色与同行文字保持一致；
-  // 排除控件默认/选中值色，避免列表序号因控件选中值而变成蓝色
-  private getListColor(elementList: IElement[]): string | undefined {
-    const styleElement = this.findStyledElement(elementList)
+  // 当前行为控件且未自定义颜色（color 为空或为控件系统默认色）时，使用 options.defaultColor；
+  // 避免列表序号因控件选中值而变成蓝色，且避免沿用上个绘制状态的 fillStyle
+  private getListColor(elementList: IElement[], listStyleElement?: IElement): string {
+    // 传入列表基准样式时优先使用，保证同列表序号颜色一致
+    const styleElement = listStyleElement || this.findStyledElement(elementList)
     const color = styleElement.color
-    if (
-      color &&
-      color !== this.options.control.selectValueColor &&
-      color !== this.options.control.defaultValueColor
-    ) {
+    if (color && !this.isControlRenderColor(color)) {
       return color
     }
-    return undefined
+    return this.options.defaultColor
   }
 
   public getListStyleWidth(
@@ -254,6 +290,12 @@ export class ListParticle {
     const { elementList, offsetX, listIndex, ascent } = row
     const startElement = elementList[0]
     if (startElement.value !== ZERO || startElement.listWrap) return
+    // 使用该列表的基准样式元素（首个有显式样式的元素），
+    // 保证同列表所有序号的颜色/字号一致，避免因各行文字样式差异导致序号渲染不一致
+    // 若 map 未命中（如该列表未参与 computeListStyle），回退到当前行内查找样式
+    const listStyleElement =
+      this.listStyleElementMap.get(startElement.listId!) ||
+      this.findStyledElement(elementList)
     // tab width
     let tabWidth = 0
     const { defaultTabWidth, scale } = this.options
@@ -305,12 +347,9 @@ export class ListParticle {
       }
       if (!text) return
       ctx.save()
-      ctx.font = this.getListFontStyle(elementList, scale)
+      ctx.font = this.getListFontStyle(elementList, scale, listStyleElement)
       // 序号颜色与同行文字保持一致（排除控件默认/选中值色，避免列表序号变蓝）
-      const listColor = this.getListColor(elementList)
-      if (listColor) {
-        ctx.fillStyle = listColor
-      }
+      ctx.fillStyle = this.getListColor(elementList, listStyleElement)
       // 与同行文字采用相同基线对齐：y = startY + ascent 即文字基线坐标
       // （控件 UI 的基准是基线而非整行几何中心，故不能用 row.height/2）
       ctx.textBaseline = 'alphabetic'

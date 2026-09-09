@@ -69,7 +69,8 @@ export function home(evt: KeyboardEvent, host: CanvasEvent) {
     curIndex: isCollapsed ? anchorStart : undefined,
     isSetCursor: isCollapsed,
     isSubmitHistory: false,
-    isCompute: false
+    isCompute: false,
+    isMoveCursorToVisible: true
   })
 
   // 光标显示下一行首

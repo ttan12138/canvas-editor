@@ -379,6 +379,10 @@ export class Control {
     return this.draw.getElementList()
   }
 
+  public getOptions(): DeepRequired<IEditorOption> {
+    return this.options
+  }
+
   public getPosition(): IElementPosition | null {
     const positionList = this.draw.getPosition().getPositionList()
     const { endIndex } = this.range.getRange()

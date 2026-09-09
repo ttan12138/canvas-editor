@@ -42,6 +42,10 @@ export const globalMenus: IRegisterContextMenu[] = [
     when: payload => {
       return !payload.isReadonly
     },
+    disabled: (payload) => {
+      // 无选区（且非表格跨格选择）时禁用剪切
+      return !payload.editorHasSelection && !payload.isCrossRowCol
+    },
     callback: (command: Command) => {
       command.executeCut()
     }

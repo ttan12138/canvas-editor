@@ -2,6 +2,7 @@ import { ImageDisplay } from '../../../dataset/enum/Common'
 import { EditorMode } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
 import { MouseEventButton } from '../../../dataset/enum/Event'
+import { MoveDirection } from '../../../dataset/enum/Observer'
 import { ControlComponent } from '../../../dataset/enum/Control'
 import { ControlType } from '../../../dataset/enum/Control'
 import { IPreviewerDrawOption } from '../../../interface/Previewer'
@@ -97,6 +98,9 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     draw.setPageNo(Number(pageIndex))
   }
   host.isAllowSelection = true
+  // 记录按下时的 client 坐标，供 mousemove 判定单纯点击
+  host.mouseDownClientX = evt.clientX
+  host.mouseDownClientY = evt.clientY
   // 缓存旧上下文信息
   const oldPositionContext = deepClone(position.getPositionContext())
   const positionResult = position.adjustPositionContext({
@@ -150,9 +154,10 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     }
     rangeManager.setRange(startIndex, endIndex)
     position.setCursorPosition(positionList[positionIndex])
-    // 多编辑器实例：让其他编辑器隐藏光标，再聚焦当前编辑器
+    // 多编辑器实例：让其他编辑器隐藏光标。
+    // 焦点交给 drawCursor 的 setTimeout 异步聚焦（在浏览器默认焦点处理之后再聚焦，
+    // 否则在 mousedown 中同步 focus 会被覆盖，导致 textarea 无法真正获得焦点、无法录入）
     GlobalEvent.blurOtherEditors(draw.getContainer())
-    draw.getCursor().focus()
     // 右键点击时关闭弹窗类控件，避免下拉列表与右键菜单同时显示
     if (evt.button === MouseEventButton.RIGHT) {
       draw.getControl().destroyControl({ isEmitEvent: false })
@@ -185,16 +190,23 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     } else {
       draw.render({
         curIndex: positionIndex,
-        isCompute: false,
+        // 点击控件/分组等元素时 moveCursor 会改变元素布局，必须用 isCompute:true 重算位置，
+        // 否则复用旧 positionList 会让文字绘制在错误坐标，产生"双影/重影"
+        isCompute: true,
         isSubmitHistory: false,
         isSetCursor:
-          !isDirectHitImage && !isDirectHitCheckbox && !isDirectHitRadio
+          !isDirectHitImage && !isDirectHitCheckbox && !isDirectHitRadio,
+        // 鼠标点击：若点击行“只显示一半”（顶部被截或底部被截），自动滚动使其完整展示；
+        // 整行已完整可见则不滚动。具体方向由 moveCursorToVisible 的 AUTO 模式判断。
+        isMoveCursorToVisible: true,
+        direction: MoveDirection.AUTO
       })
     }
     // 首字需定位到行首，非上一行最后一个字后
     if (hitLineStartIndex) {
       host.getDraw().getCursor().drawCursor({
-        hitLineStartIndex
+        hitLineStartIndex,
+        isMoveCursorToVisible: false
       })
     }
   }

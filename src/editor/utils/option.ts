@@ -26,7 +26,7 @@ import { ICheckboxOption } from '../interface/Checkbox'
 import { DeepRequired } from '../interface/Common'
 import { IControlOption } from '../interface/Control'
 import { ICursorOption } from '../interface/Cursor'
-import { IEditorOption, IModeRule } from '../interface/Editor'
+import { IEditorOption, IModeRule, ISelectorOption } from '../interface/Editor'
 import { IMagnifierOption } from '../interface/Magnifier'
 import { IFooter } from '../interface/Footer'
 import { IGroup } from '../interface/Group'
@@ -168,6 +168,36 @@ export function mergeOption(
     ...defaultMagnifierOption,
     ...options.magnifier
   }
+  const defaultSelectorOption: Required<ISelectorOption> = {
+    popupBackgroundColor: '#fff',
+    optionColor: '#000',
+    optionHoverBackgroundColor: '#5175f4',
+    optionHoverColor: '#000',
+    activeOptionColor: '#e2e6ed',
+    activeOptionBackgroundColor: '#5175f4',
+    inputBorderColor: '#8195dd',
+    inputHoverBorderColor: '#5175f4',
+    inputActiveBorderColor: '#e2e6ed',
+    inputPlaceholderColor: '#c0c4cc',
+    inputHoverPlaceholderColor: '#fff',
+    inputActivePlaceholderColor: '#fff',
+    dividerColor: '#ebeef5',
+    customSelectValueColor: '#000',
+    multiSelectValueColor: '#000',
+    customSelectTextValueColor: '#000',
+    multiSelectTextValueColor: '#000',
+    checkboxBackgroundColor: '#5175f4',
+    checkboxBorderColor: '#5175f4',
+    checkboxMarkColor: '#fff',
+    arrowBackgroundColor: '#5175f4',
+    arrowColor: '#ffffff',
+    associationBackgroundColor: '#5175f4',
+    associationTextColor: '#ffffff'
+  }
+  const selectorOptions: Required<ISelectorOption> = {
+    ...defaultSelectorOption,
+    ...options.selector
+  }
   const modeRuleOption: DeepRequired<IModeRule> = {
     print: {
       ...defaultModeRuleOption.print,
@@ -228,6 +258,9 @@ export function mergeOption(
     shortcutDisableKeys: [],
     scrollContainerSelector: '',
     pageOuterSelectionDisable: false,
+    isMoveCursorToVisible: true,
+    // 选择器类控件统一颜色配置，默认与原有样式一致，保持向后兼容
+    selector: selectorOptions,
     ...options,
     table: tableOptions,
     header: headerOptions,

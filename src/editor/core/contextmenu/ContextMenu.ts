@@ -196,6 +196,15 @@ export class ContextMenu {
       EDITOR_COMPONENT,
       EditorComponent.CONTEXTMENU
     )
+    // 复用 selector 浮层主题变量，使右键菜单与下拉列表样式统一
+    const selectorOption = this.options.selector
+    const style = contextMenuContainer.style
+    style.setProperty('--ce-selector-popup-bg', selectorOption.popupBackgroundColor)
+    style.setProperty('--ce-selector-option-color', selectorOption.optionColor)
+    style.setProperty('--ce-selector-option-hover-bg', selectorOption.optionHoverBackgroundColor)
+    style.setProperty('--ce-selector-option-hover-color', selectorOption.optionHoverColor)
+    style.setProperty('--ce-selector-active-color', selectorOption.activeOptionColor)
+    style.setProperty('--ce-selector-active-bg', selectorOption.activeOptionBackgroundColor)
     this.container.append(contextMenuContainer)
     return contextMenuContainer
   }
@@ -296,7 +305,12 @@ export class ContextMenu {
         const name = menu.i18nPath
           ? this._formatName(this.i18n.t(menu.i18nPath))
           : this._formatName(menu.name || '')
-        span.append(document.createTextNode(name))
+        if (menu.html) {
+          // 支持 HTML 渲染（v-html 效果）
+          span.innerHTML = name
+        } else {
+          span.append(document.createTextNode(name))
+        }
         menuItem.append(span)
         // 快捷方式提示
         if (menu.shortCut) {
@@ -364,6 +378,33 @@ export class ContextMenu {
 
   public registerContextMenuList(payload: IRegisterContextMenu[]) {
     this.contextMenuList.push(...payload)
+  }
+
+  // 按 key 查找菜单项（含子菜单递归查找），找不到返回 null
+  public getContextMenu(
+    key: string,
+    menuList: IRegisterContextMenu[] = this.contextMenuList
+  ): IRegisterContextMenu | null {
+    for (const menu of menuList) {
+      if (menu.key === key) return menu
+      if (menu.childMenus) {
+        const found = this.getContextMenu(key, menu.childMenus)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  // 按 key 更新某个菜单项的字段（name/icon/callback/disable/disabled/when/shortCut 等）
+  // 返回是否更新成功
+  public updateContextMenu(
+    key: string,
+    patch: Partial<IRegisterContextMenu>
+  ): boolean {
+    const target = this.getContextMenu(key)
+    if (!target) return false
+    Object.assign(target, patch)
+    return true
   }
 
   public dispose() {

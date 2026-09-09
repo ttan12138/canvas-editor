@@ -69,7 +69,8 @@ export function end(evt: KeyboardEvent, host: CanvasEvent) {
     curIndex: isCollapsed ? anchorStart : undefined,
     isSetCursor: isCollapsed,
     isSubmitHistory: false,
-    isCompute: false
+    isCompute: false,
+    isMoveCursorToVisible: true
   })
 
   evt.preventDefault()

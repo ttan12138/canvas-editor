@@ -79,11 +79,9 @@ export class AssociationStateManager {
       ? JSON.stringify(valueSets) !== JSON.stringify(state.valueSets)
       : valueSets !== state?.valueSets
 
-    console.log('AssociationStateManager.setValue - value:', value, 'multiSelectDelimiter:', multiSelectDelimiter, 'valueSetsChanged:', valueSetsChanged)
 
     if (state?.value === value && state?.multiSelectDelimiter === multiSelectDelimiter && !valueSetsChanged) return
 
-    console.log('AssociationStateManager.setValue - 触发同步，valueSets:', valueSets)
 
     this.associationStates.set(associationId, { value, controlType, multiSelectDelimiter, valueSets })
     this.syncingAssociationId = associationId

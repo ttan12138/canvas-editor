@@ -316,20 +316,67 @@ export function convertStringToBase64(input: string) {
   return base64
 }
 
-export function findScrollContainer(element: HTMLElement) {
-  let parent = element.parentElement
-  while (parent) {
-    const style = window.getComputedStyle(parent)
+export function findScrollContainer(
+  element: HTMLElement,
+  scrollContainerSelector?: string
+) {
+  // 配置了滚动容器选择器时，优先使用（与 SelectionObserver / ScrollObserver 同源）。
+  if (scrollContainerSelector) {
+    const container = document.querySelector(scrollContainerSelector)
+    if (container){
+      return container as HTMLElement
+    }else{
+      console.warn(`[findScrollContainer] scrollContainerSelector=${scrollContainerSelector} not found`)
+    } 
+  }
+  // 未配置时：从 element 向上寻找最近的、真正可滚动的祖先作为滚动容器。
+  // 关键：不能回退到 document.documentElement —— 否则在“真实滚动发生在某祖先 div、
+  // 而非 window”的布局下，视口边界由 getScrollableViewport 从该祖先取得（如 top=126,
+  // bottom=459），而滚动却被错误地施加到 window（isDocumentScroll=true → window.scrollTo），
+  // 导致 moveCursorToVisible 计算出正确 delta 却实际不滚动。
+  let el: HTMLElement | null = element
+  while (el && el !== document.documentElement) {
+    const style = window.getComputedStyle(el)
     const overflowY = style.getPropertyValue('overflow-y')
-    if (
-      parent.scrollHeight > parent.clientHeight &&
-      (overflowY === 'auto' || overflowY === 'scroll')
-    ) {
-      return parent
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      return el
     }
-    parent = parent.parentElement
+    el = el.parentElement
   }
   return document.documentElement
+}
+
+// 计算元素真正可见的视口边界。配置了滚动容器选择器时，
+// 以该容器可视矩形（与窗口取交集）作为视口边界；否则回退为向上遍历所有
+// 可滚动祖先取交集（无 selector / 未命中时），兼容窗口滚动/嵌套滚动。
+export function getScrollableViewport(
+  element: HTMLElement,
+  scrollContainerSelector?: string
+): { top: number; bottom: number } {
+  if (scrollContainerSelector) {
+    const container = document.querySelector(scrollContainerSelector)
+    if (container) {
+      const rect = container.getBoundingClientRect()
+      return {
+        top: Math.max(0, rect.top),
+        bottom: Math.min(window.innerHeight, rect.bottom)
+      }
+    }
+  }
+  let top = 0
+  let bottom = window.innerHeight
+  let el: HTMLElement | null = element
+  while (el && el !== document.documentElement) {
+    const style = window.getComputedStyle(el)
+    const overflowY = style.getPropertyValue('overflow-y')
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      const rect = el.getBoundingClientRect()
+      top = Math.max(top, rect.top)
+      bottom = Math.min(bottom, rect.bottom)
+    }
+    el = el.parentElement
+  }
+  return { top, bottom }
 }
 
 export function isArrayEqual(arr1: unknown[], arr2: unknown[]): boolean {

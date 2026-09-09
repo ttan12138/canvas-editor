@@ -6,7 +6,7 @@
   z-index: 1;
   border: 1px solid #e4e7ed;
   border-radius: 4px;
-  background-color: #fff;
+  background-color: var(--ce-selector-popup-bg, #fff);
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .1);
   box-sizing: border-box;
   margin: 5px 0;
@@ -27,18 +27,63 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #666;
-  height: 36px;
-  line-height: 36px;
+  height: 28px;
+  line-height: 28px;
   box-sizing: border-box;
   cursor: pointer;
+  color: var(--ce-selector-option-color, #666) !important;
+  background-color: transparent !important;
+}
+
+/* 选项之间分割线（最后一项不显示） */
+.ce-select-control-popup ul li:not(:last-child) {
+  border-bottom: 1px solid var(--ce-selector-divider, #ebeef5) !important;
+}
+
+/* 子元素（选项文字 textSpan / 数值输入框）跟随 li 颜色，覆盖全局 * 规则 */
+.ce-select-control-popup ul li * {
+  color: inherit !important;
 }
 
 .ce-select-control-popup ul li:hover {
-  background-color: #EEF2FD;
+  background-color: var(--ce-selector-option-hover-bg, #EEF2FD) !important;
+  color: var(--ce-selector-option-hover-color, #000) !important;
 }
 
 .ce-select-control-popup ul li.active {
-  color: var(--COLOR-HOVER, #5175f4);
-  font-weight: 700;
+  color: var(--ce-selector-active-color, #5175f4) !important;
+  background-color: var(--ce-selector-active-bg, #e2e6ed) !important;
+  /* font-weight: 700; */
+}
+
+/* 数值输入框：下边框、背景、占位符 跟随选项三态 */
+.ce-select-control-popup ul li input {
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ce-selector-input-border, #8195dd) !important;
+  color: inherit !important;
+  font-size: 13px;
+}
+
+.ce-select-control-popup ul li input::placeholder {
+  color: var(--ce-selector-input-placeholder, #c0c4cc) !important;
+  opacity: 1 !important;
+}
+
+.ce-select-control-popup ul li:hover input {
+  background-color: var(--ce-selector-option-hover-bg, #EEF2FD) !important;
+  border-bottom-color: var(--ce-selector-input-hover-border, #5175f4) !important;
+}
+
+.ce-select-control-popup ul li:hover input::placeholder {
+  color: var(--ce-selector-input-hover-placeholder, #fff) !important;
+}
+
+.ce-select-control-popup ul li.active input {
+  background-color: var(--ce-selector-active-bg, #e2e6ed) !important;
+  border-bottom-color: var(--ce-selector-input-active-border, #e2e6ed) !important;
+}
+
+.ce-select-control-popup ul li.active input::placeholder {
+  color: var(--ce-selector-input-active-placeholder, #fff) !important;
 }

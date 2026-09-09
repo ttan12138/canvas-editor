@@ -52,8 +52,13 @@ export class CheckboxParticle {
         checkMarkColor,
         verticalAlign
       },
+      selector,
       scale
     } = this.options
+    // 选中态颜色优先跟随 options.selector 配置（否则沿用 checkbox 默认选中色）
+    const selFillStyle = selector?.checkboxBackgroundColor || checkFillStyle
+    const selStrokeStyle = selector?.checkboxBorderColor || checkStrokeStyle
+    const selMarkColor = selector?.checkboxMarkColor || checkMarkColor
     const { metrics, checkbox } = row.elementList[index]
     // 垂直布局设置
     if (
@@ -93,17 +98,17 @@ export class CheckboxParticle {
     // 绘制勾选状态
     if (checkbox?.value) {
       // 选中时填充背景
-      ctx.fillStyle = checkFillStyle
+      ctx.fillStyle = selFillStyle
       ctx.fillRect(left, top, width, height)
       // 选中时绘制边框
       ctx.beginPath()
       ctx.lineWidth = lineWidth
-      ctx.strokeStyle = checkStrokeStyle
+      ctx.strokeStyle = selStrokeStyle
       ctx.rect(left, top, width, height)
       ctx.stroke()
       // 勾选对号
       ctx.beginPath()
-      ctx.strokeStyle = checkMarkColor
+      ctx.strokeStyle = selMarkColor
       ctx.lineWidth = lineWidth * 2 * scale
       ctx.moveTo(left + 2 * scale, top + height / 2)
       ctx.lineTo(left + width / 2, top + height - 3 * scale)

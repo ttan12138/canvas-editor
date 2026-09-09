@@ -41,6 +41,9 @@ export class CanvasEvent {
   public cachePositionList: IElementPosition[] | null
   public cachePositionContext: IPositionContext | null
   public mouseDownStartPosition: ICurrentPosition | null
+  // 鼠标按下时的 client 坐标，用于判定"单纯点击"（位移极小）vs 拖拽
+  public mouseDownClientX: number
+  public mouseDownClientY: number
 
   private draw: Draw
   private pageContainer: HTMLDivElement
@@ -65,6 +68,8 @@ export class CanvasEvent {
     this.cachePositionList = null
     this.cachePositionContext = null
     this.mouseDownStartPosition = null
+    this.mouseDownClientX = 0
+    this.mouseDownClientY = 0
   }
 
   public getDraw(): Draw {

@@ -7,6 +7,7 @@ import {
 import { ControlComponent } from '../../../../dataset/enum/Control'
 import { IElement } from '../../../../interface/Element'
 import { getUUID, omitObject } from '../../../../utils'
+import { MoveDirection } from '../../../../dataset/enum/Observer'
 import { formatElementContext } from '../../../../utils/element'
 import { CanvasEvent } from '../../CanvasEvent'
 
@@ -120,7 +121,12 @@ export function enter(evt: KeyboardEvent, host: CanvasEvent) {
   }
   if (~curIndex) {
     rangeManager.setRange(curIndex, curIndex)
-    draw.render({ curIndex })
+    draw.render({
+      curIndex,
+      isMoveCursorToVisible: true,
+      // 统一 auto 模式：依据回车后光标结果行是否越界（顶部/底部）自动滚动
+      direction: MoveDirection.AUTO
+    })
   }
   evt.preventDefault()
 }

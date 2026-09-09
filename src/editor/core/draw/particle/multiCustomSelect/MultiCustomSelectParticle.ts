@@ -72,10 +72,10 @@ export class MultiCustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = this.options.control.selectValueColor
+      ctx.fillStyle = this.options.selector.associationBackgroundColor
       ctx.fill()
 
-      ctx.fillStyle = 'white'
+      ctx.fillStyle = this.options.selector.associationTextColor
       ctx.font = font
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -90,10 +90,10 @@ export class MultiCustomSelectParticle {
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = this.options.control.selectValueColor
+      ctx.fillStyle = this.options.selector.arrowBackgroundColor
       ctx.fill()
 
-      ctx.fillStyle = 'white'
+      ctx.fillStyle = this.options.selector.arrowColor
       ctx.beginPath()
 
       const startX = centerX - arrowWidth / 2

@@ -1,5 +1,6 @@
 import { ImageDisplay } from '../dataset/enum/Common'
 import { EditorMode, EditorZone } from '../dataset/enum/Editor'
+import { MoveDirection } from '../dataset/enum/Observer'
 import { IElement, IElementPosition } from './Element'
 import { IRow } from './Row'
 
@@ -15,6 +16,11 @@ export interface IDrawOption {
   // 跳过光标聚焦（仅 changeGroupStyle 等场景使用），避免重新聚焦导致
   // 输入法重建、滚动条乱跳
   isSkipFocus?: boolean
+  // 覆盖全局 options.isMoveCursorToVisible，强制本次渲染后是否滚动到光标可见
+  isMoveCursorToVisible?: boolean
+  // 显式指定光标移动方向（上/下），用于决定滚动到首行还是尾行。
+  // 由键盘方向键等调用方传入，避免 drawCursor 内部基于 style.top 推断导致方向误判
+  direction?: MoveDirection
 }
 
 export interface IForceUpdateOption {

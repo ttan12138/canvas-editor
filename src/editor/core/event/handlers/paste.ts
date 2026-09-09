@@ -159,7 +159,6 @@ export function pasteImage(host: CanvasEvent, file: File | Blob) {
 
 export function pasteByEvent(host: CanvasEvent, evt: ClipboardEvent) {
   const draw = host.getDraw()
-  console.log('[pasteByEvent] container:', draw.getContainer())
   if (draw.isReadonly() || draw.isDisabled()) return
   const clipboardData = evt.clipboardData
   if (!clipboardData) return

@@ -20,6 +20,8 @@ import {ControlRenderMode} from './dataset/enum/Editor'
 import { formatElementList } from './utils/element'
 import { Register } from './core/register/Register'
 import { ContextMenu } from './core/contextmenu/ContextMenu'
+import { PrefixAutocomplete } from './core/prefixAutocomplete/PrefixAutocomplete'
+import { IPrefixAutocompleteList, IPrefixAutocompleteItem } from './interface/prefixAutocomplete/PrefixAutocomplete'
 import {
   IContextMenuContext,
   IRegisterContextMenu
@@ -86,6 +88,8 @@ export default class Editor {
   public eventBus: EventBus<EventBusMap>
   public override: Override
   public register: Register
+  public prefixAutocomplete: PrefixAutocomplete
+  public contextMenu: ContextMenu
   public destroy: () => void
   public use: UsePlugin
 
@@ -147,6 +151,9 @@ export default class Editor {
     this.command = new Command(new CommandAdapt(draw))
     // 菜单
     const contextMenu = new ContextMenu(draw, this.command)
+    this.contextMenu = contextMenu
+    // 前缀预输入（@ 提及等）
+    this.prefixAutocomplete = draw.getPrefixAutocomplete()
     // 快捷键
     const shortcut = new Shortcut(draw, this.command)
     // 注册
@@ -165,6 +172,54 @@ export default class Editor {
     // 插件
     const plugin = new Plugin(this)
     this.use = plugin.use.bind(plugin)
+  }
+
+  public registerPrefixAutocomplete(
+    payload: IPrefixAutocompleteList,
+    replace = false
+  ) {
+    this.prefixAutocomplete.register(payload, replace)
+
+  }
+
+  // 重置（清空）所有已注册的预输入配置
+  public resetPrefixAutocomplete() {
+    this.prefixAutocomplete.reset()
+  }
+
+  // 外部控制预输入下拉的搜索中状态（加载提示）
+  // 仅当存在激活的自动补全前缀且下拉已打开时生效，返回是否成功设置
+  public setPrefixAutocompleteSearching(value: boolean): boolean {
+    return this.prefixAutocomplete.setSearching(value)
+  }
+
+  public getPrefixAutocompleteSearching(): boolean {
+    return this.prefixAutocomplete.getSearching()
+  }
+
+  // 外部直接设置预输入下拉的候选列表
+  // 仅当存在激活的自动补全前缀且下拉已打开时生效，返回是否成功设置
+  public setPrefixAutocompleteList(list: IPrefixAutocompleteItem[]): boolean {
+    return this.prefixAutocomplete.setList(list)
+  }
+
+  // 主动关闭所有形式的下拉列表（单选 / 多选 / 自定义多选控件下拉、@ 预输入下拉等）
+  public closeAllDropdowns() {
+    this.command.closeDropdowns()
+  }
+
+  // 按 key 更新右键菜单的某个选项（name/icon/callback/disable/disabled/when 等）
+  // 返回是否更新成功（找不到对应 key 时返回 false）
+  public updateContextMenu(
+    key: string,
+    patch: Partial<IRegisterContextMenu>
+  ): boolean {
+    return this.contextMenu.updateContextMenu(key, patch)
+  }
+
+  // 按 key 获取右键菜单项（含子菜单递归查找），找不到返回 null
+  public getContextMenu(key: string): IRegisterContextMenu | null {
+    return this.contextMenu.getContextMenu(key)
   }
 }
 

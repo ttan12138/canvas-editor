@@ -311,12 +311,18 @@ export class CommandAdapt {
   public undo() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    // 多编辑器实例：程序化撤销前先把焦点切到当前实例。
+    // 否则 drawCursor 内“焦点落在其他实例则不强夺焦点”的守卫会阻止聚焦，
+    // 导致撤销/重做后当前编辑器无法聚焦、渲染异常（与 ctrl+z/y 行为不一致）。
+    this.draw.getCursor().focus()
     this.historyManager.undo()
   }
 
   public redo() {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
+    // 多编辑器实例：程序化重做前先把焦点切到当前实例
+    this.draw.getCursor().focus()
     this.historyManager.redo()
   }
 
@@ -3043,6 +3049,18 @@ export class CommandAdapt {
   // 获取控件渲染模式
   public getControlRenderMode(): ControlRenderMode {
     return this.draw.getControlRenderMode()
+  }
+
+  // 主动关闭所有形式的下拉列表（单选 / 多选 / 自定义多选控件下拉、@ 预输入下拉等）
+  public closeDropdowns() {
+    // 关闭当前激活的下拉类控件（单选 / 多选 / 自定义多选）
+    this.draw.getControl().destroyControl()
+    // 关闭 @ 预输入下拉
+    this.draw.getPrefixAutocomplete().close()
+    // 兜底：移除所有残留的控件下拉 DOM
+    document
+      .querySelectorAll('.ce-select-control-popup')
+      .forEach(el => el.remove())
   }
 
   // 将所有控件转换为纯文本

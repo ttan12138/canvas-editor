@@ -42,6 +42,14 @@ export class HistoryManager {
     return this.undoStack.length > 1
   }
 
+  public getUndoStack(): Array<Function> {
+    return this.undoStack
+  }
+
+  public getRedoStack(): Array<Function> {
+    return this.redoStack
+  }
+
   public isCanRedo(): boolean {
     return !!this.redoStack.length
   }

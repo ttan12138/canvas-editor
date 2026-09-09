@@ -108,6 +108,7 @@ import { EventBusMap } from '../../interface/EventBus'
 import { Group } from './interactive/Group'
 import { Override } from '../override/Override'
 import { FlexDirection, ImageDisplay } from '../../dataset/enum/Common'
+import { MoveDirection } from '../../dataset/enum/Observer'
 import {
   PUNCTUATION_REG,
   WHITE_SPACE_REG
@@ -117,6 +118,7 @@ import { WhiteSpaceParticle } from './particle/WhiteSpaceParticle'
 import { NumberFlagParticle } from './particle/number/NumberFlagParticle'
 import { CustomSelectParticle } from './particle/customSelect/CustomSelectParticle'
 import { MultiCustomSelectParticle } from './particle/multiCustomSelect/MultiCustomSelectParticle'
+import { PrefixAutocomplete } from '../prefixAutocomplete/PrefixAutocomplete'
 import { MouseObserver } from '../observer/MouseObserver'
 import { LineNumber } from './frame/LineNumber'
 import { PageBorder } from './frame/PageBorder'
@@ -150,6 +152,7 @@ export class Draw {
   private canvasEvent: CanvasEvent
   private globalEvent: GlobalEvent
   private cursor: Cursor
+  private prefixAutocomplete: PrefixAutocomplete
   private range: RangeManager
   private margin: Margin
   private background: Background
@@ -293,6 +296,7 @@ export class Draw {
 
     this.canvasEvent = new CanvasEvent(this)
     this.cursor = new Cursor(this, this.canvasEvent)
+    this.prefixAutocomplete = new PrefixAutocomplete(this)
     this.canvasEvent.register()
     this.globalEvent = new GlobalEvent(this, this.canvasEvent)
     this.globalEvent.register()
@@ -439,6 +443,28 @@ export class Draw {
 
   public getControlRenderMode(): ControlRenderMode {
     return this.controlRenderMode
+  }
+
+  // 纯文本模式下选择器控件选中值使用独立配置色（仅渲染层替换，不修改元素数据）
+  private getSelectorTextValueElement(element: IRowElement): IRowElement {
+    if (this.controlRenderMode !== ControlRenderMode.TEXT) return element
+    if (!element.control || element.controlComponent !== ControlComponent.VALUE) {
+      return element
+    }
+    const selectorOption = this.options.selector
+    if (element.control.type === ControlType.CUSTOM_SELECT) {
+      return {
+        ...element,
+        color: selectorOption.customSelectTextValueColor
+      }
+    }
+    if (element.control.type === ControlType.MULTI_CUSTOM_SELECT) {
+      return {
+        ...element,
+        color: selectorOption.multiSelectTextValueColor
+      }
+    }
+    return element
   }
 
   public setControlRenderMode(payload: ControlRenderMode) {
@@ -784,6 +810,11 @@ export class Draw {
       isHandleFirstElement: false,
       editorOptions: this.options
     })
+    // 撤销支持：在修改 elementList 之前先记录“插入前”快照，
+    // 否则当本次插入是首个历史记录时无法撤销回插入前状态。
+    if (isSubmitHistory) {
+      this.submitHistory(undefined)
+    }
     let curIndex = -1
     // 判断是否在控件内
     let activeControl = this.control.getActiveControl()
@@ -839,6 +870,76 @@ export class Draw {
     })
     let curIndex: number
     const { isPrepend, isSubmitHistory = true } = options
+    // 撤销支持：在修改 elementList 之前，先记录“append 前”的快照作为可回退基线。
+    // 仅当撤销栈为空（即首个历史记录）时记录一次，避免每次 append 都重复记录
+    // “append 前 / append 后”两个快照，导致同一内容在历史中出现两次（如 A 被记录两次）。
+    // 非首个记录时，栈顶已是对应的“append 前”状态，无需重复记录。
+    if (isSubmitHistory && this.historyManager.isStackEmpty()) {
+      this.submitHistory(undefined)
+    }
+    // 判断文档尾部是否处于列表上下文（用于续接列表，避免插入后中断或产生空行）
+    // 注意：列表项的标记本身就是带 listId 的 ZERO，因此“最后一行是列表”不能简单用
+    // “锚点元素不是 ZERO”来判定，否则会漏掉列表项之间的标记 ZERO 以及列表尾部空行。
+    const anchorPreIndex = isPrepend ? 0 : this.elementList.length - 1
+    let continueListId: string | undefined
+    let continueListType: IElement['listType']
+    let continueListStyle: IElement['listStyle']
+    let listAnchorIndex = -1
+    for (let i = anchorPreIndex; i >= 0; i--) {
+      const el = this.elementList[i]
+      if (el?.listId) {
+        continueListId = el.listId
+        continueListType = el.listType
+        continueListStyle = el.listStyle
+        listAnchorIndex = i
+        break
+      }
+      // 末尾连续的占位/换行 ZERO（可能来自列表尾部空行）继续往前探测列表上下文
+      if (el?.value === ZERO && (!el.type || el.type === ElementType.TEXT)) {
+        continue
+      }
+      break
+    }
+    const isLastLineList = !!continueListId
+    const firstAppendElement = elementList[0]
+    const isFirstAppendWrap =
+      firstAppendElement?.value === ZERO &&
+      (!firstAppendElement.type || firstAppendElement.type === ElementType.TEXT)
+    // 最后一行是列表 && 追加内容以换行符开头：
+    // 移除该换行符，并将后续内容继承列表信息，使其继续以列表形式追加；
+    // 若最后一行不是列表，则保留换行符作为正常换行，避免错误续接。
+    if (isLastLineList && isFirstAppendWrap) {
+      const listId = continueListId!
+      const listType = continueListType
+      const listStyle = continueListStyle
+      // 若列表尾部存在连续的空行 ZERO（不带 listId），一并继承列表信息，
+      // 否则插入后会在列表项之间渲染出空列表项行（空行显示）。
+      for (let i = anchorPreIndex; i > listAnchorIndex; i--) {
+        const el = this.elementList[i]
+        if (
+          el?.value === ZERO &&
+          (!el.type || el.type === ElementType.TEXT) &&
+          !el.listId
+        ) {
+          el.listId = listId
+          el.listType = listType
+          el.listStyle = listStyle
+        } else {
+          break
+        }
+      }
+      // 移除追加内容开头的换行符
+      // elementList.shift()
+      // 给后续尚未带 listId 的元素继承列表信息，直到遇到新的 LIST 元素为止
+      for (const el of elementList) {
+        if (el.type === ElementType.LIST) break
+        if (!el.listId) {
+          el.listId = listId
+          el.listType = listType
+          el.listStyle = listStyle
+        }
+      }
+    }
     if (isPrepend) {
       this.elementList.splice(1, 0, ...elementList)
       curIndex = elementList.length
@@ -849,9 +950,19 @@ export class Draw {
     this.range.setRange(curIndex, curIndex)
     this.render({
       curIndex,
-      isSubmitHistory,
-      isSkipFocus: options.isSkipFocus
+      isSubmitHistory: false,
+      isSkipFocus: options.isSkipFocus,
+      // 追加元素后默认自动滚动到末尾光标（即使全局关闭了切换光标滚动），
+      // 除非显式 isSkipFocus 跳过聚焦
+      isMoveCursorToVisible: options.isSkipFocus ? false : true,
+      // 统一 auto 模式：依据追加后光标结果行是否越界（顶部/底部）自动滚动
+      direction: MoveDirection.AUTO
     })
+    // 仅记录“append 后”的快照一次（render 内已不再记录），
+    // 与前面的基线快照共同构成 [基线, 内容] 的单一历史步骤，避免重复记录。
+    if (isSubmitHistory) {
+      this.submitHistory(curIndex)
+    }
   }
 
   public spliceElementList(
@@ -949,6 +1060,10 @@ export class Draw {
 
   public getCursor(): Cursor {
     return this.cursor
+  }
+
+  public getPrefixAutocomplete(): PrefixAutocomplete {
+    return this.prefixAutocomplete
   }
 
   public getPreviewer(): Previewer {
@@ -1294,7 +1409,9 @@ export class Draw {
   public setValue(payload: Partial<IEditorData>, options?: ISetValueOption) {
     const { header, main, footer } = deepClone(payload)
     if (!header && !main && !footer) return
-    const { isSetCursor = false } = options || {}
+    const { isSetCursor = false, recordHistory = false } = options || {}
+    // 记录本次 setValue 之前的内容，用于 recordHistory 撤销回原状态
+    const oldData = recordHistory ? this.getValue() : null
     const pageComponentData = [header, main, footer]
     pageComponentData.forEach(data => {
       if (!data) return
@@ -1308,8 +1425,10 @@ export class Draw {
       main,
       footer
     })
-    // 渲染&计算&清空历史记录
-    this.historyManager.recovery()
+    // recordHistory=false 时清空历史（保持原默认行为）；true 时由下方追加，不清空
+    if (!recordHistory) {
+      this.historyManager.recovery()
+    }
     const curIndex = isSetCursor
       ? main?.length
         ? main.length - 1
@@ -1317,6 +1436,50 @@ export class Draw {
       : undefined
     if (curIndex !== undefined) {
       this.range.setRange(curIndex, curIndex)
+    }
+    // recordHistory: 把 setValue 前后的状态都作为快照，使撤销可逐步回到设置前。
+    // HistoryManager 约定：undoStack 栈顶始终是“当前状态”，撤销 = 弹出栈顶并恢复到新的栈顶（上一步状态）。
+    // 因此每次 setValue 都需要把“当前新状态”压到栈顶：
+    // - 栈为空（首次）：先压“设置前状态”作底（index 0 占位），再压“当前新状态”作顶；
+    // - 栈非空：直接在顶上压“当前新状态”（其“设置前状态”已为当前栈顶，无需重复压入）。
+    if (recordHistory && oldData) {
+      // 撤销恢复“设置前”状态时，将光标落到恢复后内容的合法位置，
+      // 避免旧 range 索引越界导致光标无法重绘（表现为撤销/重做后无法聚焦）。
+      const oldMain = oldData.data?.main
+      const oldCurIndex =
+        oldMain && oldMain.length ? oldMain.length - 1 : undefined
+      const oldFn = () => {
+        this.setEditorData(deepClone(oldData.data))
+        this.render({
+          curIndex: oldCurIndex,
+          isSetCursor: oldCurIndex !== undefined,
+          isSubmitHistory: false,
+          isSourceHistory: true
+        })
+      }
+      ;(oldFn as any).__historySource = 'setValue-before'
+      const finalData = {
+        header: deepClone(header),
+        main: deepClone(main),
+        footer: deepClone(footer)
+      }
+      // 重做恢复“设置后”状态时同样落到合法末尾位置，确保光标可见、可编辑。
+      const newCurIndex = main && main.length ? main.length - 1 : undefined
+      const newFn = () => {
+        this.setEditorData(finalData)
+        this.render({
+          curIndex: newCurIndex,
+          isSetCursor: newCurIndex !== undefined,
+          isSubmitHistory: false,
+          isSourceHistory: true
+        })
+      }
+      ;(newFn as any).__historySource = 'setValue-after'
+      if (this.historyManager.isStackEmpty()) {
+        // 栈为空：先压“设置前状态”作底，再压“当前新状态”作顶
+        this.historyManager.execute(oldFn)
+      }
+      this.historyManager.execute(newFn)
     }
     this.render({
       curIndex,
@@ -1414,14 +1577,10 @@ export class Draw {
       defaultRowMargin,
       scale
     } = this.options
-    // 字体在12-30之间，行间距不变，小于12按比例缩小，大于30按比例放大
+    // 行间距随字号等比缩放：以默认字号为基准（基准字号时 ratio=1），
+    // 缩小字号时行距同步缩小，放大字号时行距同步放大（类似 Word 单倍行距）
     const fontSize = el.size || defaultSize
-    let ratio = 1
-    if (fontSize < 12) {
-      ratio = fontSize / 12
-    } else if (fontSize > 30) {
-      ratio = 1 + (fontSize - 30) / 30
-    }
+    const ratio = fontSize / defaultSize
     return (
       defaultBasicRowMarginHeight *
       ratio *
@@ -1806,20 +1965,24 @@ export class Draw {
         element.type === ElementType.RADIO ||
         element.controlComponent === ControlComponent.RADIO
       ) {
-        const { width, height, gap } = this.options.radio
-        const elementWidth = width + gap * 2
-        element.width = elementWidth
+        const { gap } = this.options.radio
+        // 图标高度随字号缩放，避免固定像素撑大整行行高
+        const boxSize = (element.size || defaultSize) * scale
+        const elementWidth = boxSize + gap * 2 * scale
+        element.width = boxSize + gap * 2
         metrics.width = elementWidth * scale
-        metrics.height = height * scale
+        metrics.height = boxSize
       } else if (
         element.type === ElementType.CHECKBOX ||
         element.controlComponent === ControlComponent.CHECKBOX
       ) {
-        const { width, height, gap } = this.options.checkbox
-        const elementWidth = width + gap * 2
-        element.width = elementWidth
+        const { gap } = this.options.checkbox
+        // 图标高度随字号缩放，避免固定像素撑大整行行高
+        const boxSize = (element.size || defaultSize) * scale
+        const elementWidth = boxSize + gap * 2 * scale
+        element.width = boxSize + gap * 2
         metrics.width = elementWidth * scale
-        metrics.height = height * scale
+        metrics.height = boxSize
       } else if (element.type === ElementType.TAB) {
         metrics.width = defaultTabWidth * scale
         metrics.height = defaultSize * scale
@@ -1895,9 +2058,11 @@ export class Draw {
           metrics.width += element.letterSpacing * scale
         }
         // 使用基于字体的基准度量以确保一致的行高，避免字符特定度量导致的布局跳动
+        // 注意：必须传入含字号的完整 font（getElementFont），而非仅字体族名 element.font，
+        // 否则基准行高不随 element.size 变化，导致放大字号后缩小字号时行高不回落
         const basisMetrics = this.textParticle.measureBasisWord(
           ctx,
-          element.font!
+          this.getElementFont(element)
         )
         metrics.boundingBoxAscent = basisMetrics.actualBoundingBoxAscent * scale
         metrics.boundingBoxDescent =
@@ -2414,7 +2579,12 @@ export class Draw {
           element.rowFlex === RowFlex.JUSTIFY
         ) {
           // 如果是两端对齐，因canvas目前不支持letterSpacing需单独绘制文本
-          this.textParticle.record(ctx, element, x, y + offsetY)
+          this.textParticle.record(
+            ctx,
+            this.getSelectorTextValueElement(element),
+            x,
+            y + offsetY
+          )
           this.textParticle.complete()
         } else if (element.type === ElementType.BLOCK) {
           this.textParticle.complete()
@@ -2427,9 +2597,14 @@ export class Draw {
           const drawY =
             element.controlComponent === ControlComponent.POSTFIX &&
             element.control?.type === ControlType.NUMBER_FLAG
-            ? y + offsetY - 1
-            : y + offsetY
-          this.textParticle.record(ctx, element, x, drawY)
+              ? y + offsetY - 1
+              : y + offsetY
+          this.textParticle.record(
+            ctx,
+            this.getSelectorTextValueElement(element),
+            x,
+            drawY
+          )
           // 如果设置字宽、字间距、标点符号（避免浏览器排版缩小间距）需单独绘制
           if (
             element.width ||
@@ -2584,7 +2759,7 @@ export class Draw {
           let color: string | undefined
           // 联动状态优先级最高
           if (isAssociationFocused) {
-            color = this.options.control.selectValueColor
+            color = this.options.selector.associationBackgroundColor
           } else if (element.underlineColor) {
             // 元素自定义下划线颜色优先
             color = element.underlineColor
@@ -2649,6 +2824,15 @@ export class Draw {
           startIndex,
           endIndex
         } = this.range.getRange()
+        if (startIndex !== endIndex) {
+          // console.warn('[Draw._drawRow] 检测到选区绘制条件', {
+          //   startIndex,
+          //   endIndex,
+          //   index,
+          //   currentZone,
+          //   zone
+          // })
+        }
         if (
           currentZone === zone &&
           startIndex !== endIndex &&
@@ -2960,7 +3144,9 @@ export class Draw {
       isInit = false,
       isSourceHistory = false,
       isFirstRender = false,
-      isSkipFocus = false
+      isSkipFocus = false,
+      isMoveCursorToVisible,
+      direction
     } = payload || {}
     let { curIndex } = payload || {}
     const innerWidth = this.getInnerWidth()
@@ -3049,7 +3235,7 @@ export class Draw {
     }
     // 光标重绘
     if (isSetCursor) {
-      curIndex = this.setCursor(curIndex)
+      curIndex = this.setCursor(curIndex, { isMoveCursorToVisible, direction })
     } else if (isSkipFocus) {
       // 仅 changeGroupStyle 等场景使用：isSetCursor 为 false 且不聚焦光标，
       // 避免重新聚焦导致输入法重建、滚动条乱跳
@@ -3178,7 +3364,10 @@ export class Draw {
     return cleared
   }
 
-  public setCursor(curIndex: number | undefined) {
+  public setCursor(
+    curIndex: number | undefined,
+    payload?: { isMoveCursorToVisible?: boolean; direction?: MoveDirection }
+  ) {
     const positionContext = this.position.getPositionContext()
     const positionList = this.position.getPositionList()
 
@@ -3213,7 +3402,9 @@ export class Draw {
       }
     }
     this.cursor.drawCursor({
-      isShow: isShowCursor
+      isShow: isShowCursor,
+      isMoveCursorToVisible: payload?.isMoveCursorToVisible,
+      direction: payload?.direction
     })
     return curIndex
   }
@@ -3232,7 +3423,7 @@ export class Draw {
     const oldPositionContext = deepClone(positionContext)
     const zone = this.zone.getZone()
     const oldControlRenderMode = this.controlRenderMode
-    this.historyManager.execute(() => {
+    const fn = () => {
       this.zone.setZone(zone)
       this.setPageNo(pageNo)
       // 模式变化时触发回调，确保撤销/重做时外部UI同步
@@ -3250,7 +3441,9 @@ export class Draw {
         isSubmitHistory: false,
         isSourceHistory: true
       })
-    })
+    }
+    ;(fn as any).__historySource = 'submitHistory'
+    this.historyManager.execute(fn)
   }
 
   public destroy() {

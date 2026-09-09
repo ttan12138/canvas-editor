@@ -201,25 +201,44 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
         rightTop: [curRightX]
       }
     } = anchorPosition
-    // 向上时在首行、向下时在尾行则忽略
-    if (
-      (isUp && rowIndex === 0) ||
-      (!isUp && rowIndex === draw.getRowCount() - 1)
-    ) {
-      return
+    let nextIndex = -1
+    // 向上时在首行：光标移到首字符之前（index 0）
+    if (isUp && rowIndex === 0) {
+      let firstIndex = 0
+      for (let p = 0; p < positionList.length; p++) {
+        if (!positionList[p].isInvisible) {
+          firstIndex = positionList[p].index
+          break
+        }
+      }
+      anchorStartIndex = firstIndex
+      anchorEndIndex = firstIndex
     }
-    // 查找下一行位置列表
-    const nextIndex = getNextPositionIndex({
-      positionList,
-      index,
-      rowNo,
-      isUp,
-      cursorX: curRightX
-    })
-    if (nextIndex < 0) return
-    // shift则缩放选区
-    anchorStartIndex = nextIndex
-    anchorEndIndex = nextIndex
+    // 向下时在尾行：光标移到最后一个字符之后（末尾 index）
+    else if (!isUp && rowIndex === draw.getRowCount() - 1) {
+      let lastIndex = positionList[positionList.length - 1].index
+      for (let p = positionList.length - 1; p >= 0; p--) {
+        if (!positionList[p].isInvisible) {
+          lastIndex = positionList[p].index
+          break
+        }
+      }
+      anchorStartIndex = lastIndex
+      anchorEndIndex = lastIndex
+    }
+    // 否则查找下一行最接近的光标位置
+    else {
+      nextIndex = getNextPositionIndex({
+        positionList,
+        index,
+        rowNo,
+        isUp,
+        cursorX: curRightX
+      })
+      if (nextIndex < 0) return
+      anchorStartIndex = nextIndex
+      anchorEndIndex = nextIndex
+    }
     if (evt.shiftKey) {
       if (startIndex !== endIndex) {
         if (startIndex === cursorPosition.index) {
@@ -235,10 +254,10 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
         }
       }
     }
-    // 如果下一行是表格则进入单元格内
+    // 如果下一行是表格则进入单元格内（仅在存在下一行位置时可进入）
     const elementList = draw.getElementList()
-    const nextElement = elementList[nextIndex]
-    if (nextElement.type === ElementType.TABLE) {
+    const nextElement = nextIndex !== -1 ? elementList[nextIndex] : undefined
+    if (nextElement && nextElement.type === ElementType.TABLE) {
       const { scale } = draw.getOptions()
       const margins = draw.getMargins()
       const trList = nextElement.trList!
@@ -329,12 +348,18 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
     curIndex: isCollapsed ? anchorStartIndex : undefined,
     isSetCursor: isCollapsed,
     isSubmitHistory: false,
-    isCompute: false
+    isCompute: false,
+    isMoveCursorToVisible: true,
+    // 统一 auto 模式：依据上下键移动后光标结果行是否越界（顶部/底部）自动滚动
+    direction: MoveDirection.AUTO
   })
   // 非光标闭合：将光标移动到可视范围内，闭合光标统一处理
   if (!isCollapsed) {
+    const mp = positionList[isUp ? anchorStartIndex : anchorEndIndex]
+    // 选区滚动规则：向上选中 → 结束位置（活动端）所在行滚到视口顶部；
+    // 向下选中 → 结束位置所在行滚到视口底部。方向分支自带越界判定（未超出可见不滚动）。
     draw.getCursor().moveCursorToVisible({
-      cursorPosition: positionList[isUp ? anchorStartIndex : anchorEndIndex],
+      cursorPosition: mp,
       direction: isUp ? MoveDirection.UP : MoveDirection.DOWN
     })
   }

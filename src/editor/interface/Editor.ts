@@ -115,6 +115,49 @@ export interface IEditorOption {
   imgCaption?: IImgCaptionOption
   list?: IListOption
   magnifier?: IMagnifierOption
+  // 切换光标（聚焦/点击）时，若光标在可视范围外是否自动滚动到光标位置，默认 true
+  isMoveCursorToVisible?: boolean
+  // 选择器类控件（下拉选择/自定义下拉/多选/复选框/联动标识）统一颜色配置
+  selector?: ISelectorOption
+}
+
+// 选择器类控件（SELECT/CUSTOM_SELECT/MULTI_CUSTOM_SELECT/CHECKBOX/联动）颜色配置
+export interface ISelectorOption {
+  // 下拉列表浮层
+  popupBackgroundColor: string // 下拉列表背景颜色
+  optionColor: string // 选项未选中时文字颜色
+  optionHoverBackgroundColor: string // 选项 hover 背景颜色
+  optionHoverColor: string // 选项 hover 文字颜色
+  activeOptionColor: string // 选项选中时文字颜色
+  activeOptionBackgroundColor: string // 选项选中时背景颜色
+  // 复选框（单选/多选通用）
+  checkboxBackgroundColor: string // 选中（checked）背景颜色
+  checkboxBorderColor: string // 未选中（unchecked）边框颜色（checked 时同用此色作边框）
+  checkboxMarkColor: string // 选中（checked）内容颜色（对勾）
+  // 数值输入框下边框（三态）
+  inputBorderColor: string // 输入框下边框颜色（选项未选中态）
+  inputHoverBorderColor: string // 输入框下边框颜色（选项 hover 态）
+  inputActiveBorderColor: string // 输入框下边框颜色（选项选中态）
+  // 数值输入框占位符（三态）
+  inputPlaceholderColor: string // 占位符颜色（选项未选中态）
+  inputHoverPlaceholderColor: string // 占位符颜色（选项 hover 态）
+  inputActivePlaceholderColor: string // 占位符颜色（选项选中态）
+  // 选项分割线
+  dividerColor: string // 选项之间分割线颜色
+  // 画布正文渲染（CUSTOM_SELECT 选中值文字颜色，控件模式与文本模式均生效）
+  customSelectValueColor: string
+  // 画布正文渲染（MULTI_CUSTOM_SELECT 选中值文字颜色，控件模式与文本模式均生效）
+  multiSelectValueColor: string
+  // 纯文本模式（ControlRenderMode.TEXT）下 CUSTOM_SELECT 选中值文字颜色
+  customSelectTextValueColor: string
+  // 纯文本模式（ControlRenderMode.TEXT）下 MULTI_CUSTOM_SELECT 选中值文字颜色
+  multiSelectTextValueColor: string
+  // 下拉箭头（CUSTOM_SELECT/MULTI_CUSTOM_SELECT 的 POSTFIX）
+  arrowBackgroundColor: string // 箭头圆点背景颜色
+  arrowColor: string // 箭头颜色
+  // 联动标识（带 associationId 的控件）
+  associationBackgroundColor: string // 联动标识背景颜色
+  associationTextColor: string // 联动标识文字（“联”）颜色
 }
 
 export interface IEditorResult {
@@ -146,6 +189,10 @@ export type IUpdateOption = Omit<
 
 export interface ISetValueOption {
   isSetCursor?: boolean
+  // 是否在设置后允许撤销回“本次 setValue 之前”的内容。
+  // 默认 false：setValue 会清空历史记录（recovery），不可撤销。
+  // 传 true 时，会记录一条历史，使撤销可回到 setValue 之前的状态。
+  recordHistory?: boolean
 }
 
 export interface IFocusOption {
