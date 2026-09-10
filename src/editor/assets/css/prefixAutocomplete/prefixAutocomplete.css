@@ -61,5 +61,5 @@
   display: flex;
   align-items: center;
   font-size: 12px;
-  color: #a0a4ab;
+  color: var(--ce-selector-option-color, #a0a4ab);
 }
