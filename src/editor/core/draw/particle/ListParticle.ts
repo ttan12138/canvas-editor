@@ -46,6 +46,10 @@ export class ListParticle {
       this.unsetList()
       return
     }
+    // 有序列表：去除行首手动编号前缀（如 "1、"、"2."），避免与自动序号重复显示
+    if (listType === ListType.OL) {
+      this.stripLeadingManualNumber(changeElementList)
+    }
     // 设置值
     const listId = getUUID()
     changeElementList.forEach(el => {
@@ -57,6 +61,93 @@ export class ListParticle {
     const isSetCursor = startIndex === endIndex
     const curIndex = isSetCursor ? endIndex : startIndex
     this.draw.render({ curIndex, isSetCursor })
+  }
+
+  // 去除有序列表项行首的手动编号前缀（如 "1、"、"2."、"3）"），
+  // 仅删除文本字符、不改动 ZERO 换行标记，因此不会产生空行。
+  // 跨连续文本元素拼接行首文本以匹配被拆分的编号（例如 "1" 与 "、" 分属不同元素）。
+  private stripLeadingManualNumber(changeElementList: IElement[]): void {
+    const removeList: IElement[] = []
+    let atLineStart = true
+    for (let i = 0; i < changeElementList.length; i++) {
+      const el = changeElementList[i]
+      if (!el) continue
+      // 行分隔：ZERO / \r / \n 均视为新行起点
+      if (el.value === ZERO || el.value === '\n' || el.value === '\r') {
+        atLineStart = true
+        continue
+      }
+      // 控件：行首时清理其字符串值里的手动编号
+      if (el.type === ElementType.CONTROL && el.control) {
+        if (atLineStart) {
+          const cv = (el.control as any).value
+          if (typeof cv === 'string') {
+            const nv = this.stripLeadingManualNumberInText(cv)
+            if (nv !== cv) (el.control as any).value = nv
+          }
+        }
+        atLineStart = false
+        continue
+      }
+      // 非文本元素
+      if (el.type && el.type !== ElementType.TEXT) {
+        atLineStart = typeof el.value === 'string' && /[\n\r]/.test(el.value)
+        continue
+      }
+      // 文本元素：仅在行首、非空时处理
+      if (!atLineStart || typeof el.value !== 'string' || el.value === '') continue
+      // 跨连续文本元素拼接行首文本，确定需删除的字符数
+      let text = ''
+      const lineEls: IElement[] = []
+      for (let j = i; j < changeElementList.length; j++) {
+        const je = changeElementList[j]
+        if (!je) break
+        if (je.type === ElementType.CONTROL) break
+        if (je.type && je.type !== ElementType.TEXT) break
+        if (typeof je.value !== 'string') break
+        if (je.value === ZERO || je.value === '\n' || je.value === '\r') break
+        if (je.value === '') continue
+        text += je.value
+        lineEls.push(je)
+        if (text.length > 40) break
+      }
+      const removeLen = this.leadingManualNumberLength(text)
+      if (removeLen > 0) {
+        let remain = removeLen
+        for (const le of lineEls) {
+          if (remain <= 0) break
+          if (le.value.length <= remain) {
+            removeList.push(le)
+            remain -= le.value.length
+          } else {
+            le.value = le.value.slice(remain)
+            remain = 0
+          }
+        }
+      }
+      atLineStart = false
+    }
+    // 从主元素列表移除被标记的元素（基于引用，规避索引偏移）
+    if (removeList.length) {
+      const mainElementList = this.draw.getElementList()
+      for (const el of removeList) {
+        const idx = mainElementList.indexOf(el)
+        if (~idx) mainElementList.splice(idx, 1)
+      }
+    }
+  }
+
+  // 匹配行首 "数字 + 分隔符"（允许前导空格/零宽字符），返回需删除的字符长度
+  private leadingManualNumberLength(text: string): number {
+    const m = text.match(
+      /^[ \t]*[\u200B-\u200F\uFEFF\u00AD\u2060\u202A-\u202E]*\d+[\u200B-\u200F\uFEFF\u00AD\u2060\u202A-\u202E]*[.\uFF0E\u3001\uFF0C:：)）]/
+    )
+    return m ? m[0].length : 0
+  }
+
+  private stripLeadingManualNumberInText(value: string): string {
+    const len = this.leadingManualNumberLength(value)
+    return len > 0 ? value.slice(len) : value
   }
 
   public unsetList() {

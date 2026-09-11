@@ -806,7 +806,7 @@ export class CustomSelectControl implements IControlInstance {
       }
 
       li.onmouseenter = () => {
-        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD)'
+        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD) !important'
       }
 
       li.onmouseleave = () => {
@@ -877,8 +877,8 @@ export class CustomSelectControl implements IControlInstance {
     selectPopupContainer.style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
     selectPopupContainer.style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
     selectPopupContainer.style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
-    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff)'
-    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed)'
+    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff) !important'
+    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed) !important'
     selectPopupContainer.style.borderRadius = '4px'
     selectPopupContainer.style.boxShadow = '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
 

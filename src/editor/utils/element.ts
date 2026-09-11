@@ -791,7 +791,7 @@ export function formatElementList(
       }
       el = elementList[i]
     }
-    if (el.value === '\n' || el.value == '\r\n') {
+    if (el.value === '\n' || el.value === '\r\n') {
       el.value = ZERO
     }
     if (el.type === ElementType.IMAGE || el.type === ElementType.BLOCK) {
@@ -1460,6 +1460,7 @@ export function splitListElement(
   const listElementListMap: Map<number, IElement[]> = new Map()
   for (let e = 0; e < elementList.length; e++) {
     const element = elementList[e]
+    // [DEBUG] 仅当列表项疑似被合并时打印，避免刷屏
     // 移除列表首行换行字符-如果是复选框直接忽略
     if (e === 0) {
       if (element.checkbox) continue

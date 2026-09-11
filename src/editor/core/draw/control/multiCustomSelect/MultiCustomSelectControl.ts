@@ -761,15 +761,15 @@ export class MultiCustomSelectControl implements IControlInstance {
 
       const isChecked = selectedCodes.has(valueSet.code)
       if (isChecked) {
-        checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
-        checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF)'
+        checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
+        checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
         const checkmark = document.createElement('span')
         checkmark.style.position = 'absolute'
         checkmark.style.left = '4px'
         checkmark.style.top = '2px'
         checkmark.style.width = '6px'
         checkmark.style.height = '10px'
-        checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white)'
+        checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
         checkmark.style.borderWidth = '0 2px 2px 0'
         checkmark.style.transform = 'rotate(45deg)'
         checkmark.style.boxSizing = 'content-box'
@@ -853,21 +853,21 @@ export class MultiCustomSelectControl implements IControlInstance {
                 if (isCurrentlyChecked) {
                   selectedCodes.delete(valueSet.code)
                   checkbox.style.backgroundColor = ''
-                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6)'
+                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6) !important'
                   const checkmark = checkbox.querySelector('span')
                   if (checkmark) checkmark.remove()
                   li.classList.remove('active')
                   } else {
                   selectedCodes.add(valueSet.code)
-                  checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
-                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF)'
+                  checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
+                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
                   const checkmark = document.createElement('span')
                   checkmark.style.position = 'absolute'
                   checkmark.style.left = '4px'
                   checkmark.style.top = '0px'
                   checkmark.style.width = '6px'
                   checkmark.style.height = '10px'
-                  checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white)'
+                  checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
                   checkmark.style.borderWidth = '0 2px 2px 0'
                   checkmark.style.transform = 'rotate(45deg)'
                   checkmark.style.boxSizing = 'content-box'
@@ -953,7 +953,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       }
 
       li.onmouseenter = () => {
-        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD)'
+        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD) !important'
       }
       li.onmouseleave = () => {
         li.style.backgroundColor = ''
@@ -981,21 +981,21 @@ export class MultiCustomSelectControl implements IControlInstance {
         if (isCurrentlyChecked) {
           selectedCodes.delete(valueSet.code)
           checkbox.style.backgroundColor = ''
-          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6)'
+          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6) !important'
           const checkmark = checkbox.querySelector('span')
           if (checkmark) checkmark.remove()
           li.classList.remove('active')
         } else {
           selectedCodes.add(valueSet.code)
-          checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
-          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF)'
+          checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
+          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
           const checkmark = document.createElement('span')
           checkmark.style.position = 'absolute'
           checkmark.style.left = '4px'
           checkmark.style.top = '0px'
           checkmark.style.width = '6px'
           checkmark.style.height = '10px'
-          checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white)'
+          checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
           checkmark.style.borderWidth = '0 2px 2px 0'
           checkmark.style.transform = 'rotate(45deg)'
           checkmark.style.boxSizing = 'content-box'
@@ -1030,7 +1030,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     const delimiterLabel = document.createElement('span')
     delimiterLabel.textContent = ''
     delimiterLabel.style.fontSize = '12px'
-    delimiterLabel.style.color = 'var(--ce-selector-option-color, #606266)'
+    delimiterLabel.style.color = 'var(--ce-selector-option-color, #606266) !important'
     delimiterContainer.appendChild(delimiterLabel)
 
     const delimiters = [',', ';', '，']
@@ -1040,10 +1040,10 @@ export class MultiCustomSelectControl implements IControlInstance {
       delimBtn.textContent = delim
       delimBtn.style.padding = '2px 8px'
       delimBtn.style.fontSize = '12px'
-      delimBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6)'
+      delimBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6) !important'
       delimBtn.style.borderRadius = '3px'
-      delimBtn.style.backgroundColor = delim === currentDelimiter ? 'var(--ce-selector-checkbox-bg, #409EFF)' : 'var(--ce-selector-popup-bg, #fff)'
-      delimBtn.style.color = 'var(--ce-selector-option-color, #606266)'
+      delimBtn.style.backgroundColor = delim === currentDelimiter ? 'var(--ce-selector-checkbox-bg, #409EFF) !important' : 'var(--ce-selector-popup-bg, #fff) !important'
+      delimBtn.style.color = 'var(--ce-selector-option-color, #606266) !important'
       delimBtn.style.cursor = 'pointer'
       delimBtn.style.outline = 'none'
       delimBtn.onclick = (e) => {
@@ -1051,8 +1051,8 @@ export class MultiCustomSelectControl implements IControlInstance {
         delimiters.forEach(d => {
           const btn = delimiterContainer.querySelector(`button[data-delim="${d}"]`) as HTMLButtonElement
           if (btn) {
-            btn.style.backgroundColor = d === delim ? 'var(--ce-selector-checkbox-bg, #409EFF)' : 'var(--ce-selector-popup-bg, #fff)'
-            btn.style.color = d === delim ? '#fff' : 'var(--ce-selector-option-color, #606266)'
+            btn.style.backgroundColor = d === delim ? 'var(--ce-selector-checkbox-bg, #409EFF) !important' : 'var(--ce-selector-popup-bg, #fff) !important'
+            btn.style.color = d === delim ? '#fff' : 'var(--ce-selector-option-color, #606266) !important'
           }
         })
         ;(selectPopupContainer as any).currentDelimiter = delim
@@ -1070,8 +1070,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     confirmBtn.style.fontSize = '12px'
     confirmBtn.style.border = 'none'
     confirmBtn.style.borderRadius = '4px'
-    confirmBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6)'
-    confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
+    confirmBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6) !important'
+    confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
     confirmBtn.style.color = '#000'
     confirmBtn.style.cursor = 'pointer'
     confirmBtn.style.outline = 'none'
@@ -1107,10 +1107,10 @@ export class MultiCustomSelectControl implements IControlInstance {
       this.setSelectWithInputValues(codesArray, inputValues, delimiter, delimiterChanged)
     }
     confirmBtn.onmouseenter = () => {
-      confirmBtn.style.backgroundColor = 'var(--ce-selector-active-bg, #66B1FF)'
+      confirmBtn.style.backgroundColor = 'var(--ce-selector-active-bg, #66B1FF) !important'
     }
     confirmBtn.onmouseleave = () => {
-      confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
+      confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
     }
     bottomBar.appendChild(confirmBtn)
 
@@ -1137,8 +1137,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     selectPopupContainer.style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
     selectPopupContainer.style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
     selectPopupContainer.style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
-    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff)'
-    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed)'
+    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff) !important'
+    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed) !important'
     selectPopupContainer.style.borderRadius = '4px'
     selectPopupContainer.style.boxShadow = '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
 

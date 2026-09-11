@@ -810,9 +810,11 @@ export class Draw {
       isHandleFirstElement: false,
       editorOptions: this.options
     })
-    // 撤销支持：在修改 elementList 之前先记录“插入前”快照，
-    // 否则当本次插入是首个历史记录时无法撤销回插入前状态。
-    if (isSubmitHistory) {
+    // 撤销支持：仅当撤销栈为空（即首个历史记录）时，在修改 elementList 之前
+    // 记录一次“插入前”基线快照；否则栈顶已是对应的“插入前”状态，无需重复记录。
+    // 注意：必须与下方 render(isSubmitHistory:false) + submitHistory(curIndex) 配合，
+    // 否则每个插入会同时产生“前”与“后”两条记录，导致 undo 步数与文档状态错位。
+    if (isSubmitHistory && this.historyManager.isStackEmpty()) {
       this.submitHistory(undefined)
     }
     let curIndex = -1
@@ -852,10 +854,15 @@ export class Draw {
     }
     if (~curIndex) {
       this.range.setRange(curIndex, curIndex)
+      // render 不再重复提交历史（与 appendElementList 对齐），统一由下方
+      // submitHistory 记录“插入后”的单一快照，避免每个插入产生两条历史记录
       this.render({
         curIndex,
-        isSubmitHistory
+        isSubmitHistory: false
       })
+      if (isSubmitHistory) {
+        this.submitHistory(curIndex)
+      }
     }
   }
 
@@ -951,6 +958,8 @@ export class Draw {
     this.render({
       curIndex,
       isSubmitHistory: false,
+      // 追加内容视为一次文档变更，触发 contentChange（不额外写入历史，历史由下方 submitHistory 统一处理）
+      isSourceHistory: true,
       isSkipFocus: options.isSkipFocus,
       // 追加元素后默认自动滚动到末尾光标（即使全局关闭了切换光标滚动），
       // 除非显式 isSkipFocus 跳过聚焦

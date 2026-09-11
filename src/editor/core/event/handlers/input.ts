@@ -93,8 +93,22 @@ export function input(data: string, host: CanvasEvent) {
         (copyElement.type === SUPERSCRIPT && nextElement?.type === SUPERSCRIPT)
       ) {
         EDITOR_ELEMENT_COPY_ATTR.forEach(attr => {
-          // 在分组外无需复制分组信息
-          if (attr === 'groupIds' && !nextElement?.groupIds) return
+          // 分组信息仅在「同组内连续」时向下传递：
+          // 仅当下一个元素与当前元素同属某一分组（groupIds 有交集）才复制，
+          // 否则（下一个元素是不同分组或普通元素）跳过，避免把分组标识延伸到
+          // 分组之外，导致新输入的字符被并入分组、破坏「实际值从头部包含即把尾部
+          // 拆分出去作为单独元素」的预期结构。
+          if (attr === 'groupIds') {
+            const copyGroupIds = copyElement.groupIds
+            const nextGroupIds = nextElement?.groupIds
+            const isSameGroup =
+              !!copyGroupIds?.length &&
+              !!nextGroupIds?.length &&
+              nextGroupIds.some(g => copyGroupIds.includes(g))
+            if (!isSameGroup) {
+              return
+            }
+          }
           const value = copyElement[attr] as never
           if (value !== undefined) {
             newElement[attr] = value

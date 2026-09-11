@@ -6,7 +6,7 @@
   z-index: 1;
   border: 1px solid #e4e7ed;
   border-radius: 4px;
-  background-color: var(--ce-selector-popup-bg, #fff);
+  background-color: var(--ce-selector-popup-bg, #fff) !important;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .1);
   box-sizing: border-box;
   margin: 5px 0;
