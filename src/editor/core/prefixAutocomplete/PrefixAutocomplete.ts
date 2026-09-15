@@ -336,6 +336,9 @@ export class PrefixAutocomplete {
     style.setProperty('--ce-selector-option-hover-color', selectorOption?.optionHoverColor || '#3d4757')
     style.setProperty('--ce-selector-active-color', selectorOption?.activeOptionColor || '#3d4757')
     style.setProperty('--ce-selector-active-bg', selectorOption?.activeOptionBackgroundColor || 'rgba(25, 55, 88, .04)')
+    // 弹窗底部操作提示（hint）颜色：复用 selector 配置，缺省回退黄色，与单选/多选提示条一致
+    style.setProperty('--ce-selector-hint-color', selectorOption?.hintColor || '#E6A23C')
+    style.setProperty('--ce-selector-hint-bg', selectorOption?.hintBackgroundColor || '#FFFBE6')
     // 挂载到 document.body，使 fixed 定位的 containing block 为视口。
     // 否则当编辑器容器或其祖先存在 transform/filter 等属性时，
     // fixed 会相对该容器定位，下拉将被容器 overflow 裁剪或渲染到屏幕外而不可见。
@@ -390,7 +393,8 @@ export class PrefixAutocomplete {
     if (!this.dom) return
     this.dom.innerHTML = ''
     this.itemDomList = []
-    if (!this.list || !this.list.length) {
+    const list = this.list
+    if (!list || !list.length) {
       const config = this.activePrefix
         ? this.configMap.get(this.activePrefix)
         : null
@@ -398,15 +402,13 @@ export class PrefixAutocomplete {
       empty.classList.add(`${EDITOR_PREFIX}-prefix-autocomplete-empty`)
       // list 为 null（尚未加载/外部未 setList）显示加载中；
       // list 为 []（已加载但无结果）显示无匹配
-      const isLoading = this.list === null || this.searching
+      const isLoading = list === null || this.searching
       empty.textContent = isLoading
         ? config?.loadingText ?? '加载中...'
         : config?.emptyText ?? '无匹配项'
       this.dom.append(empty)
-      this.position()
-      return
     }
-    this.list.forEach((item, index) => {
+    list?.forEach((item, index) => {
       const itemDom = document.createElement('div')
       itemDom.classList.add(`${EDITOR_PREFIX}-prefix-autocomplete-item`)
       // 输入框型候选：

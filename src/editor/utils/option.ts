@@ -192,11 +192,17 @@ export function mergeOption(
     arrowBackgroundColor: '#5175f4',
     arrowColor: '#ffffff',
     associationBackgroundColor: '#5175f4',
-    associationTextColor: '#ffffff'
+    associationTextColor: '#ffffff',
+    hintColor: '#E6A23C',
+    hintBackgroundColor: '#FFFBE6'
   }
   const selectorOptions: Required<ISelectorOption> = {
     ...defaultSelectorOption,
-    ...options.selector
+    ...options.selector,
+    // 新增可选字段：确保合并后始终为 string，兼容 DeepRequired 返回类型
+    hintColor: options.selector?.hintColor ?? defaultSelectorOption.hintColor,
+    hintBackgroundColor:
+      options.selector?.hintBackgroundColor ?? defaultSelectorOption.hintBackgroundColor
   }
   const modeRuleOption: DeepRequired<IModeRule> = {
     print: {
@@ -259,9 +265,11 @@ export function mergeOption(
     scrollContainerSelector: '',
     pageOuterSelectionDisable: false,
     isMoveCursorToVisible: true,
-    // 选择器类控件统一颜色配置，默认与原有样式一致，保持向后兼容
-    selector: selectorOptions,
     ...options,
+    // 选择器类控件统一颜色配置，默认与原有样式一致，保持向后兼容。
+    // 必须放在 ...options 之后：selectorOptions 已合并用户 selector，
+    // 避免被展开的用户选项覆盖导致 hintColor 等新增字段丢失。
+    selector: selectorOptions,
     table: tableOptions,
     header: headerOptions,
     footer: footerOptions,

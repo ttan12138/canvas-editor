@@ -144,6 +144,9 @@ export interface ISelectorOption {
   inputActivePlaceholderColor: string // 占位符颜色（选项选中态）
   // 选项分割线
   dividerColor: string // 选项之间分割线颜色
+  // 弹窗底部操作提示（hint）颜色，预输入/单选/多选弹窗底部提示条复用
+  hintColor?: string // 提示条文字颜色（默认 #E6A23C）
+  hintBackgroundColor?: string // 提示条背景颜色（默认 #FFFBE6）
   // 画布正文渲染（CUSTOM_SELECT 选中值文字颜色，控件模式与文本模式均生效）
   customSelectValueColor: string
   // 画布正文渲染（MULTI_CUSTOM_SELECT 选中值文字颜色，控件模式与文本模式均生效）
