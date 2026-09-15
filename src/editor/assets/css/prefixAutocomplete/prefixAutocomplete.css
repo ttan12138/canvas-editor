@@ -28,6 +28,7 @@
   cursor: pointer;
   font-size: 12px;
   overflow: hidden;
+  color: var(--ce-selector-option-color, #3d4757) !important;
 }
 
 .ce-prefix-autocomplete-item span {
@@ -39,7 +40,11 @@
 }
 
 .ce-prefix-autocomplete-item:hover {
-  background: var(--ce-selector-option-hover-bg, rgba(25, 55, 88, .04)) !important;
+  background: var(
+    --ce-selector-option-hover-bg,
+    rgba(25, 55, 88, 0.04)
+  ) !important;
+  color: var(--ce-selector-option-hover-color, #3d4757) !important;
 }
 
 .ce-prefix-autocomplete-item:hover span {
@@ -47,7 +52,8 @@
 }
 
 .ce-prefix-autocomplete-active {
-  background: var(--ce-selector-active-bg, rgba(25, 55, 88, .04)) !important;
+  background: var(--ce-selector-active-bg, rgba(25, 55, 88, 0.04)) !important;
+  color: var(--ce-selector-active-color, #3d4757) !important;
 }
 
 .ce-prefix-autocomplete-active span {
@@ -62,4 +68,62 @@
   align-items: center;
   font-size: 12px;
   color: var(--ce-selector-option-color, #a0a4ab) !important;
+}
+
+/* 候选行内嵌输入框：参考单选/多选弹窗实现，采用下边框风格，
+   背景跟随选项三态（默认透明、hover、active），并使用同一组 --ce-selector-* 主题变量 */
+.ce-prefix-autocomplete-input {
+  flex-shrink: 0;
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ce-selector-input-border, #8195dd) !important;
+  color: inherit !important;
+  font-size: 13px;
+  outline: none;
+}
+
+.ce-prefix-autocomplete-input::placeholder {
+  color: var(--ce-selector-input-placeholder, #c0c4cc) !important;
+  opacity: 1 !important;
+}
+
+.ce-prefix-autocomplete-item:hover .ce-prefix-autocomplete-input {
+  background-color: var(
+    --ce-selector-option-hover-bg,
+    rgba(25, 55, 88, 0.04)
+  ) !important;
+  border-bottom-color: var(
+    --ce-selector-input-hover-border,
+    #5175f4
+  ) !important;
+}
+
+.ce-prefix-autocomplete-item:hover .ce-prefix-autocomplete-input::placeholder {
+  color: var(--ce-selector-input-hover-placeholder, #fff) !important;
+}
+
+.ce-prefix-autocomplete-active .ce-prefix-autocomplete-input {
+  background-color: var(
+    --ce-selector-active-bg,
+    rgba(25, 55, 88, 0.04)
+  ) !important;
+  border-bottom-color: var(
+    --ce-selector-input-active-border,
+    #e2e6ed
+  ) !important;
+}
+
+.ce-prefix-autocomplete-active .ce-prefix-autocomplete-input::placeholder {
+  color: var(--ce-selector-input-active-placeholder, #fff) !important;
+}
+
+/* 弹窗底部操作提示（仅当配置 hint 时展示）：参考多选弹窗 select-hint 风格 */
+.ce-prefix-autocomplete-hint {
+  padding: 8px 12px;
+  background-color: #fffbe6;
+  border-top: 1px solid #e4e7ed;
+  font-size: 12px;
+  color: #e6a23c;
+  white-space: nowrap;
+  border-radius: 0 0 4px 4px;
 }

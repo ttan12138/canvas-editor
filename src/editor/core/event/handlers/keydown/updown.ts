@@ -14,6 +14,11 @@ interface IGetNextPositionIndexPayload {
 // 根据当前位置索引查找上下行最接近的索引位置
 function getNextPositionIndex(payload: IGetNextPositionIndexPayload) {
   const { positionList, index, isUp, rowNo, cursorX } = payload
+  console.log('[DEBUG updown] getNextPositionIndex 入参 index=', index, 'rowNo=', rowNo,
+    'isUp=', isUp, 'cursorX=', cursorX,
+    '前12项=', positionList.slice(0, 12).map(p => ({
+      i: p.index, rowNo: p.rowNo, rowIndex: p.rowIndex, inv: p.isInvisible, v: (p as any).value, listId: (p as any).listId
+    })))
   let nextIndex = -1
   // 查找下一行位置列表
   const probablePosition: IElementPosition[] = []
@@ -57,6 +62,9 @@ function getNextPositionIndex(payload: IGetNextPositionIndexPayload) {
     nextIndex = nextPosition.index
     break
   }
+  console.log('[DEBUG updown] getNextPositionIndex 结果 nextIndex=', nextIndex,
+    'probablePosition 长度=', probablePosition.length,
+    '参数 rowNo=', rowNo, 'isUp=', isUp, 'index=', index)
   return nextIndex
 }
 
@@ -71,6 +79,12 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
   const { startIndex, endIndex } = rangeManager.getRange()
   let positionList = position.getPositionList()
   const isUp = evt.key === KeyMap.Up
+  // [DEBUG updown] 总览：当前光标、行号、是否向上
+  console.log('[DEBUG updown] isUp=', isUp,
+    'cursorIndex=', cursorPosition?.index,
+    'cursorRowIndex=', cursorPosition?.rowIndex,
+    'startIndex=', startIndex, 'endIndex=', endIndex,
+    'positionListLen=', positionList.length)
   // 新的光标开始结束位置
   let anchorStartIndex = -1
   let anchorEndIndex = -1
@@ -202,20 +216,8 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
       }
     } = anchorPosition
     let nextIndex = -1
-    // 向上时在首行：光标移到首字符之前（index 0）
-    if (isUp && rowIndex === 0) {
-      let firstIndex = 0
-      for (let p = 0; p < positionList.length; p++) {
-        if (!positionList[p].isInvisible) {
-          firstIndex = positionList[p].index
-          break
-        }
-      }
-      anchorStartIndex = firstIndex
-      anchorEndIndex = firstIndex
-    }
     // 向下时在尾行：光标移到最后一个字符之后（末尾 index）
-    else if (!isUp && rowIndex === draw.getRowCount() - 1) {
+    if (!isUp && rowIndex === draw.getRowCount() - 1) {
       let lastIndex = positionList[positionList.length - 1].index
       for (let p = positionList.length - 1; p >= 0; p--) {
         if (!positionList[p].isInvisible) {
@@ -223,6 +225,7 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
           break
         }
       }
+      console.log('[DEBUG updown] 尾行分支 lastIndex=', lastIndex)
       anchorStartIndex = lastIndex
       anchorEndIndex = lastIndex
     }
@@ -235,9 +238,37 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
         isUp,
         cursorX: curRightX
       })
-      if (nextIndex < 0) return
-      anchorStartIndex = nextIndex
-      anchorEndIndex = nextIndex
+      if (nextIndex < 0) {
+        // 找不到上一行/下一行（如列表首项整段 rowNo 相同、前面无更上一行）。
+        // 向上时不应让光标不动，而是回退到当前段落/列表项的起始位置
+        // （即“序号 N 之后”的首字符）；向下时保持光标不动。
+        if (isUp) {
+          let fallbackIndex = anchorPosition.index
+          for (let p = anchorPosition.index; p >= 0; p--) {
+            const pos = positionList[p]
+            // 越过段落/列表项边界（进入上一行或不同行块）则停止向前
+            if (pos.rowNo !== rowNo) break
+            if (!pos.isInvisible) {
+              fallbackIndex = pos.index
+            }
+          }
+          console.log('[DEBUG updown] 向上找不到上一行，回退到段落/列表项起点 fallbackIndex=',
+            fallbackIndex, 'rowNo=', rowNo, 'rowIndex=', rowIndex)
+          anchorStartIndex = fallbackIndex
+          anchorEndIndex = fallbackIndex
+        } else {
+          console.log('[DEBUG updown] 普通分支 nextIndex<0，光标不动。',
+            '当前 rowNo=', rowNo, 'rowIndex=', rowIndex,
+            'anchorPosition index=', index)
+          return
+        }
+      } else {
+        console.log('[DEBUG updown] 普通分支 nextIndex=', nextIndex,
+          'anchorPosition index=', index, 'rowNo=', rowNo, 'rowIndex=', rowIndex,
+          'curRightX=', curRightX)
+        anchorStartIndex = nextIndex
+        anchorEndIndex = nextIndex
+      }
     }
     if (evt.shiftKey) {
       if (startIndex !== endIndex) {
@@ -339,6 +370,10 @@ export function updown(evt: KeyboardEvent, host: CanvasEvent) {
   }
   // 执行跳转
   if (!~anchorStartIndex || !~anchorEndIndex) return
+  console.log('[DEBUG updown] 最终设置选区 anchorStartIndex=', anchorStartIndex,
+    'anchorEndIndex=', anchorEndIndex,
+    '目标元素 listId=', (draw.getElementList()[anchorStartIndex] as any)?.listId,
+    '目标元素 value=', (draw.getElementList()[anchorStartIndex] as any)?.value)
   if (anchorStartIndex > anchorEndIndex) {
     ;[anchorStartIndex, anchorEndIndex] = [anchorEndIndex, anchorStartIndex]
   }

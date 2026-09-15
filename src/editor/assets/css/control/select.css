@@ -20,7 +20,8 @@
   box-sizing: border-box;
 }
 
-.ce-select-control-popup ul li {
+/* 重复容器类名以提升特异性，确保压过 html.theme-pacsclient * 等全局 * 规则 */
+.ce-select-control-popup.ce-select-control-popup ul li {
   font-size: 13px;
   padding: 0 20px;
   position: relative;
@@ -41,16 +42,16 @@
 }
 
 /* 子元素（选项文字 textSpan / 数值输入框）跟随 li 颜色，覆盖全局 * 规则 */
-.ce-select-control-popup ul li * {
+.ce-select-control-popup.ce-select-control-popup ul li * {
   color: inherit !important;
 }
 
-.ce-select-control-popup ul li:hover {
+.ce-select-control-popup.ce-select-control-popup ul li:hover {
   background-color: var(--ce-selector-option-hover-bg, #EEF2FD) !important;
   color: var(--ce-selector-option-hover-color, #000) !important;
 }
 
-.ce-select-control-popup ul li.active {
+.ce-select-control-popup.ce-select-control-popup ul li.active {
   color: var(--ce-selector-active-color, #5175f4) !important;
   background-color: var(--ce-selector-active-bg, #e2e6ed) !important;
   /* font-weight: 700; */

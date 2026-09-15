@@ -8,7 +8,10 @@ import {
   TEXTLIKE_ELEMENT_TYPE
 } from '../../../../dataset/constant/Element'
 import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
-import { ControlRenderMode, EditorComponent } from '../../../../dataset/enum/Editor'
+import {
+  ControlRenderMode,
+  EditorComponent
+} from '../../../../dataset/enum/Editor'
 import { ElementType } from '../../../../dataset/enum/Element'
 import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import { DeepRequired } from '../../../../interface/Common'
@@ -453,7 +456,9 @@ export class CustomSelectControl implements IControlInstance {
     const isMultiSelect = control.isMultiSelect
     if (
       (!isMultiSelect && code === oldCode && !options.isForceUpdate) ||
-      (isMultiSelect && isArrayEqual(oldCodes, newCodes) && !options.isForceUpdate)
+      (isMultiSelect &&
+        isArrayEqual(oldCodes, newCodes) &&
+        !options.isForceUpdate)
     ) {
       this.control.repaintControl({
         curIndex: range.startIndex,
@@ -580,7 +585,6 @@ export class CustomSelectControl implements IControlInstance {
     }
   }
 
-
   // private _togglePopup() {
   //   if (this.isPopup) {
   //     this.destroy()
@@ -602,13 +606,15 @@ export class CustomSelectControl implements IControlInstance {
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
     // 阻止 mousedown/click 冒泡至 document，避免编辑器全局失焦逻辑/宿主页面的全局点击处理销毁弹窗，
     // 保证弹窗内数值输入框可正常聚焦
-    selectPopupContainer.addEventListener('mousedown', (e) => {
+    selectPopupContainer.addEventListener('mousedown', e => {
       // 记录本次按下是否发生在数值输入框上：click 的 target 是 mousedown/mouseup 的公共祖先，
       // 按下在 input、抬起在父容器时 click target 会变成 SPAN，需借此标志识别
-      ;(selectPopupContainer as any).__ceMousedownOnInput = !!(e.target as HTMLElement).closest?.('input')
+      ;(selectPopupContainer as any).__ceMousedownOnInput = !!(
+        e.target as HTMLElement
+      ).closest?.('input')
       e.stopPropagation()
     })
-    selectPopupContainer.addEventListener('click', (e) => {
+    selectPopupContainer.addEventListener('click', e => {
       e.stopPropagation()
     })
     selectPopupContainer.style.display = 'flex'
@@ -625,7 +631,9 @@ export class CustomSelectControl implements IControlInstance {
     const inputValues = new Map<string, string>()
     const inputElements = new Map<string, HTMLInputElement[]>()
     const isMultiSelect = control.isMultiSelect
-    const activeCodes = isMultiSelect ? new Set(this.getCodes()) : this.getCodes()[0]
+    const activeCodes = isMultiSelect
+      ? new Set(this.getCodes())
+      : this.getCodes()[0]
 
     for (let v = 0; v < valueSets.length; v++) {
       const valueSet = valueSets[v]
@@ -653,7 +661,10 @@ export class CustomSelectControl implements IControlInstance {
 
       const multiUnitMatch = detectMultiUnitPattern(valueSet.value)
 
-      if (multiUnitMatch && multiUnitMatch.parts.some(p => p.type === 'input')) {
+      if (
+        multiUnitMatch &&
+        multiUnitMatch.parts.some(p => p.type === 'input')
+      ) {
         const contentContainer = document.createElement('span')
         contentContainer.style.display = 'flex'
         contentContainer.style.alignItems = 'center'
@@ -665,7 +676,7 @@ export class CustomSelectControl implements IControlInstance {
         // 用于跟踪输入框索引
         let inputIndex = 0
 
-        multiUnitMatch.parts.forEach((part) => {
+        multiUnitMatch.parts.forEach(part => {
           if (part.type === 'text') {
             // 文本部分
             const textSpan = document.createElement('span')
@@ -707,7 +718,7 @@ export class CustomSelectControl implements IControlInstance {
               input.style.boxShadow = 'none'
             }
 
-            input.onkeydown = (e) => {
+            input.onkeydown = e => {
               e.stopPropagation()
               if (e.key === KeyMap.TAB) {
                 e.preventDefault()
@@ -727,7 +738,12 @@ export class CustomSelectControl implements IControlInstance {
                     inputValues.set(inputKey, input.value)
                   })
                 })
-                this.handleEnterSelect(valueSet.code, isMultiSelect || false, activeCodes, inputValues)
+                this.handleEnterSelect(
+                  valueSet.code,
+                  isMultiSelect || false,
+                  activeCodes,
+                  inputValues
+                )
               }
             }
 
@@ -806,14 +822,14 @@ export class CustomSelectControl implements IControlInstance {
       }
 
       li.onmouseenter = () => {
-        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD) !important'
+        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD)'
       }
 
       li.onmouseleave = () => {
         li.style.backgroundColor = ''
       }
 
-      li.onclick = (e) => {
+      li.onclick = e => {
         // click target 可能是 input 的父容器（mousedown 在 input、mouseup 在容器时公共祖先为 SPAN），
         // 仅判断 tagName === 'INPUT' 会误放行，导致点击输入框时触发选中并销毁弹窗
         const isInputInteraction =
@@ -859,26 +875,82 @@ export class CustomSelectControl implements IControlInstance {
     selectPopupContainer.style.zIndex = '1000'
     // 统一使用 options.selector 配置的颜色（通过 CSS 变量注入，select.css 消费）
     const selectorOption = this.options.selector
-    selectPopupContainer.style.setProperty('--ce-selector-popup-bg', selectorOption.popupBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-color', selectorOption.optionColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-hover-bg', selectorOption.optionHoverBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-hover-color', selectorOption.optionHoverColor)
-    selectPopupContainer.style.setProperty('--ce-selector-active-color', selectorOption.activeOptionColor)
-    selectPopupContainer.style.setProperty('--ce-selector-active-bg', selectorOption.activeOptionBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-border', selectorOption.inputBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-hover-border', selectorOption.inputHoverBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-active-border', selectorOption.inputActiveBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-placeholder', selectorOption.inputPlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-hover-placeholder', selectorOption.inputHoverPlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-active-placeholder', selectorOption.inputActivePlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-bg', selectorOption.checkboxBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-divider', selectorOption.dividerColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-border', selectorOption.checkboxBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
-    selectPopupContainer.style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
-    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff) !important'
-    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed) !important'
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-bg',
+      selectorOption.popupBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-color',
+      selectorOption.optionColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-hover-bg',
+      selectorOption.optionHoverBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-hover-color',
+      selectorOption.optionHoverColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-active-color',
+      selectorOption.activeOptionColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-active-bg',
+      selectorOption.activeOptionBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-border',
+      selectorOption.inputBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-hover-border',
+      selectorOption.inputHoverBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-active-border',
+      selectorOption.inputActiveBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-placeholder',
+      selectorOption.inputPlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-hover-placeholder',
+      selectorOption.inputHoverPlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-active-placeholder',
+      selectorOption.inputActivePlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-bg',
+      selectorOption.checkboxBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-divider',
+      selectorOption.dividerColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-border',
+      selectorOption.checkboxBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-mark',
+      selectorOption.checkboxMarkColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-arrow-bg',
+      selectorOption.arrowBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-arrow-color',
+      selectorOption.arrowColor
+    )
+    selectPopupContainer.style.backgroundColor =
+      'var(--ce-selector-popup-bg, #fff)'
+    selectPopupContainer.style.border =
+      '1px solid var(--ce-selector-active-bg, #e2e6ed)'
     selectPopupContainer.style.borderRadius = '4px'
     selectPopupContainer.style.boxShadow = '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
 
@@ -928,7 +1000,8 @@ export class CustomSelectControl implements IControlInstance {
     if (!hint) {
       hint = document.createElement('div')
       hint.className = 'select-hint'
-      hint.textContent = '按 Tab 键切换到下一个输入框，按 Enter 键确认选择，按 Esc 键退出'
+      hint.textContent =
+        '按 Tab 键切换到下一个输入框，按 Enter 键确认选择，按 Esc 键退出'
       hint.style.padding = '0px 6px'
       hint.style.backgroundColor = '#FFFBE6'
       hint.style.borderTop = '1px solid #E4E7ED'
@@ -936,6 +1009,7 @@ export class CustomSelectControl implements IControlInstance {
       hint.style.color = '#E6A23C'
       hint.style.whiteSpace = 'nowrap'
       hint.style.borderRadius = '0 0 4px 4px'
+      hint.style.textWrap = 'auto'
       container.appendChild(hint)
     }
     hint.style.display = 'block'
@@ -948,7 +1022,10 @@ export class CustomSelectControl implements IControlInstance {
     }
   }
 
-  private navigateToNextInput(container: HTMLDivElement, currentInput: HTMLInputElement): void {
+  private navigateToNextInput(
+    container: HTMLDivElement,
+    currentInput: HTMLInputElement
+  ): void {
     const inputs = Array.from(container.querySelectorAll('input'))
     const currentIndex = inputs.indexOf(currentInput)
     const nextIndex = (currentIndex + 1) % inputs.length
@@ -975,7 +1052,12 @@ export class CustomSelectControl implements IControlInstance {
     document.body.removeChild(span)
   }
 
-  private handleEnterSelect(code: string, isMultiSelect: boolean, activeCodes: Set<string> | string, inputValues: Map<string, string>): void {
+  private handleEnterSelect(
+    code: string,
+    isMultiSelect: boolean,
+    activeCodes: Set<string> | string,
+    inputValues: Map<string, string>
+  ): void {
     let newCodes: string[]
     if (isMultiSelect) {
       const currentCodes = new Set(activeCodes as Set<string>)
@@ -991,7 +1073,10 @@ export class CustomSelectControl implements IControlInstance {
     this.setSelectWithInputValues(newCodes, inputValues)
   }
 
-  private setSelectWithInputValues(codes: string[], inputValues: Map<string, string>): void {
+  private setSelectWithInputValues(
+    codes: string[],
+    inputValues: Map<string, string>
+  ): void {
     const control = this.element.control!
     const valueSets = control.valueSets
     if (!Array.isArray(valueSets) || !valueSets.length) return
@@ -1011,13 +1096,16 @@ export class CustomSelectControl implements IControlInstance {
         let newValue = ''
         let inputIndex = 0
 
-        unitMatch.parts.forEach((part) => {
+        unitMatch.parts.forEach(part => {
           if (part.type === 'text') {
             newValue += part.text || ''
           } else if (part.type === 'input') {
             const inputKey = `${code}_${inputIndex}`
             const inputValue = inputValues.get(inputKey)
-            newValue += (inputValue && inputValue.trim() !== '' ? inputValue.trim() : part.value || '')
+            newValue +=
+              inputValue && inputValue.trim() !== ''
+                ? inputValue.trim()
+                : part.value || ''
             newValue += part.unit || ''
             inputIndex++
           }
@@ -1037,7 +1125,11 @@ export class CustomSelectControl implements IControlInstance {
     // 如果值有变化，需要强制更新正文
     if (hasValueChanged) {
       // 调用 setSelect 并强制更新
-      this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER), {}, { isForceUpdate: true })
+      this.setSelect(
+        newCodesWithValues.join(this.VALUE_DELIMITER),
+        {},
+        { isForceUpdate: true }
+      )
     } else {
       this.setSelect(newCodesWithValues.join(this.VALUE_DELIMITER))
     }

@@ -14,6 +14,10 @@ import { CanvasEvent } from './CanvasEvent'
 import { ImageParticle } from '../draw/particle/ImageParticle'
 import { INTERNAL_SHORTCUT_KEY } from '../../dataset/constant/Shortcut'
 import { Magnifier } from '../draw/interactive/Magnifier'
+import {
+  applyCrossEditorListPolicy,
+  stripRedundantLeadingBreak
+} from './dragState'
 
 export class GlobalEvent {
   private static editorInstances: Map<Element, CanvasEvent> = new Map()
@@ -91,10 +95,14 @@ export class GlobalEvent {
     document.addEventListener('mouseup', this.setCanvasEventAbility)
     document.addEventListener('wheel', this.setPageScale, { passive: false })
     document.addEventListener('visibilitychange', this._handleVisibilityChange)
-    document.addEventListener('dragover', this.handleGlobalDragover, { capture: true })
+    document.addEventListener('dragover', this.handleGlobalDragover, {
+      capture: true
+    })
     document.addEventListener('drop', this.handleGlobalDrop, { capture: true })
     document.addEventListener('mousemove', this.handleGlobalMousemove)
-    document.addEventListener('mouseup', this.handleGlobalMouseup, { capture: true })
+    document.addEventListener('mouseup', this.handleGlobalMouseup, {
+      capture: true
+    })
     this.dprMediaQueryList.addEventListener('change', this._handleDprChange)
     // console.log('[GLOBAL EVENT] Global drag listeners registered (capture phase)')
   }
@@ -207,11 +215,20 @@ export class GlobalEvent {
       }
       const range = this.range.getRange()
       if (range.startIndex !== range.endIndex) {
-        this.range.setRange(range.endIndex, range.endIndex)
-        this.draw.render({
-          isSetCursor: false,
-          isSubmitHistory: false
-        })
+        if (this.canvasEvent.isAllowDrag) {
+          // 拖拽起始位置在已有选区内：保留源选区高亮，不在按下瞬间折叠，
+          // 否则源选区会在 mousedown 时消失、拖拽过程中只剩跟随鼠标的落点光标。
+          console.log('[clearSideEffect] keep source selection (drag start)', {
+            start: range.startIndex,
+            end: range.endIndex
+          })
+        } else {
+          this.range.setRange(range.endIndex, range.endIndex)
+          this.draw.render({
+            isSetCursor: false,
+            isSubmitHistory: false
+          })
+        }
       }
       this.cursor.recoveryCursor()
       this.range.recoveryRangeStyle()
@@ -232,6 +249,26 @@ export class GlobalEvent {
   public setCanvasEventAbility = () => {
     this.canvasEvent.setIsAllowDrag(false)
     this.canvasEvent.setIsAllowSelection(false)
+  }
+
+  // 跨编辑器拖拽在“编辑器外部/无效目标”松开时，结束源编辑器的选中状态：
+  // 折叠选区、恢复光标、清空拖拽缓存，避免高亮残留。
+  private endSourceSelection() {
+    const range = this.draw.getRange()
+    const curRange = range.getRange()
+    if (curRange.startIndex !== curRange.endIndex) {
+      range.setRange(curRange.endIndex, curRange.endIndex)
+    }
+    this.draw.getCursor().recoveryCursor()
+    range.recoveryRangeStyle()
+    this.canvasEvent.cacheRange = null
+    this.canvasEvent.cacheElementList = null
+    this.canvasEvent.cachePositionList = null
+    this.canvasEvent.cachePositionContext = null
+    this.draw.render({
+      isSetCursor: false,
+      isSubmitHistory: false
+    })
   }
 
   private handleGlobalDragover = (evt: DragEvent) => {
@@ -269,6 +306,11 @@ export class GlobalEvent {
     if (innerEditorDom) {
       // console.log('[GLOBAL DRAG] handling dragover for current editor')
       this.canvasEvent.dragover(evt)
+    } else {
+      // [DEBUG drag] dragover 命中 pageContainer 但未命中 canvas，预览光标可能显示但 drop 不触发
+      console.log('[DEBUG drag] dragover inside-pageContainer 但 innerEditorDom=false',
+        'target=', (target as any)?.tagName,
+        'isInside=', isInsideCurrentEditor)
     }
   }
 
@@ -281,6 +323,18 @@ export class GlobalEvent {
       (node: HTMLCanvasElement) => pageList.includes(node),
       true
     )
+    // [DEBUG drag] drop 判定：innerEditorDom 是否存在 / 目标元素 / 是否命中 pageContainer
+    const pageContainer = this.draw.getPageContainer()
+    const containerRect = pageContainer.getBoundingClientRect()
+    const dropInsidePageContainer =
+      evt.clientX >= containerRect.left &&
+      evt.clientX <= containerRect.right &&
+      evt.clientY >= containerRect.top &&
+      evt.clientY <= containerRect.bottom
+    console.log('[DEBUG drag] handleGlobalDrop innerEditorDom=', !!innerEditorDom,
+      'target=', (target as any)?.tagName,
+      'dropInsidePageContainer=', dropInsidePageContainer,
+      'clientX/Y=', evt.clientX, evt.clientY)
     // console.log('[GLOBAL DRAG] drop, innerEditorDom found:', !!innerEditorDom, 'target:', target)
     if (innerEditorDom) {
       this.canvasEvent.drop(evt)
@@ -292,7 +346,10 @@ export class GlobalEvent {
 
   private handleGlobalMousemove = (evt: MouseEvent) => {
     // 处理选区拖拽：鼠标超出编辑器范围时仍能调整选区
-    if (this.canvasEvent.isAllowSelection && this.canvasEvent.mouseDownStartPosition) {
+    if (
+      this.canvasEvent.isAllowSelection &&
+      this.canvasEvent.mouseDownStartPosition
+    ) {
       // console.log('GlobalEvent - 检测到选区拖拽状态')
       const pageList = this.draw.getPageList()
       const pageNo = this.draw.getPageNo()
@@ -313,8 +370,14 @@ export class GlobalEvent {
       // console.log('GlobalEvent - canvasRect:', canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height)
 
       // 计算相对于当前 canvas 的位置，限制在 canvas 范围内
-      const clampedX = Math.max(0, Math.min(canvasRect.width, mouseX - canvasRect.left))
-      const clampedY = Math.max(0, Math.min(canvasRect.height, mouseY - canvasRect.top))
+      const clampedX = Math.max(
+        0,
+        Math.min(canvasRect.width, mouseX - canvasRect.left)
+      )
+      const clampedY = Math.max(
+        0,
+        Math.min(canvasRect.height, mouseY - canvasRect.top)
+      )
 
       // console.log('GlobalEvent - clampedX:', clampedX, 'clampedY:', clampedY)
 
@@ -393,19 +456,26 @@ export class GlobalEvent {
           offsetX: x,
           offsetY: y,
           preventDefault: () => {},
-          composedPath: () => [targetCanvas || foundTargetPageContainer, foundTargetPageContainer],
+          composedPath: () => [
+            targetCanvas || foundTargetPageContainer,
+            foundTargetPageContainer
+          ],
           target: targetCanvas || foundTargetPageContainer,
           type: 'mousemove'
         } as unknown as DragEvent
 
         // 查找目标编辑器的 CanvasEvent 实例
-        const targetEditorDom = foundTargetPageContainer.closest(`[${EDITOR_COMPONENT}]`)
+        const targetEditorDom = foundTargetPageContainer.closest(
+          `[${EDITOR_COMPONENT}]`
+        )
         // console.log('[GLOBAL MOUSEMOVE] targetEditorDom:', targetEditorDom)
         // console.log('[GLOBAL MOUSEMOVE] editorInstances keys:', Array.from(GlobalEvent.editorInstances.keys()))
         // console.log('[GLOBAL MOUSEMOVE] editorInstances size:', GlobalEvent.editorInstances.size)
 
         if (targetEditorDom) {
-          const targetCanvasEvent = GlobalEvent.editorInstances.get(targetEditorDom as Element)
+          const targetCanvasEvent = GlobalEvent.editorInstances.get(
+            targetEditorDom as Element
+          )
           // console.log('[GLOBAL MOUSEMOVE] targetCanvasEvent found:', !!targetCanvasEvent)
           if (targetCanvasEvent) {
             // console.log('[GLOBAL MOUSEMOVE] Calling target editor dragover')
@@ -463,25 +533,31 @@ export class GlobalEvent {
     }
 
     if (!foundTargetPageContainer) {
-      // console.log('[GLOBAL MOUSEUP] No target editor found')
+      // 源编辑器外部、且不在任何目标编辑器内：结束源编辑器选中状态
+      this.endSourceSelection()
       return
     }
 
-    const targetEditorDom = foundTargetPageContainer.closest(`[${EDITOR_COMPONENT}]`)
+    const targetEditorDom = foundTargetPageContainer.closest(
+      `[${EDITOR_COMPONENT}]`
+    )
     if (!targetEditorDom) {
-      // console.log('[GLOBAL MOUSEUP] Target editor DOM not found')
+      this.endSourceSelection()
       return
     }
 
-    const targetCanvasEvent = GlobalEvent.editorInstances.get(targetEditorDom as Element)
+    const targetCanvasEvent = GlobalEvent.editorInstances.get(
+      targetEditorDom as Element
+    )
     if (!targetCanvasEvent) {
-      // console.log('[GLOBAL MOUSEUP] Target editor CanvasEvent not found')
+      this.endSourceSelection()
       return
     }
 
     // 检查目标编辑器是否允许放置
     if (!targetCanvasEvent.isAllowDrop) {
-      // console.log('[GLOBAL MOUSEUP] Target editor does not allow drop')
+      // 目标编辑器不允许放置：结束源编辑器选中状态
+      this.endSourceSelection()
       return
     }
 
@@ -494,7 +570,7 @@ export class GlobalEvent {
     const cacheElementList = this.canvasEvent.cacheElementList
 
     if (!cacheRange || !cacheElementList) {
-      // console.log('[GLOBAL MOUSEUP] No cached drag data')
+      this.endSourceSelection()
       return
     }
 
@@ -504,9 +580,12 @@ export class GlobalEvent {
     const cacheStartIndex = isCacheRangeCollapsed ? startIndex - 1 : startIndex
     const cacheEndIndex = endIndex
 
-    const dragElementList = cacheElementList.slice(cacheStartIndex + 1, cacheEndIndex + 1)
+    const dragElementList = cacheElementList.slice(
+      cacheStartIndex + 1,
+      cacheEndIndex + 1
+    )
     if (!dragElementList.length) {
-      // console.log('[GLOBAL MOUSEUP] No drag elements')
+      this.endSourceSelection()
       return
     }
 
@@ -516,7 +595,7 @@ export class GlobalEvent {
     const targetRange = targetRangeManager.getRange()
 
     if (targetRange.startIndex < 0) {
-      // console.log('[GLOBAL MOUSEUP] Invalid target range')
+      this.endSourceSelection()
       return
     }
 
@@ -526,12 +605,31 @@ export class GlobalEvent {
     // 获取目标编辑器的元素列表
     const targetElementList = targetDraw.getElementList()
 
-    // 在目标位置插入元素
-    targetDraw.spliceElementList(targetElementList, targetRange.startIndex + 1, 0, replaceElementList)
+    // 跨编辑器列表策略：
+    // - 源编辑器的列表结构（如编辑器B的列表拖入不支持列表的编辑器A）拍平为
+    //   文字与换行，不带入列表样式；
+    // - 落点位于目标编辑器列表项中时（如内容拖进支持列表的编辑器B的列表内），
+    //   拍平后的文本继承落点列表属性，使拖入内容并入目标列表，
+    //   与同编辑器内拖拽的行为保持一致。
+    const insertIndex = targetRange.startIndex + 1
+    const processedElementList = applyCrossEditorListPolicy(
+      replaceElementList,
+      targetElementList,
+      insertIndex
+    )
+    // 插入点换行去重，避免拍平后的列表项标记在行尾产生多余空行
+    stripRedundantLeadingBreak(
+      processedElementList,
+      targetElementList[targetRange.startIndex]
+    )
 
-    // 从源编辑器删除原有元素
-    const sourceElementList = sourceDraw.getElementList()
-    sourceDraw.spliceElementList(sourceElementList, cacheStartIndex + 1, cacheEndIndex - cacheStartIndex)
+    // 在目标位置插入元素
+    targetDraw.spliceElementList(
+      targetElementList,
+      targetRange.startIndex + 1,
+      0,
+      processedElementList
+    )
 
     // 重置拖拽状态
     this.canvasEvent.setIsAllowDrag(false)
@@ -543,19 +641,31 @@ export class GlobalEvent {
     this.canvasEvent.cachePositionList = null
     this.canvasEvent.cachePositionContext = null
 
-    // 渲染源编辑器
-    sourceRangeManager.setRange(cacheStartIndex, cacheStartIndex)
-    sourceDraw.render({
-      isSetCursor: true,
-      isSubmitHistory: true
-    })
-
-    // 渲染目标编辑器
-    const newEndIndex = targetRange.startIndex + replaceElementList.length
+    // 渲染目标编辑器（复制/移动都会把内容插入目标）
+    const newEndIndex = targetRange.startIndex + processedElementList.length
     targetRangeManager.setRange(targetRange.startIndex, newEndIndex)
     targetDraw.render({
       isSetCursor: false,
       isSubmitHistory: true
+    })
+
+    // 按住 Ctrl / Cmd 时为“复制”模式：保留源编辑器内容；
+    // 默认（未按 Ctrl）为“移动”模式：从源编辑器删除被拖拽的内容
+    const isCopyMode = evt.ctrlKey || evt.metaKey
+    if (!isCopyMode) {
+      // 从源编辑器删除原有元素
+      const sourceElementList = sourceDraw.getElementList()
+      sourceDraw.spliceElementList(
+        sourceElementList,
+        cacheStartIndex + 1,
+        cacheEndIndex - cacheStartIndex
+      )
+    }
+    // 无论复制/移动，跨编辑器拖拽结束后都应结束源编辑器的选中状态
+    sourceRangeManager.setRange(cacheStartIndex, cacheStartIndex)
+    sourceDraw.render({
+      isSetCursor: true,
+      isSubmitHistory: !isCopyMode
     })
 
     // console.log('[GLOBAL MOUSEUP] Cross-editor drop completed!')

@@ -815,6 +815,7 @@ export class Draw {
     // 注意：必须与下方 render(isSubmitHistory:false) + submitHistory(curIndex) 配合，
     // 否则每个插入会同时产生“前”与“后”两条记录，导致 undo 步数与文档状态错位。
     if (isSubmitHistory && this.historyManager.isStackEmpty()) {
+      console.log('[DEBUG history] insertElementList 栈为空，记录基线(插入前)快照')
       this.submitHistory(undefined)
     }
     let curIndex = -1
@@ -866,6 +867,56 @@ export class Draw {
     }
   }
 
+  // 获取元素的“实际取值”，用于判断末尾/追加内容是否以换行结尾：
+  // - 列表元素：实际取值在 valueList 的最后一个元素中
+  // - 单选/多选/下拉等选择类控件：实际取值优先取 structValues，其次取选项值（依据 code 映射 valueSets）
+  // - 其余元素：直接取 value
+  private _getElementActualValue(element: IElement): string {
+    if (!element) return ''
+    // 列表元素：实际取值在 valueList 最后一个元素
+    if (element.type === ElementType.LIST) {
+      const valueList = element.valueList
+      if (Array.isArray(valueList) && valueList.length) {
+        const last = valueList[valueList.length - 1]
+        return last?.value ?? ''
+      }
+      return element.value
+    }
+    // 单选/多选/下拉等选择类控件
+    const control = element.control
+    if (
+      control &&
+      (control.type === ControlType.RADIO ||
+        control.type === ControlType.CHECKBOX ||
+        control.type === ControlType.SELECT ||
+        control.type === ControlType.CUSTOM_SELECT ||
+        control.type === ControlType.MULTI_CUSTOM_SELECT)
+    ) {
+      // 优先取结构化值
+      if (Array.isArray(control.structValues) && control.structValues.length) {
+        return control.structValues
+          .map(structValue => structValue.value)
+          .join('')
+      }
+      // 其次依据 code 从选项值（valueSets）中映射实际取值
+      const code = control.code
+      if (code) {
+        const delimiter = control.multiSelectDelimiter || ','
+        const valueSets = control.valueSets || []
+        return code
+          .split(delimiter)
+          .map(c => valueSets.find(valueSet => valueSet.code === c?.trim())?.value)
+          .filter((value): value is string => !!value)
+          .join(delimiter)
+      }
+      // 兜底：控件直接存储的纯文本值
+      if (typeof control.value === 'string' && control.value) {
+        return control.value
+      }
+    }
+    return element.value
+  }
+
   public appendElementList(
     elementList: IElement[],
     options: IAppendElementListOption = {}
@@ -882,6 +933,7 @@ export class Draw {
     // “append 前 / append 后”两个快照，导致同一内容在历史中出现两次（如 A 被记录两次）。
     // 非首个记录时，栈顶已是对应的“append 前”状态，无需重复记录。
     if (isSubmitHistory && this.historyManager.isStackEmpty()) {
+      console.log('[DEBUG history] appendElementList 栈为空，记录基线(append前)快照, 当前main长度=', this.elementList.length)
       this.submitHistory(undefined)
     }
     // 判断文档尾部是否处于列表上下文（用于续接列表，避免插入后中断或产生空行）
@@ -912,6 +964,84 @@ export class Draw {
     const isFirstAppendWrap =
       firstAppendElement?.value === ZERO &&
       (!firstAppendElement.type || firstAppendElement.type === ElementType.TEXT)
+    // 处理追加内容与主数据末尾的换行重复：
+    // 若主数据末尾“实际取值”以段落换行结尾（空值 / \n / ZERO 均视为段落换行），
+    // 且追加内容首个元素也是段落换行（空值 / \n / ZERO），
+    // 则忽略追加内容开头的换行，避免产生多余空段落（如把 \n1.\n 追加到行尾时
+    // 期望“1.”接在上一行而非另起一行）。
+    const lastMainElement = this.elementList[this.elementList.length - 1]
+    console.log(
+      '[appendElementList] debug start | isPrepend=' +
+        String(isPrepend) +
+        ' | lastMainElement=' +
+        (lastMainElement
+          ? JSON.stringify({
+              type: lastMainElement.type,
+              controlType: lastMainElement.control?.type,
+              value: lastMainElement.value,
+              valueListLen: lastMainElement.valueList?.length
+            })
+          : 'null') +
+        ' | firstAppendElement=' +
+        (firstAppendElement
+          ? JSON.stringify({
+              type: firstAppendElement.type,
+              value: firstAppendElement.value
+            })
+          : 'null')
+    )
+    if (!isPrepend && lastMainElement && firstAppendElement) {
+      const lastMainValue = this._getElementActualValue(lastMainElement)
+      const firstAppendValue = firstAppendElement.value || ''
+      // 主数据末尾是否以段落换行结尾
+      const lastEndsWithBreak =
+        lastMainValue === '' ||
+        lastMainValue === ZERO ||
+        lastMainValue.includes('\n')
+      // 追加内容首个元素是否为段落换行（普通文本且非列表标记）
+      const firstIsPlainText =
+        !firstAppendElement.type ||
+        firstAppendElement.type === ElementType.TEXT
+      const firstIsListMarker = !!firstAppendElement.listId
+      const firstIsBreak =
+        firstIsPlainText &&
+        !firstIsListMarker &&
+        (firstAppendValue === '' ||
+          firstAppendValue === ZERO ||
+          firstAppendValue.includes('\n'))
+      console.log(
+        '[appendElementList] compare | lastMainValue=' +
+          JSON.stringify(lastMainValue) +
+          ' | firstAppendValue=' +
+          JSON.stringify(firstAppendValue) +
+          ' | lastEndsWithBreak=' +
+          String(lastEndsWithBreak) +
+          ' | firstIsBreak=' +
+          String(firstIsBreak)
+      )
+      if (lastEndsWithBreak && firstIsBreak) {
+        if (firstAppendValue && firstAppendValue !== ZERO) {
+          const newValue = firstAppendValue.replace(/^\n+/, '')
+          if (newValue) {
+            firstAppendElement.value = newValue
+            console.log(
+              '[appendElementList] strip leading \\n | newValue=' +
+                JSON.stringify(newValue)
+            )
+          } else {
+            // 首个追加元素整体即为换行，直接移除，避免多余空段落
+            elementList.shift()
+            console.log('[appendElementList] shift first element (all \\n)')
+          }
+        } else {
+          // 首个追加元素整体为空（空段落标记）/ ZERO，直接移除
+          elementList.shift()
+          console.log('[appendElementList] shift first element (empty/ZERO)')
+        }
+      } else {
+        console.log('[appendElementList] no match, keep as is')
+      }
+    }
     // 最后一行是列表 && 追加内容以换行符开头：
     // 移除该换行符，并将后续内容继承列表信息，使其继续以列表形式追加；
     // 若最后一行不是列表，则保留换行符作为正常换行，避免错误续接。
@@ -1421,6 +1551,9 @@ export class Draw {
     const { isSetCursor = false, recordHistory = false } = options || {}
     // 记录本次 setValue 之前的内容，用于 recordHistory 撤销回原状态
     const oldData = recordHistory ? this.getValue() : null
+    console.log('[DEBUG history] setValue recordHistory=', recordHistory,
+      '调用前 undoStack长度=', this.historyManager.getUndoStack().length,
+      'main长度=', main?.length)
     const pageComponentData = [header, main, footer]
     pageComponentData.forEach(data => {
       if (!data) return
@@ -1436,6 +1569,8 @@ export class Draw {
     })
     // recordHistory=false 时清空历史（保持原默认行为）；true 时由下方追加，不清空
     if (!recordHistory) {
+      console.log('[DEBUG history] setValue(recordHistory=false) 清空整个撤销栈! 之前长度=',
+        this.historyManager.getUndoStack().length)
       this.historyManager.recovery()
     }
     const curIndex = isSetCursor
@@ -1452,6 +1587,7 @@ export class Draw {
     // - 栈为空（首次）：先压“设置前状态”作底（index 0 占位），再压“当前新状态”作顶；
     // - 栈非空：直接在顶上压“当前新状态”（其“设置前状态”已为当前栈顶，无需重复压入）。
     if (recordHistory && oldData) {
+      console.log('[DEBUG history] setValue(recordHistory=true) 压入 before/after 快照, 当前栈长=', this.historyManager.getUndoStack().length)
       // 撤销恢复“设置前”状态时，将光标落到恢复后内容的合法位置，
       // 避免旧 range 索引越界导致光标无法重绘（表现为撤销/重做后无法聚焦）。
       const oldMain = oldData.data?.main
@@ -2327,6 +2463,20 @@ export class Draw {
         x += metrics.width
       }
     }
+    // [DEBUG history] 单行可疑诊断：整段只生成一行且元素很多，
+    // 打印首元素宽度与 ctx.font，确认是否 metrics.width=0 导致不折行
+    if (rowList.length === 1 && elementList.length > 5) {
+      const _firstEl = rowList[0].elementList[0]
+      const _firstW = _firstEl?.metrics?.width ?? -1
+      console.log('[DEBUG history] computeRowList 单行可疑! rowList行数=',
+        rowList.length, 'elementList长度=', elementList.length,
+        '首元素value=', JSON.stringify(_firstEl?.value),
+        '首元素type=', _firstEl?.type,
+        '首元素metrics.width=', _firstW.toFixed(2),
+        'ctx.font=', ctx.font,
+        'defaultFont=', this.options.defaultFont,
+        'innerWidth=', innerWidth.toFixed(0))
+    }
     return rowList
   }
 
@@ -3196,6 +3346,40 @@ export class Draw {
       })
       // 页面信息
       this.pageRowList = this._computePageList()
+      // [DEBUG history] 段落折行诊断：统计每页行数、最长行元素数/宽度，判断是否单行不折行
+      {
+        const _paperW = this.getInnerWidth()
+        let _totalRows = 0
+        let _maxRowElems = 0
+        let _maxRowWidth = 0
+        let _maxRowPage = -1
+        let _overWidthRows = 0
+        const _rowCountByPage: number[] = []
+        this.pageRowList.forEach((rows, pi) => {
+          _totalRows += rows.length
+          _rowCountByPage[pi] = rows.length
+          rows.forEach(r => {
+            const w = r.width || 0
+            if (r.elementList.length > _maxRowElems) {
+              _maxRowElems = r.elementList.length
+              _maxRowWidth = w
+              _maxRowPage = pi
+            }
+            if (w > _paperW) _overWidthRows++
+          })
+        })
+        // 单行不折行特征：超宽行>0，或整文档只有1行（总行数===1 且 总元素多）
+        const _singleLineAnomaly = _overWidthRows > 0 ||
+          (_totalRows === 1 && this.elementList.length > 5)
+        console.log('[DEBUG history] 渲染后 pageRowList 来源=',
+          (isSourceHistory ? '历史恢复' : '正常编辑'),
+          'renderCount=', (this.renderCount || 0), '纸宽=', _paperW.toFixed(0),
+          '页数=', this.pageRowList.length, '每页行数=', JSON.stringify(_rowCountByPage),
+          '总行数=', _totalRows, '最长行元素数=', _maxRowElems,
+          '最长行宽度=', _maxRowWidth.toFixed(0), '最长行所在页=', _maxRowPage,
+          '超宽行数=', _overWidthRows, 'elementList长度=', this.elementList.length,
+          (_singleLineAnomaly ? ' <<< 疑似单行不折行异常' : ''))
+      }
       // 位置信息
       this.position.computePositionList()
       // 区域信息
@@ -3421,6 +3605,12 @@ export class Draw {
   public submitHistory(curIndex: number | undefined) {
     const positionContext = this.position.getPositionContext()
     const oldElementList = getSlimCloneElementList(this.elementList)
+    const _mainCount = this.elementList.length
+    const _breakCount = this.elementList.filter(e => e.value === '\n').length
+    const _controlCount = this.elementList.filter(e => e.control).length
+    console.log('[DEBUG history] submitHistory curIndex=', curIndex,
+      '栈长度=', this.historyManager.getUndoStack().length,
+      'main元素数=', _mainCount, '换行数=', _breakCount, '控件数=', _controlCount)
     const oldHeaderElementList = getSlimCloneElementList(
       this.header.getElementList()
     )

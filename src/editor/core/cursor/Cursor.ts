@@ -115,6 +115,12 @@ export class Cursor {
   public focus() {
     // 移动端只读模式禁用聚焦避免唤起输入法，web端允许聚焦避免事件无法捕获
     if (isMobile && this.draw.isReadonly()) return
+    // 预输入弹窗（@ 提及等）内的输入框正在编辑时，不抢回焦点，
+    // 否则 render 中的 cursor.focus() 会把焦点从弹窗输入框夺走，导致无法输入
+    const ae = document.activeElement as (HTMLElement | null)
+    if (ae && ae.closest && ae.closest('.ce-prefix-autocomplete')) {
+      return
+    }
     const container = this.draw.getContainer()
     const agentCursorDom = this.cursorAgent.getAgentCursorDom()
     // 多编辑器实例：聚焦当前实例前，先隐藏其他实例的光标，避免同时出现多个光标。
@@ -176,6 +182,12 @@ export class Cursor {
       setTimeout(() => {
         // 多编辑器实例：若焦点已落在“其他”实例，不抢回焦点（避免竞态）
         if (GlobalEvent.isActiveElementOtherEditor(container)) {
+          return
+        }
+        // 预输入弹窗（@ 提及等）内的输入框正在编辑时，不抢回焦点，
+        // 否则 render 中的 cursor.focus() 会把焦点从弹窗输入框夺走，导致无法输入
+        const ae = document.activeElement as (HTMLElement | null)
+        if (ae && ae.closest && ae.closest('.ce-prefix-autocomplete')) {
           return
         }
         this.focus()

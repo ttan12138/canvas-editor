@@ -8,6 +8,28 @@ import {
   IPrefixAutocompleteOption
 } from '../../interface/prefixAutocomplete/PrefixAutocomplete'
 
+// 解析带输入框占位符的模板字符串。
+// 占位符语法：{} （不限，按文本框）、{number}（数值框）、{text}（文本框）。
+// 例：'si: {};mi: {number}' -> segments=['si: ', ';mi: '], types=['', 'number']
+// 返回 segments 文本段与 types 占位符类型，types.length === segments.length - 1。
+function parseInputTemplate(value: string): {
+  segments: string[]
+  types: string[]
+} {
+  const segments: string[] = []
+  const types: string[] = []
+  const regex = /\{\s*(\w*)\s*\}/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(value)) !== null) {
+    segments.push(value.slice(lastIndex, match.index))
+    types.push((match[1] || '').toLowerCase())
+    lastIndex = regex.lastIndex
+  }
+  segments.push(value.slice(lastIndex))
+  return { segments, types }
+}
+
 export class PrefixAutocomplete {
   private draw: Draw
   private cursor: Cursor
@@ -15,6 +37,9 @@ export class PrefixAutocomplete {
   private configMap: Map<string, IPrefixAutocompleteOption>
   private dom: HTMLDivElement | null
   private itemDomList: HTMLDivElement[]
+  // 候选项索引 -> 数值输入框当前值（inputType==='number' 时生效）
+  // key 为 `${listIndex}`（单输入框旧用法）或 `${listIndex}:${localIndex}`（多占位符）
+  private inputValueMap: Map<string, string>
 
   private isOpen: boolean
   private activePrefix: string | null
@@ -31,6 +56,7 @@ export class PrefixAutocomplete {
     this.configMap = new Map()
     this.dom = null
     this.itemDomList = []
+    this.inputValueMap = new Map()
 
     this.isOpen = false
     this.activePrefix = null
@@ -131,9 +157,13 @@ export class PrefixAutocomplete {
     // 手动模式：由外部通过 setSearching/setList 自行驱动，不自动拉取
     if (config.manual) {
       this.renderList()
+      // 打开后下一帧再聚焦一次，覆盖编辑器渲染可能抢走焦点的情况
+      requestAnimationFrame(() => this.highlight())
       return
     }
     this.refresh()
+    // 打开后下一帧再聚焦一次，覆盖编辑器渲染（draw.render 的 cursor.focus）可能抢走焦点的情况
+    requestAnimationFrame(() => this.highlight())
   }
 
   // 预输入弹窗出现时，隐藏单选/多选/customSelect 控件下拉
@@ -149,11 +179,15 @@ export class PrefixAutocomplete {
       this.dom = null
     }
     this.itemDomList = []
+    this.inputValueMap = new Map()
     this.isOpen = false
     this.activePrefix = null
     this.activeIndex = 0
     this.list = null
     this.searching = false
+    // 弹窗关闭（ESC / 失焦 / 选中后）需把焦点还给编辑器，
+    // 否则焦点停留在已移除的输入框上 -> 光标虽闪烁但无法键入
+    this.draw.getCursor().focus()
   }
 
   // 下拉打开时继续输入普通字符：关闭下拉，字符照常写入
@@ -193,7 +227,55 @@ export class PrefixAutocomplete {
       return false
     }
     const item = this.list[this.activeIndex] || this.list[0]
-    this.replacePrefixWith(item.value)
+    // 输入框型候选：确认前读取各输入框值并回填到占位符
+    let text = item.value
+    const template = parseInputTemplate(item.value)
+    if (template.types.length > 0) {
+      // value 含占位符：按占位符顺序回填，类型决定输入框（仅影响渲染，回填逻辑一致）
+      let ok = true
+      const values: string[] = []
+      for (let i = 0; i < template.types.length; i++) {
+        const raw = (this.inputValueMap.get(`${this.activeIndex}:${i}`) ?? '').trim()
+        if (!raw) {
+          if (item.inputRequired) {
+            // 必填但未输入：高亮对应输入框并阻止确认
+            const inputs = this.itemDomList[this.activeIndex]?.querySelectorAll('input')
+            const target = inputs && (inputs[i] as HTMLInputElement)
+            if (target) {
+              target.focus()
+              target.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, .4)'
+            }
+            ok = false
+            break
+          }
+          values.push('')
+        } else {
+          values.push(raw)
+        }
+      }
+      if (!ok) return false
+      // 按占位符顺序回填（末尾文本段 template.segments[types.length] 拼接）
+      text = template.segments[0]
+      for (let i = 0; i < template.types.length; i++) {
+        text += values[i] + (item.unit ?? '') + template.segments[i + 1]
+      }
+    } else if (item.inputType === 'number') {
+      // 兼容旧用法：整项单个输入框（无占位符，inputType 声明为 number）
+      const raw = (this.inputValueMap.get(`${this.activeIndex}`) ?? '').trim()
+      if (!raw) {
+        if (item.inputRequired) {
+          const input = this.itemDomList[this.activeIndex]?.querySelector('input')
+          if (input) {
+            ;(input as HTMLInputElement).focus()
+            input.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, .4)'
+          }
+          return false
+        }
+      } else {
+        text = item.value + raw + (item.unit ?? '')
+      }
+    }
+    this.replacePrefixWith(text)
     this.close()
     return true
   }
@@ -327,15 +409,98 @@ export class PrefixAutocomplete {
     this.list.forEach((item, index) => {
       const itemDom = document.createElement('div')
       itemDom.classList.add(`${EDITOR_PREFIX}-prefix-autocomplete-item`)
-      const span = document.createElement('span')
-      const label = item.label ?? item.value
-      if (item.html) {
-        // 支持 HTML 渲染（v-html 效果）
-        span.innerHTML = label
+      // 输入框型候选：
+      // - value 含占位符 {} / {number} / {text} -> 按占位符拆分成文本段 + 对应类型输入框
+      // - 否则若 inputType==='number' -> 整项末尾追加一个数值框（旧用法兼容）
+      // 注意：占位符可能带类型名（如 {number}），需用正则判断是否包含任意 "{}" 占位符
+      const hasTemplate = /\{\s*\w*\s*\}/.test(item.value)
+      const template = hasTemplate
+        ? parseInputTemplate(item.value)
+        : (item.inputType === 'number'
+          ? { segments: [item.value, ''], types: ['number'] }
+          : null)
+      // 无输入框：纯文本/HTML 展示
+      if (!template) {
+        const span = document.createElement('span')
+        if (item.html) {
+          span.innerHTML = item.label ?? item.value
+        } else {
+          span.textContent = item.label ?? item.value
+        }
+        itemDom.append(span)
       } else {
-        span.textContent = label
+        template.segments.forEach((seg, segIndex) => {
+          if (seg) {
+            const span = document.createElement('span')
+            if (item.html) {
+              span.innerHTML = seg
+            } else {
+              span.textContent = seg
+            }
+            itemDom.append(span)
+          }
+          // 每个文本段后（最后一个段之后不插）放一个输入框
+          if (segIndex < template.types.length) {
+            const inputType = template.types[segIndex] === 'number' ? 'number' : 'text'
+            const input = document.createElement('input')
+            input.type = inputType
+            input.classList.add(`${EDITOR_PREFIX}-prefix-autocomplete-input`)
+            input.style.width = inputType === 'number' ? '64px' : '100px'
+            input.style.height = '22px'
+            input.style.marginLeft = '4px'
+            input.style.marginRight = '4px'
+            input.style.padding = '0 4px'
+            input.style.fontSize = '13px'
+            input.style.outline = 'none'
+            input.placeholder = item.inputPlaceholder ?? (inputType === 'number' ? '请输入数值' : '请输入文本')
+            const mapKey = `${index}:${segIndex}`
+            input.value = item.inputValue ?? this.inputValueMap.get(mapKey) ?? ''
+            this.inputValueMap.set(mapKey, input.value)
+            const syncValue = () => this.inputValueMap.set(mapKey, input.value)
+            input.oninput = syncValue
+            input.onmousedown = evt => {
+              // 点击输入框本身不触发候选确认/关闭
+              evt.stopPropagation()
+            }
+            input.onfocus = () => {
+              input.style.boxShadow = '0 0 0 2px rgba(25, 55, 88, .2)'
+            }
+            input.onblur = () => {
+              input.style.boxShadow = 'none'
+            }
+            input.onkeydown = evt => {
+              // 阻止键盘事件冒泡到编辑器（避免上下键/回车被下拉导航接管）
+              evt.stopPropagation()
+              if (evt.key === 'Enter') {
+                evt.preventDefault()
+                this.activeIndex = index
+                this.confirm()
+              } else if (evt.key === 'Escape') {
+                evt.preventDefault()
+                this.close()
+              } else if (evt.key === 'ArrowUp') {
+                // 输入框内按上键：切换到上一项（焦点由 highlight 自动转移到新项的输入框）
+                evt.preventDefault()
+                this.moveSelection(-1)
+              } else if (evt.key === 'ArrowDown') {
+                evt.preventDefault()
+                this.moveSelection(1)
+              } else if (evt.key === 'Tab') {
+                // 同一候选项有多个输入框时，Tab 在它们之间循环切换焦点
+                evt.preventDefault()
+                const inputs = input.parentElement?.querySelectorAll('input')
+                if (inputs && inputs.length > 1) {
+                  const list = Array.from(inputs) as HTMLInputElement[]
+                  const idx = list.indexOf(input)
+                  const nextInput = list[(idx + 1) % list.length]
+                  nextInput.focus()
+                }
+              }
+            }
+            itemDom.append(input)
+          }
+        })
       }
-      itemDom.append(span)
       itemDom.onmousedown = (evt: MouseEvent) => {
         // 阻止输入框失焦导致的关闭
         evt.preventDefault()
@@ -345,6 +510,16 @@ export class PrefixAutocomplete {
       this.itemDomList.push(itemDom)
       this.dom!.append(itemDom)
     })
+    // 底部操作提示：仅当配置显式声明 hint 时展示（默认不展示）
+    const hintConfig = this.activePrefix
+      ? this.configMap.get(this.activePrefix)
+      : null
+    if (hintConfig?.hint) {
+      const hintDom = document.createElement('div')
+      hintDom.className = `${EDITOR_PREFIX}-prefix-autocomplete-hint`
+      hintDom.textContent = hintConfig.hint
+      this.dom!.append(hintDom)
+    }
     this.highlight()
     // 列表内容/高度变化后重新贴边定位
     this.position()
@@ -361,6 +536,20 @@ export class PrefixAutocomplete {
     const activeDom = this.itemDomList[this.activeIndex]
     if (activeDom && this.dom) {
       this.dom.scrollTop = activeDom.offsetTop - this.dom.clientHeight / 2
+    }
+    // 打开列表 / 切换选项时，聚焦激活项内的第一个输入框（若有），
+    // 便于用户直接输入数值 / 文本，无需额外点击
+    const firstInput = activeDom?.querySelector('input') as HTMLInputElement | null
+    if (firstInput) {
+      // 同步聚焦（input 已挂载到 document.body，可直接聚焦）
+      firstInput.focus()
+      // 兜底：若被编辑器其它同步/异步逻辑（如画布重渲染）抢走焦点，再补一次
+      setTimeout(() => {
+        const stillActive = this.itemDomList[this.activeIndex]?.querySelector('input')
+        if (stillActive && document.activeElement !== stillActive) {
+          stillActive.focus()
+        }
+      }, 0)
     }
   }
 }

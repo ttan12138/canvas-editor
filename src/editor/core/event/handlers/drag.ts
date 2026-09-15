@@ -3,6 +3,7 @@ import { ElementType } from '../../../dataset/enum/Element'
 import { findParent } from '../../../utils'
 import { CanvasEvent } from '../CanvasEvent'
 import { IElement } from '../../../interface/Element'
+import { setDragSourceDraw } from '../dragState'
 
 function dragover(evt: DragEvent | MouseEvent, host: CanvasEvent) {
   const draw = host.getDraw()
@@ -80,6 +81,8 @@ function dragover(evt: DragEvent | MouseEvent, host: CanvasEvent) {
 function dragstart(evt: DragEvent, host: CanvasEvent) {
   const draw = host.getDraw()
   if (draw.isReadonly()) return
+  // 记录拖拽源编辑器实例，供 drop 时判断是否为跨编辑器拖拽
+  setDragSourceDraw(draw)
   const rangeManager = draw.getRange()
   const range = rangeManager.getRange()
   const { startIndex, endIndex } = range
@@ -89,6 +92,10 @@ function dragstart(evt: DragEvent, host: CanvasEvent) {
     startIndex + 1,
     endIndex + 1
   )
+  console.log('[DEBUG drag] dragstart 拖出元素列表 startIndex=', startIndex, 'endIndex=', endIndex,
+    '元素=', dragElementList.map(e => ({
+      type: e.type, value: e.value, control: e.control?.type, listId: e.listId, listType: e.listType
+    })))
   if (!dragElementList.length) return
   try {
     const data = JSON.stringify(dragElementList)

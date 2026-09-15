@@ -27,6 +27,32 @@ export function setRangeCache(host: CanvasEvent) {
   host.cachePositionContext = position.getPositionContext()
 }
 
+// 兜底判定：鼠标是否落在已有选区内。
+// getIsPointInRange 仅做逐字符精确包围盒命中，点在选中行内上下空白或略微偏离字形时会漏判，
+// 导致本应“移动选区”的拖拽被误判为“重新编辑选中范围”。这里用最近元素索引是否在选区内做兜底，
+// 使在已选中文字上按下能稳定进入移动拖拽。
+function isMouseInSelection(
+  evt: MouseEvent,
+  host: CanvasEvent,
+  range: { startIndex: number; endIndex: number }
+): boolean {
+  const { startIndex, endIndex } = range
+  if (startIndex === endIndex) return false
+  const draw = host.getDraw()
+  const position = draw.getPosition()
+  // 表格选区命中较复杂，仍交给 getIsPointInRange 处理
+  if (position.getPositionContext().isTable) return false
+  const positionResult = position.getPositionByXY({
+    x: evt.offsetX,
+    y: evt.offsetY,
+    pageNo: draw.getPageNo()
+  })
+  const index = positionResult.index
+  if (!~index) return false
+  // 选中元素范围为 [startIndex + 1, endIndex]
+  return index > startIndex && index <= endIndex
+}
+
 export function hitCheckbox(element: IElement, draw: Draw) {
   const { checkbox, control } = element
   // 复选框不在控件内独立控制
@@ -81,10 +107,9 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
   // 是否是选区拖拽
   if (!host.isAllowDrag) {
     if (!isReadonly && range.startIndex !== range.endIndex) {
-      const isPointInRange = rangeManager.getIsPointInRange(
-        evt.offsetX,
-        evt.offsetY
-      )
+      const isPointInRange =
+        rangeManager.getIsPointInRange(evt.offsetX, evt.offsetY) ||
+        isMouseInSelection(evt, host, range)
       if (isPointInRange) {
         setRangeCache(host)
         return

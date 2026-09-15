@@ -8,7 +8,10 @@ import {
   TEXTLIKE_ELEMENT_TYPE
 } from '../../../../dataset/constant/Element'
 import { ControlComponent, ControlType } from '../../../../dataset/enum/Control'
-import { ControlRenderMode, EditorComponent } from '../../../../dataset/enum/Editor'
+import {
+  ControlRenderMode,
+  EditorComponent
+} from '../../../../dataset/enum/Editor'
 import { ElementType } from '../../../../dataset/enum/Element'
 import { KeyMap } from '../../../../dataset/enum/KeyMap'
 import { DeepRequired } from '../../../../interface/Common'
@@ -217,10 +220,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       .join('')
     // 控件已清空：移除所有选项
     if (!newText) {
-      this.control.setControlProperties(
-        { values: [], value: null },
-        context
-      )
+      this.control.setControlProperties({ values: [], value: null }, context)
       return
     }
     // 旧文本：选项有 structValues 时用其文字，否则用 value 字段
@@ -255,7 +255,10 @@ export class MultiCustomSelectControl implements IControlInstance {
       newParts.forEach(partText => {
         const matchedOld = oldValues.find(v => getOptionText(v) === partText)
         if (matchedOld) {
-          const newOption: IControlSelectValue = { ...matchedOld, value: partText }
+          const newOption: IControlSelectValue = {
+            ...matchedOld,
+            value: partText
+          }
           if (matchedOld.structValues?.length) {
             const synced = applyTextDiffToStructSegments(
               matchedOld.structValues,
@@ -659,7 +662,8 @@ export class MultiCustomSelectControl implements IControlInstance {
       const rangeManager = draw.getRange()
       // 找到控件末尾位置（POSTFIX 后面）
       let endIndex = newIndex
-      const curElementList = context.elementList || this.control.getElementList()
+      const curElementList =
+        context.elementList || this.control.getElementList()
       while (endIndex < curElementList.length - 1) {
         const nextElement = curElementList[endIndex + 1]
         if (nextElement.controlId === this.element.controlId) {
@@ -701,13 +705,15 @@ export class MultiCustomSelectControl implements IControlInstance {
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
     // 阻止 mousedown/click 冒泡至 document，避免编辑器全局失焦逻辑/宿主页面的全局点击处理销毁弹窗，
     // 保证弹窗内数值输入框可正常聚焦
-    selectPopupContainer.addEventListener('mousedown', (e) => {
+    selectPopupContainer.addEventListener('mousedown', e => {
       // 记录本次按下是否发生在数值输入框上：click 的 target 是 mousedown/mouseup 的公共祖先，
       // 按下在 input、抬起在父容器时 click target 会变成 SPAN，需借此标志识别
-      ;(selectPopupContainer as any).__ceMousedownOnInput = !!(e.target as HTMLElement).closest?.('input')
+      ;(selectPopupContainer as any).__ceMousedownOnInput = !!(
+        e.target as HTMLElement
+      ).closest?.('input')
       e.stopPropagation()
     })
-    selectPopupContainer.addEventListener('click', (e) => {
+    selectPopupContainer.addEventListener('click', e => {
       e.stopPropagation()
     })
     selectPopupContainer.style.display = 'flex'
@@ -722,7 +728,10 @@ export class MultiCustomSelectControl implements IControlInstance {
     ul.style.padding = '0'
 
     const selectedCodes = new Set(this.getCodes())
-    const checkboxMap = new Map<string, { li: HTMLLIElement; checkbox: HTMLSpanElement }>()
+    const checkboxMap = new Map<
+      string,
+      { li: HTMLLIElement; checkbox: HTMLSpanElement }
+    >()
     const inputValues = new Map<string, string>()
     const inputElements = new Map<string, HTMLInputElement[]>()
 
@@ -761,15 +770,17 @@ export class MultiCustomSelectControl implements IControlInstance {
 
       const isChecked = selectedCodes.has(valueSet.code)
       if (isChecked) {
-        checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
-        checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
+        checkbox.style.backgroundColor =
+          'var(--ce-selector-checkbox-bg, #409EFF)'
+        checkbox.style.borderColor =
+          'var(--ce-selector-checkbox-border, #409EFF)'
         const checkmark = document.createElement('span')
         checkmark.style.position = 'absolute'
         checkmark.style.left = '4px'
         checkmark.style.top = '2px'
         checkmark.style.width = '6px'
         checkmark.style.height = '10px'
-        checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
+        checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white)'
         checkmark.style.borderWidth = '0 2px 2px 0'
         checkmark.style.transform = 'rotate(45deg)'
         checkmark.style.boxSizing = 'content-box'
@@ -782,7 +793,10 @@ export class MultiCustomSelectControl implements IControlInstance {
 
       const multiUnitMatch = detectMultiUnitPattern(valueSet.value)
 
-      if (multiUnitMatch && multiUnitMatch.parts.some(p => p.type === 'input')) {
+      if (
+        multiUnitMatch &&
+        multiUnitMatch.parts.some(p => p.type === 'input')
+      ) {
         const contentContainer = document.createElement('span')
         contentContainer.style.display = 'flex'
         contentContainer.style.alignItems = 'center'
@@ -794,7 +808,7 @@ export class MultiCustomSelectControl implements IControlInstance {
         // 用于跟踪输入框索引
         let inputIndex = 0
 
-        multiUnitMatch.parts.forEach((part) => {
+        multiUnitMatch.parts.forEach(part => {
           if (part.type === 'text') {
             // 文本部分
             const textSpan = document.createElement('span')
@@ -836,7 +850,7 @@ export class MultiCustomSelectControl implements IControlInstance {
               input.style.boxShadow = 'none'
             }
 
-            input.onkeydown = (e) => {
+            input.onkeydown = e => {
               e.stopPropagation()
               if (e.key === KeyMap.TAB) {
                 e.preventDefault()
@@ -853,21 +867,25 @@ export class MultiCustomSelectControl implements IControlInstance {
                 if (isCurrentlyChecked) {
                   selectedCodes.delete(valueSet.code)
                   checkbox.style.backgroundColor = ''
-                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6) !important'
+                  checkbox.style.borderColor =
+                    'var(--ce-selector-checkbox-border, #DCDFE6)'
                   const checkmark = checkbox.querySelector('span')
                   if (checkmark) checkmark.remove()
                   li.classList.remove('active')
-                  } else {
+                } else {
                   selectedCodes.add(valueSet.code)
-                  checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
-                  checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
+                  checkbox.style.backgroundColor =
+                    'var(--ce-selector-checkbox-bg, #409EFF)'
+                  checkbox.style.borderColor =
+                    'var(--ce-selector-checkbox-border, #409EFF)'
                   const checkmark = document.createElement('span')
                   checkmark.style.position = 'absolute'
                   checkmark.style.left = '4px'
                   checkmark.style.top = '0px'
                   checkmark.style.width = '6px'
                   checkmark.style.height = '10px'
-                  checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
+                  checkmark.style.border =
+                    'solid var(--ce-selector-checkbox-mark, white)'
                   checkmark.style.borderWidth = '0 2px 2px 0'
                   checkmark.style.transform = 'rotate(45deg)'
                   checkmark.style.boxSizing = 'content-box'
@@ -953,13 +971,13 @@ export class MultiCustomSelectControl implements IControlInstance {
       }
 
       li.onmouseenter = () => {
-        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD) !important'
+        li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD)'
       }
       li.onmouseleave = () => {
         li.style.backgroundColor = ''
       }
 
-      li.onclick = (e) => {
+      li.onclick = e => {
         // click target 可能是 input 的父容器（mousedown 在 input、mouseup 在容器时公共祖先为 SPAN），
         // 仅判断 tagName === 'INPUT' 会误放行，导致点击输入框时触发选中并销毁弹窗
         const isInputInteraction =
@@ -969,7 +987,9 @@ export class MultiCustomSelectControl implements IControlInstance {
           return
         }
 
-        const hasInput = inputElements.has(valueSet.code) && inputElements.get(valueSet.code)!.length > 0
+        const hasInput =
+          inputElements.has(valueSet.code) &&
+          inputElements.get(valueSet.code)!.length > 0
         if (hasInput) {
           const inputs = inputElements.get(valueSet.code)!
           inputs.forEach(input => input.blur())
@@ -981,21 +1001,25 @@ export class MultiCustomSelectControl implements IControlInstance {
         if (isCurrentlyChecked) {
           selectedCodes.delete(valueSet.code)
           checkbox.style.backgroundColor = ''
-          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #DCDFE6) !important'
+          checkbox.style.borderColor =
+            'var(--ce-selector-checkbox-border, #DCDFE6)'
           const checkmark = checkbox.querySelector('span')
           if (checkmark) checkmark.remove()
           li.classList.remove('active')
         } else {
           selectedCodes.add(valueSet.code)
-          checkbox.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
-          checkbox.style.borderColor = 'var(--ce-selector-checkbox-border, #409EFF) !important'
+          checkbox.style.backgroundColor =
+            'var(--ce-selector-checkbox-bg, #409EFF)'
+          checkbox.style.borderColor =
+            'var(--ce-selector-checkbox-border, #409EFF)'
           const checkmark = document.createElement('span')
           checkmark.style.position = 'absolute'
           checkmark.style.left = '4px'
           checkmark.style.top = '0px'
           checkmark.style.width = '6px'
           checkmark.style.height = '10px'
-          checkmark.style.border = 'solid var(--ce-selector-checkbox-mark, white) !important'
+          checkmark.style.border =
+            'solid var(--ce-selector-checkbox-mark, white)'
           checkmark.style.borderWidth = '0 2px 2px 0'
           checkmark.style.transform = 'rotate(45deg)'
           checkmark.style.boxSizing = 'content-box'
@@ -1030,7 +1054,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     const delimiterLabel = document.createElement('span')
     delimiterLabel.textContent = ''
     delimiterLabel.style.fontSize = '12px'
-    delimiterLabel.style.color = 'var(--ce-selector-option-color, #606266) !important'
+    delimiterLabel.style.color = 'var(--ce-selector-option-color, #606266)'
     delimiterContainer.appendChild(delimiterLabel)
 
     const delimiters = [',', ';', '，']
@@ -1040,19 +1064,29 @@ export class MultiCustomSelectControl implements IControlInstance {
       delimBtn.textContent = delim
       delimBtn.style.padding = '2px 8px'
       delimBtn.style.fontSize = '12px'
-      delimBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6) !important'
+      delimBtn.style.border =
+        '1px solid var(--ce-selector-checkbox-border, #DCDFE6)'
       delimBtn.style.borderRadius = '3px'
-      delimBtn.style.backgroundColor = delim === currentDelimiter ? 'var(--ce-selector-checkbox-bg, #409EFF) !important' : 'var(--ce-selector-popup-bg, #fff) !important'
-      delimBtn.style.color = 'var(--ce-selector-option-color, #606266) !important'
+      delimBtn.style.backgroundColor =
+        delim === currentDelimiter
+          ? 'var(--ce-selector-checkbox-bg, #409EFF)'
+          : 'var(--ce-selector-popup-bg, #fff)'
+      delimBtn.style.color = 'var(--ce-selector-option-color, #606266)'
       delimBtn.style.cursor = 'pointer'
       delimBtn.style.outline = 'none'
-      delimBtn.onclick = (e) => {
+      delimBtn.onclick = e => {
         e.stopPropagation()
         delimiters.forEach(d => {
-          const btn = delimiterContainer.querySelector(`button[data-delim="${d}"]`) as HTMLButtonElement
+          const btn = delimiterContainer.querySelector(
+            `button[data-delim="${d}"]`
+          ) as HTMLButtonElement
           if (btn) {
-            btn.style.backgroundColor = d === delim ? 'var(--ce-selector-checkbox-bg, #409EFF) !important' : 'var(--ce-selector-popup-bg, #fff) !important'
-            btn.style.color = d === delim ? '#fff' : 'var(--ce-selector-option-color, #606266) !important'
+            btn.style.backgroundColor =
+              d === delim
+                ? 'var(--ce-selector-checkbox-bg, #409EFF)'
+                : 'var(--ce-selector-popup-bg, #fff)'
+            btn.style.color =
+              d === delim ? '#fff' : 'var(--ce-selector-option-color, #606266)'
           }
         })
         ;(selectPopupContainer as any).currentDelimiter = delim
@@ -1070,13 +1104,14 @@ export class MultiCustomSelectControl implements IControlInstance {
     confirmBtn.style.fontSize = '12px'
     confirmBtn.style.border = 'none'
     confirmBtn.style.borderRadius = '4px'
-    confirmBtn.style.border = '1px solid var(--ce-selector-checkbox-border, #DCDFE6) !important'
-    confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
+    confirmBtn.style.border =
+      '1px solid var(--ce-selector-checkbox-border, #DCDFE6)'
+    confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF)'
     confirmBtn.style.color = '#000'
     confirmBtn.style.cursor = 'pointer'
     confirmBtn.style.outline = 'none'
     confirmBtn.style.whiteSpace = 'nowrap'
-    confirmBtn.onclick = (e) => {
+    confirmBtn.onclick = e => {
       e.stopPropagation()
 
       // 从 DOM 输入框读取最新值，确保数据同步
@@ -1104,13 +1139,19 @@ export class MultiCustomSelectControl implements IControlInstance {
         codesArray = [valueSets[0].code]
       }
       const delimiterChanged = delimiter !== currentDelimiter
-      this.setSelectWithInputValues(codesArray, inputValues, delimiter, delimiterChanged)
+      this.setSelectWithInputValues(
+        codesArray,
+        inputValues,
+        delimiter,
+        delimiterChanged
+      )
     }
     confirmBtn.onmouseenter = () => {
-      confirmBtn.style.backgroundColor = 'var(--ce-selector-active-bg, #66B1FF) !important'
+      confirmBtn.style.backgroundColor = 'var(--ce-selector-active-bg, #66B1FF)'
     }
     confirmBtn.onmouseleave = () => {
-      confirmBtn.style.backgroundColor = 'var(--ce-selector-checkbox-bg, #409EFF) !important'
+      confirmBtn.style.backgroundColor =
+        'var(--ce-selector-checkbox-bg, #409EFF)'
     }
     bottomBar.appendChild(confirmBtn)
 
@@ -1119,26 +1160,82 @@ export class MultiCustomSelectControl implements IControlInstance {
     selectPopupContainer.style.zIndex = '1000'
     // 统一使用 options.selector 配置的颜色（通过 CSS 变量注入，select.css 消费）
     const selectorOption = this.options.selector
-    selectPopupContainer.style.setProperty('--ce-selector-popup-bg', selectorOption.popupBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-color', selectorOption.optionColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-hover-bg', selectorOption.optionHoverBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-option-hover-color', selectorOption.optionHoverColor)
-    selectPopupContainer.style.setProperty('--ce-selector-active-color', selectorOption.activeOptionColor)
-    selectPopupContainer.style.setProperty('--ce-selector-active-bg', selectorOption.activeOptionBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-border', selectorOption.inputBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-hover-border', selectorOption.inputHoverBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-active-border', selectorOption.inputActiveBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-placeholder', selectorOption.inputPlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-hover-placeholder', selectorOption.inputHoverPlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-input-active-placeholder', selectorOption.inputActivePlaceholderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-bg', selectorOption.checkboxBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-divider', selectorOption.dividerColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-border', selectorOption.checkboxBorderColor)
-    selectPopupContainer.style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
-    selectPopupContainer.style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
-    selectPopupContainer.style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
-    selectPopupContainer.style.backgroundColor = 'var(--ce-selector-popup-bg, #fff) !important'
-    selectPopupContainer.style.border = '1px solid var(--ce-selector-active-bg, #e2e6ed) !important'
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-bg',
+      selectorOption.popupBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-color',
+      selectorOption.optionColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-hover-bg',
+      selectorOption.optionHoverBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-option-hover-color',
+      selectorOption.optionHoverColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-active-color',
+      selectorOption.activeOptionColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-active-bg',
+      selectorOption.activeOptionBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-border',
+      selectorOption.inputBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-hover-border',
+      selectorOption.inputHoverBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-active-border',
+      selectorOption.inputActiveBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-placeholder',
+      selectorOption.inputPlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-hover-placeholder',
+      selectorOption.inputHoverPlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-input-active-placeholder',
+      selectorOption.inputActivePlaceholderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-bg',
+      selectorOption.checkboxBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-divider',
+      selectorOption.dividerColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-border',
+      selectorOption.checkboxBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-mark',
+      selectorOption.checkboxMarkColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-arrow-bg',
+      selectorOption.arrowBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-arrow-color',
+      selectorOption.arrowColor
+    )
+    selectPopupContainer.style.backgroundColor =
+      'var(--ce-selector-popup-bg, #fff)'
+    selectPopupContainer.style.border =
+      '1px solid var(--ce-selector-active-bg, #e2e6ed)'
     selectPopupContainer.style.borderRadius = '4px'
     selectPopupContainer.style.boxShadow = '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
 
@@ -1188,7 +1285,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     if (!hint) {
       hint = document.createElement('div')
       hint.className = 'select-hint'
-      hint.textContent = '按 Tab 键切换到下一个输入框，按 Enter 键确认选择，按 Esc 键退出'
+      hint.textContent =
+        '按 Tab 键切换到下一个输入框，按 Enter 键确认选择，按 Esc 键退出'
       hint.style.padding = '8px 12px'
       hint.style.backgroundColor = '#FFFBE6'
       hint.style.borderTop = '1px solid #E4E7ED'
@@ -1196,6 +1294,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       hint.style.color = '#E6A23C'
       hint.style.whiteSpace = 'nowrap'
       hint.style.borderRadius = '0 0 4px 4px'
+      hint.style.textWrap = 'auto'
       container.appendChild(hint)
     }
     hint.style.display = 'block'
@@ -1208,7 +1307,10 @@ export class MultiCustomSelectControl implements IControlInstance {
     }
   }
 
-  private navigateToNextInput(container: HTMLDivElement, currentInput: HTMLInputElement): void {
+  private navigateToNextInput(
+    container: HTMLDivElement,
+    currentInput: HTMLInputElement
+  ): void {
     const inputs = Array.from(container.querySelectorAll('input'))
     const currentIndex = inputs.indexOf(currentInput)
     const nextIndex = (currentIndex + 1) % inputs.length
@@ -1241,13 +1343,16 @@ export class MultiCustomSelectControl implements IControlInstance {
         let newValue = ''
         let inputIndex = 0
 
-        unitMatch.parts.forEach((part) => {
+        unitMatch.parts.forEach(part => {
           if (part.type === 'text') {
             newValue += part.text || ''
           } else if (part.type === 'input') {
             const inputKey = `${code}_${inputIndex}`
             const inputValue = inputValues.get(inputKey)
-            newValue += (inputValue && inputValue.trim() !== '' ? inputValue.trim() : part.value || '')
+            newValue +=
+              inputValue && inputValue.trim() !== ''
+                ? inputValue.trim()
+                : part.value || ''
             newValue += part.unit || ''
             inputIndex++
           }
@@ -1264,13 +1369,16 @@ export class MultiCustomSelectControl implements IControlInstance {
       }
     }
 
-
     // 如果值有变化，或分隔符发生变化，需要强制更新正文
     if (hasValueChanged || forceUpdate) {
       // 清除缓存，确保获取最新值
       this.valueSetCache.delete(this.element.controlId || '')
       // 调用 setSelect 并强制更新
-      this.setSelect(newCodesWithValues.join(delimiter), {}, { isForceUpdate: true })
+      this.setSelect(
+        newCodesWithValues.join(delimiter),
+        {},
+        { isForceUpdate: true }
+      )
     } else {
       this.setSelect(newCodesWithValues.join(delimiter))
     }
