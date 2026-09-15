@@ -120,10 +120,12 @@
 /* 弹窗底部操作提示（仅当配置 hint 时展示）：参考多选弹窗 select-hint 风格 */
 .ce-prefix-autocomplete-hint {
   padding: 8px 12px;
-  background-color: #fffbe6;
+  background-color: var(--ce-selector-hint-bg, #fffbe6) !important;
   border-top: 1px solid #e4e7ed;
   font-size: 12px;
-  color: #e6a23c;
+  color: var(--ce-selector-hint-color, #e6a23c) !important;
   white-space: nowrap;
   border-radius: 0 0 4px 4px;
+  position: sticky;
+  bottom: 0px;
 }
