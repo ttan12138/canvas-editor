@@ -51,7 +51,9 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
   if (draw.isReadonly()) return
   // 可输入性验证
   const rangeManager = draw.getRange()
-  if (!rangeManager.getIsCanInput()) return
+  if (!rangeManager.getIsCanInput()) {
+    return
+  }
   const { startIndex, endIndex, isCrossRowCol } = rangeManager.getRange()
   // 隐藏控件删除
   const elementList = draw.getElementList()

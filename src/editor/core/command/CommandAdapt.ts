@@ -31,6 +31,9 @@ import { VerticalAlign } from '../../dataset/enum/VerticalAlign'
 import { ICatalog } from '../../interface/Catalog'
 import { DeepRequired } from '../../interface/Common'
 import {
+  IAddControlOption,
+  IControl,
+  IControlNumber,
   IGetControlValueOption,
   IGetControlValueResult,
   ILocationControlOption,
@@ -39,6 +42,9 @@ import {
   ISetControlHighlightOption,
   ISetControlProperties,
   ISetControlValueOption,
+  ISetControlValueSetsOption,
+  ISetNumberRangeOption,
+  ISetControlAssociationIdOption,
   IGroupTextItem
 } from '../../interface/Control'
 import {
@@ -2591,6 +2597,15 @@ export class CommandAdapt {
     this.draw.getControl().setValueListById(payload)
   }
 
+  // 修改单选 / 多选控件的可选项
+  public setControlValueSets(payload: ISetControlValueSetsOption) {
+    this.draw.getControl().setValueSetsListById([payload])
+  }
+
+  public setControlValueSetsList(payload: ISetControlValueSetsOption[]) {
+    this.draw.getControl().setValueSetsListById(payload)
+  }
+
   public setControlExtension(payload: ISetControlExtensionOption) {
     this.draw.getControl().setExtensionListById([payload])
   }
@@ -2605,6 +2620,67 @@ export class CommandAdapt {
 
   public setControlPropertiesList(payload: ISetControlProperties[]) {
     this.draw.getControl().setPropertiesListById(payload)
+  }
+
+  // 更新数值控件的最大/最小值（合并保留已有的 numberExclusiveOptions）
+  public setNumberRange(payload: ISetNumberRangeOption) {
+    const { id, groupId, conceptId, areaId, min, max, calculatorDisabled } =
+      payload
+    const elementList = this.draw.getElementList()
+    // 读取目标控件已有的 numberExclusiveOptions，避免覆盖 calculatorDisabled
+    let existing: IControlNumber['numberExclusiveOptions']
+    const visit = (list: IElement[]) => {
+      for (const el of list) {
+        if (el.type === ElementType.TABLE && el.trList) {
+          for (const tr of el.trList) {
+            for (const td of tr.tdList) {
+              visit(td.value)
+              if (existing) return
+            }
+          }
+        }
+        if (!el.control) continue
+        const matched =
+          (!groupId || groupId === el.control.groupId) &&
+          ((id && el.controlId === id) ||
+            (conceptId && el.control.conceptId === conceptId) ||
+            (areaId && el.areaId === areaId))
+        if (matched) {
+          existing = el.control.numberExclusiveOptions
+          return
+        }
+      }
+    }
+    visit(elementList)
+    const merged: IControlNumber['numberExclusiveOptions'] = {
+      ...existing,
+      ...(min !== undefined ? { min } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(calculatorDisabled !== undefined ? { calculatorDisabled } : {})
+    }
+    this.draw.getControl().setPropertiesListById([
+      {
+        id,
+        groupId,
+        conceptId,
+        areaId,
+        properties: { numberExclusiveOptions: merged }
+      }
+    ])
+  }
+
+  // 修改控件（单选 / 多选 / 数值）的 associationId
+  public setControlAssociationId(payload: ISetControlAssociationIdOption) {
+    const { id, groupId, conceptId, areaId, associationId } = payload
+    this.draw.getControl().setPropertiesListById([
+      {
+        id,
+        groupId,
+        conceptId,
+        areaId,
+        properties: { associationId }
+      }
+    ])
   }
 
   public setControlHighlight(payload: ISetControlHighlightOption) {
@@ -2758,6 +2834,87 @@ export class CommandAdapt {
     cloneProperty<IElement>(cloneAttr, copyElement, cloneElement)
     // 插入控件
     this.draw.insertElementList([cloneElement])
+    // 插入控件视为一次文档内容变更：insertElementList 内部 render 的 isSubmitHistory 为 false
+    // （历史由 submitHistory 单独提交），不会触发 contentChange，此处显式通知
+    this.draw.getListener().contentChange?.()
+    if (this.draw.getEventBus().isSubscribe('contentChange')) {
+      this.draw.getEventBus().emit('contentChange')
+    }
+  }
+
+  // 编程式插入控件（单选 / 多选 / 数值输入框）
+  private _insertControlElement(control: IControl) {
+    const element: IElement = {
+      type: ElementType.CONTROL,
+      value: '',
+      control
+    }
+    this.insertControl(element)
+  }
+
+  // 新增单选控件（下拉单选，可带自定义选项）
+  public addSelectControl(payload: IAddControlOption) {
+    this._insertControlElement({
+      type: ControlType.CUSTOM_SELECT,
+      valueSets: payload.valueSets ?? [],
+      value: payload.value ?? null,
+      placeholder: payload.placeholder,
+      conceptId: payload.conceptId,
+      prefix: payload.prefix,
+      postfix: payload.postfix
+    })
+  }
+
+  // 新增多选控件（下拉多选，可带自定义选项）
+  public addMultiSelectControl(payload: IAddControlOption) {
+    this._insertControlElement({
+      type: ControlType.MULTI_CUSTOM_SELECT,
+      isMultiSelect: true,
+      valueSets: payload.valueSets ?? [],
+      value: payload.value ?? null,
+      placeholder: payload.placeholder,
+      conceptId: payload.conceptId,
+      prefix: payload.prefix,
+      postfix: payload.postfix
+    })
+  }
+
+  // 新增数值输入框控件
+  public addNumberControl(payload: IAddControlOption) {
+    // 仅写入提供的 min/max，避免空值覆盖或产生无效配置
+    const numberExclusiveOptions: IControlNumber['numberExclusiveOptions'] = {}
+    if (payload.min !== undefined) numberExclusiveOptions.min = payload.min
+    if (payload.max !== undefined) numberExclusiveOptions.max = payload.max
+    this._insertControlElement({
+      type: ControlType.NUMBER,
+      value: payload.value ?? null,
+      placeholder: payload.placeholder,
+      conceptId: payload.conceptId,
+      prefix: payload.prefix,
+      postfix: payload.postfix,
+      underline: payload.underline,
+      minWidth: payload.minWidth,
+      numberExclusiveOptions
+    })
+  }
+
+  // 新增带标记（NUMBER_FLAG）的数值输入框控件
+  public addNumberFlagControl(payload: IAddControlOption) {
+    // 仅写入提供的 min/max，避免空值覆盖或产生无效配置
+    const numberExclusiveOptions: IControlNumber['numberExclusiveOptions'] = {}
+    if (payload.min !== undefined) numberExclusiveOptions.min = payload.min
+    if (payload.max !== undefined) numberExclusiveOptions.max = payload.max
+    this._insertControlElement({
+      type: ControlType.NUMBER_FLAG,
+      value: payload.value ?? null,
+      placeholder: payload.placeholder,
+      conceptId: payload.conceptId,
+      prefix: payload.prefix,
+      postfix: payload.postfix,
+      underline: payload.underline,
+      minWidth: payload.minWidth,
+      numberExclusiveOptions
+    })
   }
 
   public jumpControl(payload?: { direction?: MoveDirection }) {

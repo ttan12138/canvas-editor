@@ -114,6 +114,12 @@ export class Command {
   public executeSetControlHighlight: CommandAdapt['setControlHighlight']
   public executeLocationControl: CommandAdapt['locationControl']
   public executeInsertControl: CommandAdapt['insertControl']
+  public executeAddSelectControl: CommandAdapt['addSelectControl']
+  public executeAddMultiSelectControl: CommandAdapt['addMultiSelectControl']
+  public executeAddNumberControl: CommandAdapt['addNumberControl']
+  public executeAddNumberFlagControl: CommandAdapt['addNumberFlagControl']
+  public executeSetNumberRange: CommandAdapt['setNumberRange']
+  public executeSetControlAssociationId: CommandAdapt['setControlAssociationId']
   public executeJumpControl: CommandAdapt['jumpControl']
   public executeConvertToText: CommandAdapt['convertToText']
   public executeConvertToControl: CommandAdapt['convertToControl']
@@ -155,6 +161,11 @@ export class Command {
   public getElementById: CommandAdapt['getElementById']
   public getControlRenderMode: CommandAdapt['getControlRenderMode']
   public closeDropdowns: CommandAdapt['closeDropdowns']
+  // 修改单选 / 多选控件可选项
+  public setControlValueSets: CommandAdapt['setControlValueSets']
+  public setControlValueSetsList: CommandAdapt['setControlValueSetsList']
+  public executeSetControlValueSets: CommandAdapt['setControlValueSets']
+  public executeSetControlValueSetsList: CommandAdapt['setControlValueSetsList']
 
   constructor(adapt: CommandAdapt) {
     // 全局命令
@@ -321,6 +332,13 @@ export class Command {
     this.getControlList = adapt.getControlList.bind(adapt)
     this.executeLocationControl = adapt.locationControl.bind(adapt)
     this.executeInsertControl = adapt.insertControl.bind(adapt)
+    this.executeAddSelectControl = adapt.addSelectControl.bind(adapt)
+    this.executeAddMultiSelectControl = adapt.addMultiSelectControl.bind(adapt)
+    this.executeAddNumberControl = adapt.addNumberControl.bind(adapt)
+    this.executeAddNumberFlagControl = adapt.addNumberFlagControl.bind(adapt)
+    this.executeSetNumberRange = adapt.setNumberRange.bind(adapt)
+    this.executeSetControlAssociationId =
+      adapt.setControlAssociationId.bind(adapt)
     this.executeJumpControl = adapt.jumpControl.bind(adapt)
     // 文本和控件转换
     this.executeConvertToText = adapt.convertToText.bind(adapt)
@@ -332,6 +350,11 @@ export class Command {
     this.executeUpdateOptions = adapt.updateOptions.bind(adapt)
     // 关闭所有下拉列表
     this.closeDropdowns = adapt.closeDropdowns.bind(adapt)
+    // 修改单选 / 多选控件可选项
+    this.setControlValueSets = adapt.setControlValueSets.bind(adapt)
+    this.setControlValueSetsList = adapt.setControlValueSetsList.bind(adapt)
+    this.executeSetControlValueSets = adapt.setControlValueSets.bind(adapt)
+    this.executeSetControlValueSetsList = adapt.setControlValueSetsList.bind(adapt)
     this.executeInsertTitle = adapt.insertTitle.bind(adapt)
     this.executeFocus = adapt.focus.bind(adapt)
     this.executeComputeElementListHeight =

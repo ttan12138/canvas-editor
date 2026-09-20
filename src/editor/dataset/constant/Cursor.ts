@@ -11,5 +11,8 @@ export const defaultCursorOption: Readonly<Required<ICursorOption>> = {
   color: '#000000',
   dragWidth: 2,
   dragColor: '#0000FF',
-  dragFloatImageDisabled: false
+  dragFloatImageDisabled: false,
+  // 控件内光标：默认不单独配置，沿用全局 width/color
+  controlWidth: 0,
+  controlColor: ''
 }

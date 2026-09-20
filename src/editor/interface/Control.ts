@@ -18,6 +18,20 @@ export interface IValueSet {
   code: string
 }
 
+// 编程式插入控件的参数：单选 / 多选 / 数值输入框共用
+export interface IAddControlOption {
+  valueSets?: IValueSet[] // 单选 / 多选的可选项
+  value?: string | null // 控件初始值（选择类可传已有 code 或 value）
+  placeholder?: string // 占位提示
+  conceptId?: string // 概念 id
+  prefix?: string // 控件前缀（整体前缀，如 '\u200c'）
+  postfix?: string // 控件后缀（整体后缀，如 '\u200c'）
+  min?: number // 数值输入框最小值
+  max?: number // 数值输入框最大值
+  underline?: boolean // 控件下划线
+  minWidth?: number // 控件最小宽度
+}
+
 // 选择类控件结构化值（保留 groupIds、underline、highlight 等属性）
 export interface IControlStructValue {
   value: string
@@ -214,6 +228,8 @@ export interface IControlRuleOption {
   isAddPlaceholder?: boolean
   isSyncAssociation?: boolean
   isForceUpdate?: boolean
+  // 实时更新正文时（如下拉面板内的输入框 oninput）不销毁已打开的弹窗
+  isSkipDestroy?: boolean
 }
 
 export interface IGetControlValueOption {
@@ -239,6 +255,17 @@ export interface ISetControlValueOption {
   isSubmitHistory?: boolean
 }
 
+// 修改单选 / 多选控件可选项
+export interface ISetControlValueSetsOption {
+  id?: string
+  groupId?: string
+  conceptId?: string
+  areaId?: string
+  // 新的可选项列表
+  valueSets: IValueSet[]
+  isSubmitHistory?: boolean
+}
+
 export interface ISetControlExtensionOption {
   id?: string
   groupId?: string
@@ -256,6 +283,26 @@ export type ISetControlProperties = {
   areaId?: string
   properties: Partial<Omit<IControl, 'value'>>
   isSubmitHistory?: boolean
+}
+
+// 更新数值控件的最大/最小值（及是否禁用计算器）
+export interface ISetNumberRangeOption {
+  id?: string
+  groupId?: string
+  conceptId?: string
+  areaId?: string
+  min?: number
+  max?: number
+  calculatorDisabled?: boolean
+}
+
+// 修改控件（单选 / 多选 / 数值）的 associationId
+export interface ISetControlAssociationIdOption {
+  id?: string
+  groupId?: string
+  conceptId?: string
+  areaId?: string
+  associationId: string
 }
 
 export type IRepaintControlOption = Pick<

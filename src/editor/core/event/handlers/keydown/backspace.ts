@@ -61,7 +61,13 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
   if (draw.isReadonly()) return
   // 可输入性验证
   const rangeManager = draw.getRange()
-  if (!rangeManager.getIsCanInput()) return
+  if (!rangeManager.getIsCanInput()) {
+    console.log('[backspace] 被 canInput 拦截，无法退格', {
+      range: rangeManager.getRange(),
+      activeControl: !!draw.getControl().getActiveControl()
+    })
+    return
+  }
   // 隐藏元素删除
   if (rangeManager.getIsCollapsed()) {
     backspaceHideElement(host)

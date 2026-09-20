@@ -7,7 +7,7 @@
   border: 1px solid #e4e7ed;
   border-radius: 4px;
   background-color: var(--ce-selector-popup-bg, #fff) !important;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   margin: 5px 0;
   overflow-y: auto;
@@ -47,7 +47,7 @@
 }
 
 .ce-select-control-popup.ce-select-control-popup ul li:hover {
-  background-color: var(--ce-selector-option-hover-bg, #EEF2FD) !important;
+  background-color: var(--ce-selector-option-hover-bg, #eef2fd) !important;
   color: var(--ce-selector-option-hover-color, #000) !important;
 }
 
@@ -72,8 +72,11 @@
 }
 
 .ce-select-control-popup ul li:hover input {
-  background-color: var(--ce-selector-option-hover-bg, #EEF2FD) !important;
-  border-bottom-color: var(--ce-selector-input-hover-border, #5175f4) !important;
+  background-color: var(--ce-selector-option-hover-bg, #eef2fd) !important;
+  border-bottom-color: var(
+    --ce-selector-input-hover-border,
+    #5175f4
+  ) !important;
 }
 
 .ce-select-control-popup ul li:hover input::placeholder {
@@ -82,9 +85,98 @@
 
 .ce-select-control-popup ul li.active input {
   background-color: var(--ce-selector-active-bg, #e2e6ed) !important;
-  border-bottom-color: var(--ce-selector-input-active-border, #e2e6ed) !important;
+  border-bottom-color: var(
+    --ce-selector-input-active-border,
+    #e2e6ed
+  ) !important;
 }
 
 .ce-select-control-popup ul li.active input::placeholder {
   color: var(--ce-selector-input-active-placeholder, #fff) !important;
+}
+
+/* “添加选项”按钮区：位于选项列表底部 */
+.ce-selector-add-bar {
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+
+.ce-selector-add-btn {
+  font-size: 13px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 4px;
+  color: var(--ce-selector-option-color, #666) !important;
+  border: 1px dashed var(--ce-selector-input-border, #8195dd) !important;
+  background-color: transparent !important;
+}
+
+.ce-selector-add-btn:hover {
+  color: var(--ce-selector-active-color, #5175f4) !important;
+  border-color: var(--ce-selector-active-color, #5175f4) !important;
+  background-color: var(--ce-selector-option-hover-bg, #eef2fd) !important;
+}
+
+/* 内联新增行：输入框 + 确认/取消 */
+.ce-selector-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.ce-selector-add-row input {
+  flex: 1;
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--ce-selector-input-border, #8195dd) !important;
+  color: var(--ce-selector-option-color, #666) !important;
+  font-size: 13px;
+  outline: none;
+  min-width: 80px;
+}
+
+.ce-selector-add-row input::placeholder {
+  color: var(--ce-selector-input-placeholder, #c0c4cc) !important;
+  opacity: 1 !important;
+}
+
+.ce-selector-add-ok,
+.ce-selector-add-cancel {
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ce-selector-add-ok {
+  color: var(--ce-selector-option-color, #666) !important;
+}
+
+.ce-selector-add-cancel {
+  color: var(--ce-selector-option-color, #666) !important;
+}
+
+.ce-selector-add-ok:hover,
+.ce-selector-add-cancel:hover {
+  opacity: 0.75;
+}
+
+/* 选项右侧“移除”按钮 */
+.ce-selector-remove-btn {
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  color: var(--ce-selector-option-color, #666) !important;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.ce-selector-remove-btn:hover {
+  color: #f56c6c !important;
+  opacity: 1;
 }

@@ -646,10 +646,8 @@ export function formatElementList(
                 valueList = [
                   {
                     value: firstValueSet.value,
-                    color:
-                      type === ControlType.MULTI_CUSTOM_SELECT
-                        ? editorOptions.selector.multiSelectValueColor
-                        : editorOptions.selector.customSelectValueColor
+                    // 默认值（自动选中第一项）使用默认值色，而非选中值黑色
+                    color: editorOptions.control.defaultValueColor
                   }
                 ]
                 // 更新 control.code 为第一个选项的 code

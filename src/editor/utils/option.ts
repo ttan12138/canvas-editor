@@ -194,7 +194,9 @@ export function mergeOption(
     associationBackgroundColor: '#5175f4',
     associationTextColor: '#ffffff',
     hintColor: '#E6A23C',
-    hintBackgroundColor: '#FFFBE6'
+    hintBackgroundColor: '#FFFBE6',
+    showAddOption: true,
+    showRemoveOption: true
   }
   const selectorOptions: Required<ISelectorOption> = {
     ...defaultSelectorOption,

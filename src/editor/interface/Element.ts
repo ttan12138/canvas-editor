@@ -22,6 +22,9 @@ export interface IElementBasic {
   value: string
   extension?: unknown
   externalId?: string
+  // 最小宽度控件渲染时记录的实际宽度（px，已含 scale），
+  // 用于下划线/边框随内容超出 minWidth 时一起增长
+  minWidthActualWidth?: number
 }
 
 export interface IElementStyle {

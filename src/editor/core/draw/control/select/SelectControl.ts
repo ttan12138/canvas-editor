@@ -419,7 +419,8 @@ export class SelectControl implements IControlInstance {
         })
         if (~prefixIndex) {
           this.control.repaintControl({
-            curIndex: prefixIndex
+            curIndex: prefixIndex,
+            isSetCursor: options.isSyncAssociation !== false
           })
           this.control.emitControlContentChange({
             controlValue: []

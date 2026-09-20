@@ -161,6 +161,10 @@ export interface ISelectorOption {
   // 联动标识（带 associationId 的控件）
   associationBackgroundColor: string // 联动标识背景颜色
   associationTextColor: string // 联动标识文字（“联”）颜色
+  // 是否显示弹窗中的“添加选项”按钮（单选/多选控件），默认 true
+  showAddOption?: boolean
+  // 是否显示每个选项右侧的“删除选项”按钮（单选/多选控件），默认 true
+  showRemoveOption?: boolean
 }
 
 export interface IEditorResult {

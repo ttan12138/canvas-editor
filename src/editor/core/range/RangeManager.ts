@@ -393,31 +393,38 @@ export class RangeManager {
 
   public getIsCanInput(): boolean {
     const { startIndex, endIndex } = this.getRange()
-    if (!~startIndex && !~endIndex) return false
+    if (!~startIndex && !~endIndex) {
+      return false
+    }
     const elementList = this.draw.getElementList()
     const startElement = elementList[startIndex]
     if (startIndex === endIndex) {
-      return (
+      const result = (
         (startElement.controlComponent !== ControlComponent.PRE_TEXT ||
           elementList[startIndex + 1]?.controlComponent !==
             ControlComponent.PRE_TEXT) &&
         startElement.controlComponent !== ControlComponent.POST_TEXT
       )
+      return result
     }
     const endElement = elementList[endIndex]
     // 选区前后不是控件 || 选区前不是控件或是后缀&&选区后不是控件或是后缀 || 选区在控件内
-    return (
-      (!startElement.controlId && !endElement.controlId) ||
+    const c1 = !startElement.controlId && !endElement.controlId
+    const c2 =
       ((!startElement.controlId ||
+        startElement.controlComponent === ControlComponent.PREFIX ||
         startElement.controlComponent === ControlComponent.POSTFIX) &&
         (!endElement.controlId ||
-          endElement.controlComponent === ControlComponent.POSTFIX)) ||
-      (!!startElement.controlId &&
-        endElement.controlId === startElement.controlId &&
-        endElement.controlComponent !== ControlComponent.PRE_TEXT &&
-        endElement.controlComponent !== ControlComponent.POST_TEXT &&
-        endElement.controlComponent !== ControlComponent.POSTFIX)
-    )
+          endElement.controlComponent === ControlComponent.PREFIX ||
+          endElement.controlComponent === ControlComponent.POSTFIX))
+    const c3 =
+      !!startElement.controlId &&
+      endElement.controlId === startElement.controlId &&
+      endElement.controlComponent !== ControlComponent.PRE_TEXT &&
+      endElement.controlComponent !== ControlComponent.POST_TEXT &&
+      endElement.controlComponent !== ControlComponent.POSTFIX
+    const result = c1 || c2 || c3
+    return result
   }
 
   public setRange(

@@ -27,6 +27,7 @@ import {
   ISetControlProperties,
   ISetControlRowFlexOption,
   ISetControlValueOption,
+  ISetControlValueSetsOption,
   IValueSet
 } from '../../../interface/Control'
 import { IEditorData, IEditorOption } from '../../../interface/Editor'
@@ -1356,6 +1357,118 @@ export class Control {
     }
   }
 
+  // 修改单选 / 多选控件的可选项（valueSets）
+  public setValueSetsListById(payload: ISetControlValueSetsOption[]) {
+    if (!payload.length) return
+    let isExistSet = false
+    let isExistSubmitHistory = false
+    // 同步选中值：清理已被移除的选项，避免正文残留已删除项
+    const syncSelectedValue = (
+      element: IElement,
+      elementList: IElement[],
+      controlStartIndex: number
+    ) => {
+      const control = element.control!
+      const valueSets = control.valueSets || []
+      const validCodes = new Set(valueSets.map(v => v.code))
+      const isMulti = !!control.isMultiSelect
+      const currentCodes = control.code ? control.code.split(',') : []
+      const remaining = currentCodes.filter(c => validCodes.has(c))
+      // 当前选中项均仍存在，无需处理
+      if (remaining.join(',') === currentCodes.join(',')) return
+      // 构造控件上下文（模拟光标选区，对齐 setValueListById 实现）
+      let currentEndIndex = controlStartIndex + 1
+      while (currentEndIndex < elementList.length) {
+        const nextElement = elementList[currentEndIndex]
+        if (nextElement.controlId !== element.controlId) break
+        currentEndIndex++
+      }
+      const fakeRange = {
+        startIndex: controlStartIndex,
+        endIndex: currentEndIndex - 2
+      }
+      const controlContext: IControlContext = { range: fakeRange, elementList }
+      const controlRule: IControlRuleOption = {
+        isIgnoreDisabledRule: true,
+        isIgnoreDeletedRule: true
+      }
+      // 当前选中的可选项已不在新选项中时，渲染新选项中的第一个，
+      // 避免正文残留已删除项或留下空值
+      const newValue = isMulti
+        ? (remaining.length ? remaining.join(',') : (valueSets[0]?.code ?? ''))
+        : (remaining[0] ?? valueSets[0]?.code ?? '')
+      const type = control.type
+      if (type === ControlType.CUSTOM_SELECT) {
+        const inst = new CustomSelectControl(element, this)
+        this.activeControl = inst
+        if (newValue) inst.setSelect(newValue, controlContext, controlRule)
+        else inst.clearSelect(controlContext, controlRule)
+      } else if (type === ControlType.MULTI_CUSTOM_SELECT) {
+        const inst = new MultiCustomSelectControl(element, this)
+        this.activeControl = inst
+        if (newValue) inst.setSelect(newValue, controlContext, controlRule)
+        else inst.clearSelect(controlContext, controlRule)
+      } else if (type === ControlType.SELECT) {
+        const inst = new SelectControl(element, this)
+        this.activeControl = inst
+        if (newValue) inst.setSelect(newValue, controlContext, controlRule)
+        else inst.clearSelect(controlContext, controlRule)
+      }
+      this.activeControl = null
+    }
+    const setValueSets = (elementList: IElement[]) => {
+      let i = 0
+      while (i < elementList.length) {
+        const element = elementList[i]
+        i++
+        // 表格下钻处理
+        if (element.type === ElementType.TABLE) {
+          const trList = element.trList!
+          for (let r = 0; r < trList.length; r++) {
+            const tr = trList[r]
+            for (let d = 0; d < tr.tdList.length; d++) {
+              const td = tr.tdList[d]
+              setValueSets(td.value)
+            }
+          }
+        }
+        if (!element.control) continue
+        const payloadItem = payload.find(
+          p =>
+            (!p.groupId || p.groupId === element.control?.groupId) &&
+            ((p.id && element.controlId === p.id) ||
+              (p.conceptId && element.control!.conceptId === p.conceptId) ||
+              (p.areaId && element.areaId === p.areaId))
+        )
+        if (!payloadItem) continue
+        isExistSet = true
+        if (payloadItem.isSubmitHistory) {
+          isExistSubmitHistory = true
+        }
+        element.control.valueSets = payloadItem.valueSets
+        // 同步选中值：清理已移除的选项
+        syncSelectedValue(element, elementList, i - 1)
+      }
+    }
+    const data = [
+      this.draw.getHeaderElementList(),
+      this.draw.getOriginalMainElementList(),
+      this.draw.getFooterElementList()
+    ]
+    for (const elementList of data) {
+      setValueSets(elementList)
+    }
+    if (isExistSet) {
+      if (!isExistSubmitHistory) {
+        this.draw.getHistoryManager().recovery()
+      }
+      this.draw.render({
+        isSubmitHistory: isExistSubmitHistory,
+        isSetCursor: false
+      })
+    }
+  }
+
   public syncAssociationValue(
     associationId: string,
     value: string | number,
@@ -1364,6 +1477,12 @@ export class Control {
     multiSelectDelimiter?: string,
     valueSets?: IValueSet[]
   ): void {
+    // 保存触发联动前的光标状态：联动同步过程会改写全局 range/光标，需在结束后复位，
+    // 避免光标跳转到被联动的控件位置
+    const rangeManager = this.draw.getRange()
+    const position = this.draw.getPosition()
+    const hadCursorBeforeSync = !!position.getCursorPosition()
+    const originalRange = rangeManager.getRange()
     const setValue = (elementList: IElement[]) => {
       let i = 0
       while (i < elementList.length) {
@@ -1478,6 +1597,34 @@ export class Control {
         isSetCursor: false
       })
     }
+    // 联动同步结束后，将光标复位到“触发联动的控件之后”，避免跳转到被联动控件
+    if (hadCursorBeforeSync && sourceControlId) {
+      const sourceEndIndex = this._findControlEndIndex(sourceControlId)
+      const positionList = position.getPositionList()
+      const targetIndex = sourceEndIndex ?? originalRange.endIndex
+      const cp = positionList[targetIndex]
+      if (cp) {
+        rangeManager.setRange(targetIndex, targetIndex)
+        position.setCursorPosition(cp)
+        this.draw.getCursor().drawCursor({ isFocus: false })
+      }
+    }
+  }
+
+  // 依据 controlId 在正文列表中定位触发联动控件的末尾位置（POSTFIX 之后），
+  // 用于联动同步结束后将光标复位到该控件之后，避免光标跳转到被联动控件
+  private _findControlEndIndex(controlId: string): number | null {
+    const elementList = this.draw.getOriginalMainElementList()
+    for (let i = 0; i < elementList.length; i++) {
+      const element = elementList[i]
+      if (
+        element.controlId === controlId &&
+        element.controlComponent === ControlComponent.POSTFIX
+      ) {
+        return i + 1 < elementList.length ? i + 1 : i
+      }
+    }
+    return null
   }
 
   public isAssociationFocused(associationId: string): boolean {
@@ -1586,7 +1733,8 @@ export class Control {
           },
           {
             elementList,
-            range: { startIndex: i, endIndex: i }
+            // i 已在上方自增，当前控件元素位于 i - 1；对齐 setValueListById 的锚点
+            range: { startIndex: i - 1, endIndex: i - 1 }
           }
         )
         // 控件默认样式
@@ -1952,22 +2100,33 @@ export class Control {
     const { scale } = this.options
     const controlMinWidth = rowElement.control.minWidth * scale
     // 设置首字符偏移量：如果控件内设置对齐方式&&存在设置最小宽度
+    // 数值控件（NUMBER / NUMBER_FLAG）未显式设置对齐方式时，内容不足最小宽度则默认居中，
+    // 使空值光标落在中间、有值时始终居中显示
+    const isNumberControl =
+      rowElement.control?.type === ControlType.NUMBER ||
+      rowElement.control?.type === ControlType.NUMBER_FLAG
     let controlFirstElement: IRowElement | null = null
     if (
       rowElement.control?.minWidth &&
       (rowElement.control?.rowFlex === RowFlex.CENTER ||
-        rowElement.control?.rowFlex === RowFlex.RIGHT)
+        rowElement.control?.rowFlex === RowFlex.RIGHT ||
+        isNumberControl)
     ) {
-      // 计算当前控件内容宽度是否超出最小宽度设置
-      let controlContentWidth = rowElement.metrics.width
+      // 计算当前控件内容宽度（不含 POSTFIX，避免重复计算）
+      let controlContentWidth = 0
       let controlElementIndex = row.elementList.length - 1
       while (controlElementIndex >= 0) {
         const controlRowElement = row.elementList[controlElementIndex]
-        controlContentWidth += controlRowElement.metrics.width
-        // 找到首字符结束循环
+        // POSTFIX 本身不计入内容宽度
+        if (controlRowElement.controlComponent !== ControlComponent.POSTFIX) {
+          controlContentWidth += controlRowElement.metrics.width
+        }
+        // 找到 PREFIX 后的第一个元素，或控件行首的第一个元素
+        const prevElement = row.elementList[controlElementIndex - 1]
         if (
-          row.elementList[controlElementIndex - 1]?.controlComponent ===
-          ControlComponent.PREFIX
+          !prevElement ||
+          prevElement.controlId !== rowElement.controlId ||
+          prevElement.controlComponent === ControlComponent.PREFIX
         ) {
           controlFirstElement = controlRowElement
           break
@@ -1977,11 +2136,14 @@ export class Control {
       // 计算首字符偏移量
       if (controlFirstElement) {
         if (controlContentWidth < controlMinWidth) {
-          if (rowElement.control.rowFlex === RowFlex.CENTER) {
+          // 数值控件未设置 rowFlex 时默认居中；显式 CENTER / RIGHT 时按原逻辑
+          const useCenter =
+            rowElement.control?.rowFlex === RowFlex.CENTER || isNumberControl
+          if (useCenter) {
             controlFirstElement.left =
               (controlMinWidth - controlContentWidth) / 2
-          } else if (rowElement.control.rowFlex === RowFlex.RIGHT) {
-            // 最小宽度 - 实际宽度 - 后缀元素宽度
+          } else if (rowElement.control?.rowFlex === RowFlex.RIGHT) {
+            // 最小宽度 - 内容宽度 - 后缀元素宽度
             controlFirstElement.left =
               controlMinWidth - controlContentWidth - rowElement.metrics.width
           }
@@ -1992,14 +2154,17 @@ export class Control {
     const extraWidth = controlMinWidth - controlRealWidth
     if (extraWidth > 0) {
       const controlFirstElementLeft = controlFirstElement?.left || 0
-      // 超出行宽时截断
-      const rowRemainingWidth =
-        availableWidth - row.width - rowElement.metrics.width
+      // 超出行宽时截断：row.width 已包含当前控件全部元素宽度
+      const rowRemainingWidth = availableWidth - row.width
       const left = Math.min(rowRemainingWidth, extraWidth)
       // 后缀偏移量需减去首字符的偏移量，避免重复偏移
       rowElement.left = left - controlFirstElementLeft
-      row.width += left - controlFirstElementLeft
+      row.width += left
     }
+    // 记录最小宽度控件的实际渲染宽度，供下划线/边框绘制时随内容增长：
+    // 内容不足最小宽度时仍为 minWidth（已居中），超出时取内容实际宽度。
+    // controlRealWidth 为已缩放的内容总宽，与 controlMinWidth 量纲一致。
+    rowElement.minWidthActualWidth = Math.max(controlMinWidth, controlRealWidth)
   }
 
 }

@@ -558,7 +558,8 @@ export class MultiCustomSelectControl implements IControlInstance {
         })
         if (~prefixIndex) {
           this.control.repaintControl({
-            curIndex: prefixIndex
+            curIndex: prefixIndex,
+            isSetCursor: options.isSyncAssociation !== false
           })
           this.control.emitControlContentChange({
             controlValue: []
@@ -649,12 +650,18 @@ export class MultiCustomSelectControl implements IControlInstance {
     )
     const newIndex = start + valueElements.length - 1
     this.control.repaintControl({
-      curIndex: newIndex
+      curIndex: newIndex,
+      isSetCursor: options.isSyncAssociation !== false,
+      // 实时更新（oninput）不污染撤销历史
+      isSubmitHistory: !options.isSkipDestroy
     })
     this.control.emitControlContentChange({
       context
     })
-    this.destroy()
+    // 实时更新（如下拉面板内输入框 oninput）时保留已打开的弹窗
+    if (!options.isSkipDestroy) {
+      this.destroy()
+    }
 
     // 设置光标到控件末尾（仅用户主动操作场景）
     if (options.isSyncAssociation !== false) {
@@ -932,6 +939,15 @@ export class MultiCustomSelectControl implements IControlInstance {
 
               // 动态调整 input 宽度
               this.adjustInputWidth(input)
+
+              // 实时将已选选项的输入框值渲染到正文（不关闭弹窗、不提交历史）
+              this.setSelectWithInputValues(
+                Array.from(selectedCodes),
+                inputValues,
+                this.getEffectiveDelimiter(),
+                true,
+                true
+              )
             }
 
             // 将输入框存储到 inputElements Map
@@ -1029,9 +1045,16 @@ export class MultiCustomSelectControl implements IControlInstance {
       }
 
       checkboxMap.set(valueSet.code, { li, checkbox })
+
+      // 选项右侧“移除”按钮：从 valueSets 删除该项
+      this._appendRemoveOptionBtn(li, valueSet!.code)
+
       ul.append(li)
     }
     selectPopupContainer.append(ul)
+
+    // “添加选项”按钮：用于动态追加额外选项
+    this._appendAddOptionBar(selectPopupContainer)
 
     const divider = document.createElement('div')
     divider.style.height = '1px'
@@ -1322,7 +1345,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     codes: string[],
     inputValues: Map<string, string>,
     delimiter: string,
-    forceUpdate: boolean = false
+    forceUpdate: boolean = false,
+    realtime: boolean = false
   ): void {
     const control = this.element.control!
     const valueSets = control.valueSets
@@ -1361,6 +1385,12 @@ export class MultiCustomSelectControl implements IControlInstance {
         // 直接更新原有选项的值
         if (newValue !== originalValue) {
           valueSet.value = newValue
+          // 同步 control.values 中对应选项，确保 buildValuesFromCodes
+          // 优先使用最新输入值渲染正文（否则其会沿用旧值）
+          const existing = control.values?.find(v => v.code === code)
+          if (existing) {
+            existing.value = newValue
+          }
           hasValueChanged = true
         }
         newCodesWithValues.push(code)
@@ -1373,13 +1403,13 @@ export class MultiCustomSelectControl implements IControlInstance {
     if (hasValueChanged || forceUpdate) {
       // 清除缓存，确保获取最新值
       this.valueSetCache.delete(this.element.controlId || '')
-      // 调用 setSelect 并强制更新
-      this.setSelect(
-        newCodesWithValues.join(delimiter),
-        {},
-        { isForceUpdate: true }
-      )
-    } else {
+      // 调用 setSelect 并强制更新；realtime 模式保留已打开的弹窗
+      this.setSelect(newCodesWithValues.join(delimiter), {}, {
+        isForceUpdate: true,
+        isSkipDestroy: realtime,
+        isSyncAssociation: !realtime
+      })
+    } else if (!realtime) {
       this.setSelect(newCodesWithValues.join(delimiter))
     }
   }
@@ -1411,6 +1441,115 @@ export class MultiCustomSelectControl implements IControlInstance {
       this.selectDom?.remove()
       this.isPopup = false
     }
+  }
+
+  // 在弹窗底部追加“添加选项”按钮，点击后可内联新增一项到 valueSets
+  private _appendAddOptionBar(container: HTMLDivElement): void {
+    if (!this.options.selector.showAddOption) return
+    const addBar = document.createElement('div')
+    addBar.className = `${EDITOR_PREFIX}-selector-add-bar`
+    const addBtn = document.createElement('div')
+    addBtn.className = `${EDITOR_PREFIX}-selector-add-btn`
+    addBtn.textContent = '+ 添加选项'
+    addBar.append(addBtn)
+    container.append(addBar)
+
+    const reset = () => {
+      const row = addBar.querySelector(
+        `.${EDITOR_PREFIX}-selector-add-row`
+      ) as HTMLDivElement | null
+      row?.remove()
+      addBtn.style.display = ''
+    }
+
+    addBtn.addEventListener('click', () => {
+      // 已处于编辑态则忽略
+      if (addBar.querySelector('input')) return
+      addBtn.style.display = 'none'
+      const row = document.createElement('div')
+      row.className = `${EDITOR_PREFIX}-selector-add-row`
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.placeholder = '输入新选项'
+      const ok = document.createElement('span')
+      ok.className = `${EDITOR_PREFIX}-selector-add-ok`
+      ok.textContent = '确认'
+      const cancel = document.createElement('span')
+      cancel.className = `${EDITOR_PREFIX}-selector-add-cancel`
+      cancel.textContent = '取消'
+
+      const confirm = () => {
+        const value = input.value.trim()
+        if (!value) {
+          input.focus()
+          return
+        }
+        const control = this.element.control!
+        const existingCodes = new Set(
+          control.valueSets?.map(v => v.code) || []
+        )
+        let code = value
+        let i = 1
+        while (existingCodes.has(code)) {
+          code = `${value}_${i++}`
+        }
+        control.valueSets = control.valueSets || []
+        control.valueSets.push({ value, code })
+        // 新增选项后使缓存失效，确保后续可正常选中
+        this.valueSetCache.delete(this.element.controlId || '')
+        // 重建弹窗以展示新选项
+        this.destroy()
+        this._createSelectPopupDom()
+        this.isPopup = true
+      }
+
+      ok.addEventListener('click', confirm)
+      cancel.addEventListener('click', reset)
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          confirm()
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          reset()
+        }
+      })
+      row.append(input, ok, cancel)
+      addBar.append(row)
+      input.focus()
+    })
+  }
+
+  // 在多选项 li 右侧追加“移除”按钮，点击后从 valueSets 删除该项
+  private _appendRemoveOptionBtn(li: HTMLLIElement, code: string): void {
+    if (!this.options.selector.showRemoveOption) return
+    const removeBtn = document.createElement('span')
+    removeBtn.className = `${EDITOR_PREFIX}-selector-remove-btn`
+    removeBtn.textContent = '×'
+    removeBtn.title = '移除该选项'
+    removeBtn.addEventListener('click', e => {
+      e.stopPropagation()
+      const control = this.element.control!
+      const valueSets = control.valueSets || []
+      const idx = valueSets.findIndex(v => v.code === code)
+      if (idx < 0) return
+      valueSets.splice(idx, 1)
+      control.valueSets = valueSets
+      // 删除选项后使缓存失效
+      this.valueSetCache.delete(this.element.controlId || '')
+      // 同步清理选中值中被删除的 code
+      const currentCodes = (this.getCodes() || []).filter(c => c !== code)
+      this.setSelectWithInputValues(
+        currentCodes,
+        new Map(),
+        this.getEffectiveDelimiter()
+      )
+      // 重建弹窗以反映变化
+      this.destroy()
+      this._createSelectPopupDom()
+      this.isPopup = true
+    })
+    li.append(removeBtn)
   }
 
   private adjustInputWidth(input: HTMLInputElement): void {

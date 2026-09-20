@@ -815,7 +815,6 @@ export class Draw {
     // 注意：必须与下方 render(isSubmitHistory:false) + submitHistory(curIndex) 配合，
     // 否则每个插入会同时产生“前”与“后”两条记录，导致 undo 步数与文档状态错位。
     if (isSubmitHistory && this.historyManager.isStackEmpty()) {
-      console.log('[DEBUG history] insertElementList 栈为空，记录基线(插入前)快照')
       this.submitHistory(undefined)
     }
     let curIndex = -1
@@ -933,7 +932,6 @@ export class Draw {
     // “append 前 / append 后”两个快照，导致同一内容在历史中出现两次（如 A 被记录两次）。
     // 非首个记录时，栈顶已是对应的“append 前”状态，无需重复记录。
     if (isSubmitHistory && this.historyManager.isStackEmpty()) {
-      console.log('[DEBUG history] appendElementList 栈为空，记录基线(append前)快照, 当前main长度=', this.elementList.length)
       this.submitHistory(undefined)
     }
     // 判断文档尾部是否处于列表上下文（用于续接列表，避免插入后中断或产生空行）
@@ -1551,9 +1549,6 @@ export class Draw {
     const { isSetCursor = false, recordHistory = false } = options || {}
     // 记录本次 setValue 之前的内容，用于 recordHistory 撤销回原状态
     const oldData = recordHistory ? this.getValue() : null
-    console.log('[DEBUG history] setValue recordHistory=', recordHistory,
-      '调用前 undoStack长度=', this.historyManager.getUndoStack().length,
-      'main长度=', main?.length)
     const pageComponentData = [header, main, footer]
     pageComponentData.forEach(data => {
       if (!data) return
@@ -1569,8 +1564,6 @@ export class Draw {
     })
     // recordHistory=false 时清空历史（保持原默认行为）；true 时由下方追加，不清空
     if (!recordHistory) {
-      console.log('[DEBUG history] setValue(recordHistory=false) 清空整个撤销栈! 之前长度=',
-        this.historyManager.getUndoStack().length)
       this.historyManager.recovery()
     }
     const curIndex = isSetCursor
@@ -1587,7 +1580,6 @@ export class Draw {
     // - 栈为空（首次）：先压“设置前状态”作底（index 0 占位），再压“当前新状态”作顶；
     // - 栈非空：直接在顶上压“当前新状态”（其“设置前状态”已为当前栈顶，无需重复压入）。
     if (recordHistory && oldData) {
-      console.log('[DEBUG history] setValue(recordHistory=true) 压入 before/after 快照, 当前栈长=', this.historyManager.getUndoStack().length)
       // 撤销恢复“设置前”状态时，将光标落到恢复后内容的合法位置，
       // 避免旧 range 索引越界导致光标无法重绘（表现为撤销/重做后无法聚焦）。
       const oldMain = oldData.data?.main
@@ -1621,8 +1613,14 @@ export class Draw {
       }
       ;(newFn as any).__historySource = 'setValue-after'
       if (this.historyManager.isStackEmpty()) {
-        // 栈为空：先压“设置前状态”作底，再压“当前新状态”作顶
-        this.historyManager.execute(oldFn)
+        // 栈为空：先压“设置前状态”作底，再压“当前新状态”作顶。
+        // 但若“设置前”本身为空文档（首次加载/清空场景），压入空底会导致
+        // 后续撤销一路回退到空文档（表现为撤销清空正文），故仅在确有
+        // 前置内容时才压底，否则仅压“当前新状态”作顶（不可撤销到空）。
+        const hasOldContent = !!(oldMain && oldMain.length)
+        if (hasOldContent) {
+          this.historyManager.execute(oldFn)
+        }
       }
       this.historyManager.execute(newFn)
     }
@@ -2463,20 +2461,6 @@ export class Draw {
         x += metrics.width
       }
     }
-    // [DEBUG history] 单行可疑诊断：整段只生成一行且元素很多，
-    // 打印首元素宽度与 ctx.font，确认是否 metrics.width=0 导致不折行
-    if (rowList.length === 1 && elementList.length > 5) {
-      const _firstEl = rowList[0].elementList[0]
-      const _firstW = _firstEl?.metrics?.width ?? -1
-      console.log('[DEBUG history] computeRowList 单行可疑! rowList行数=',
-        rowList.length, 'elementList长度=', elementList.length,
-        '首元素value=', JSON.stringify(_firstEl?.value),
-        '首元素type=', _firstEl?.type,
-        '首元素metrics.width=', _firstW.toFixed(2),
-        'ctx.font=', ctx.font,
-        'defaultFont=', this.options.defaultFont,
-        'innerWidth=', innerWidth.toFixed(0))
-    }
     return rowList
   }
 
@@ -2626,9 +2610,26 @@ export class Draw {
       }
       let tableRangeElement: IElement | null = null
       let positionIndex = curRow.startIndex
+      // 最小宽度控件下划线起点 x（前缀起始位置），用于在 POSTFIX 补绘贯穿整条下划线
+      let controlStartX = 0
       for (let j = 0; j < curRow.elementList.length; j++) {
         const element = curRow.elementList[j]
         const metrics = element.metrics
+        const preElement = curRow.elementList[j - 1]
+        // 记录最小宽度控件起点 x（控件第一个元素处），
+        // 用于 POSTFIX 处补绘贯穿整条下划线，兼容无 PREFIX 或文本模式下 PREFIX 不可见的情况
+        if (
+          element.control?.minWidth &&
+          (!preElement || preElement.controlId !== element.controlId)
+        ) {
+          const positionItem = positionList[positionIndex]
+          if (positionItem) {
+            // 减去首元素的左偏移（如数值控件默认居中的偏移），
+            // 得到控件真实左边界，避免下划线起点被偏移后右移、超出控件显示范围
+            controlStartX =
+              positionItem.coordinate.leftTop[0] - (element.left || 0)
+          }
+        }
         // 不可见元素（文本模式下 PREFIX/POSTFIX）跳过绘制
         // 但 positionIndex 和 index 都必须递增以保持索引对齐
         if (positionList[positionIndex]?.isInvisible) {
@@ -2644,7 +2645,6 @@ export class Draw {
           }
         } = positionList[positionIndex]
         positionIndex++
-        const preElement = curRow.elementList[j - 1]
         if (
           (element.hide || element.control?.hide || element.area?.hide) &&
           !this.isDesignMode()
@@ -2889,10 +2889,18 @@ export class Draw {
         const isNumberFlagPlaceholder =
           element.controlComponent === ControlComponent.PLACEHOLDER &&
           element.control?.type === ControlType.NUMBER_FLAG
+        const isNumberFlagPrefixPostfix =
+          element.control?.type === ControlType.NUMBER_FLAG &&
+          (
+            element.controlComponent === ControlComponent.PREFIX ||
+            element.controlComponent === ControlComponent.POSTFIX ||
+            element.controlComponent === ControlComponent.PRE_TEXT ||
+            element.controlComponent === ControlComponent.POST_TEXT
+          )
         const isGrouped = !!element.groupIds?.length
         if (
           element.underline ||
-          element.control?.underline ||
+          (element.control?.underline && !isNumberFlagPrefixPostfix) ||
           (isGrouped && (isNumberFlagValue || isNumberFlagPlaceholder))
         ) {
           // 下标元素下划线单独绘制
@@ -2936,8 +2944,56 @@ export class Draw {
             color,
             element.textDecoration?.style
           )
+          // 最小宽度控件：在 POSTFIX 处补绘一条贯穿整个最小宽度的连续下划线，
+          // 覆盖居中/左对齐时首字符左偏移或末字符右偏移留下的留白，保证整框下划线连续
+          if (
+            element.control?.minWidth &&
+            element.controlComponent === ControlComponent.POSTFIX &&
+            element.control?.type !== ControlType.NUMBER_FLAG
+          ) {
+            // 内容超出最小宽度时下划线随实际宽度增长；不足时仍为 minWidth
+            const minWidthPx =
+              element.minWidthActualWidth ?? element.control.minWidth * scale
+            this.underline.recordFillInfo(
+              ctx,
+              controlStartX,
+              y + curRow.height - rowMargin + offsetY,
+              minWidthPx,
+              0,
+              color,
+              element.textDecoration?.style
+            )
+          }
         } else if (preElement?.underline || preElement?.control?.underline) {
           this.underline.render(ctx)
+        }
+        // numberFlag 控件 POSTFIX：无论空值/有值、是否 grouping，始终补绘贯穿 minWidth 的下划线，
+        // 保证图标位置（postfix）始终有下划线，且空值时整框可见占位下划线。
+        // 补绘逻辑独立成块，避免被外层下划线 if 的 isNumberFlagPrefixPostfix 排除而永不执行。
+        if (
+          element.control?.type === ControlType.NUMBER_FLAG &&
+          element.control?.minWidth &&
+          element.controlComponent === ControlComponent.POSTFIX
+        ) {
+          const minWidthPx =
+            element.minWidthActualWidth ?? element.control.minWidth * scale
+          const rowMargin = this.getElementRowMargin(element)
+          let offsetY = 0
+          if (element.type === ElementType.SUBSCRIPT) {
+            offsetY = this.subscriptParticle.getOffsetY(element)
+          }
+          const nfColor = element.control?.underline
+            ? this.options.underlineColor
+            : element.color
+          this.underline.recordFillInfo(
+            ctx,
+            controlStartX,
+            y + curRow.height - rowMargin + offsetY,
+            minWidthPx,
+            0,
+            nfColor,
+            element.textDecoration?.style
+          )
         }
         // 删除线记录
         if (element.strikeout) {
@@ -3346,40 +3402,6 @@ export class Draw {
       })
       // 页面信息
       this.pageRowList = this._computePageList()
-      // [DEBUG history] 段落折行诊断：统计每页行数、最长行元素数/宽度，判断是否单行不折行
-      {
-        const _paperW = this.getInnerWidth()
-        let _totalRows = 0
-        let _maxRowElems = 0
-        let _maxRowWidth = 0
-        let _maxRowPage = -1
-        let _overWidthRows = 0
-        const _rowCountByPage: number[] = []
-        this.pageRowList.forEach((rows, pi) => {
-          _totalRows += rows.length
-          _rowCountByPage[pi] = rows.length
-          rows.forEach(r => {
-            const w = r.width || 0
-            if (r.elementList.length > _maxRowElems) {
-              _maxRowElems = r.elementList.length
-              _maxRowWidth = w
-              _maxRowPage = pi
-            }
-            if (w > _paperW) _overWidthRows++
-          })
-        })
-        // 单行不折行特征：超宽行>0，或整文档只有1行（总行数===1 且 总元素多）
-        const _singleLineAnomaly = _overWidthRows > 0 ||
-          (_totalRows === 1 && this.elementList.length > 5)
-        console.log('[DEBUG history] 渲染后 pageRowList 来源=',
-          (isSourceHistory ? '历史恢复' : '正常编辑'),
-          'renderCount=', (this.renderCount || 0), '纸宽=', _paperW.toFixed(0),
-          '页数=', this.pageRowList.length, '每页行数=', JSON.stringify(_rowCountByPage),
-          '总行数=', _totalRows, '最长行元素数=', _maxRowElems,
-          '最长行宽度=', _maxRowWidth.toFixed(0), '最长行所在页=', _maxRowPage,
-          '超宽行数=', _overWidthRows, 'elementList长度=', this.elementList.length,
-          (_singleLineAnomaly ? ' <<< 疑似单行不折行异常' : ''))
-      }
       // 位置信息
       this.position.computePositionList()
       // 区域信息
@@ -3432,7 +3454,17 @@ export class Draw {
     } else if (isSkipFocus) {
       // 仅 changeGroupStyle 等场景使用：isSetCursor 为 false 且不聚焦光标，
       // 避免重新聚焦导致输入法重建、滚动条乱跳
-      this.cursor.drawCursor({ isFocus: false })
+      const container = this.getContainer()
+      if (GlobalEvent.getActiveEditorContainer() === container) {
+        // 当前实例是聚焦实例：绘制光标并隐藏其它实例的光标，
+        // 避免多编辑器下出现多个光标同时显示
+        GlobalEvent.blurOtherEditors(container)
+        this.cursor.drawCursor({ isFocus: false })
+      } else {
+        // 当前实例非聚焦（焦点在其它实例或页面无焦点）：不显示光标，
+        // 否则多个编辑器实例会同时显示光标
+        this.cursor.recoveryCursor()
+      }
     } else if (this.range.getIsSelection()) {
       // 存在选区时仅定位避免事件无法捕获
       this.cursor.focus()
@@ -3447,10 +3479,10 @@ export class Draw {
       }
     }
     // 历史记录用于undo、redo（非首次渲染内容变更 || 第一次存在光标时）
-    if (
+    const _histWillSubmit =
       (isSubmitHistory && !isFirstRender) ||
       (curIndex !== undefined && this.historyManager.isStackEmpty())
-    ) {
+    if (_histWillSubmit) {
       this.submitHistory(curIndex)
     }
     // 信息变动回调
@@ -3513,18 +3545,16 @@ export class Draw {
         if (
           element.underline !== undefined ||
           element.underlineColor !== undefined ||
-          element.highlight !== undefined ||
-          (element.control && element.control.underline !== undefined)
+          element.highlight !== undefined
         ) {
           cleared = true
         }
         element.underline = undefined
         element.underlineColor = undefined
         element.highlight = undefined
-        // 控件自身下划线（随元素）
-        if (element.control) {
-          element.control.underline = undefined
-        }
+        // 注意：不再清除 element.control.underline。control.underline 是控件自身的持久
+        // 样式（由控件配置决定，如数值控件下划线），并非随元素的未分组质检样式；
+        // 此前在此清除会导致共享的控件对象被污染，输入值后下划线丢失。
       }
       if (element.valueList?.length) {
         if (this.clearUnGroupedStyle(element.valueList)) {
@@ -3605,12 +3635,6 @@ export class Draw {
   public submitHistory(curIndex: number | undefined) {
     const positionContext = this.position.getPositionContext()
     const oldElementList = getSlimCloneElementList(this.elementList)
-    const _mainCount = this.elementList.length
-    const _breakCount = this.elementList.filter(e => e.value === '\n').length
-    const _controlCount = this.elementList.filter(e => e.control).length
-    console.log('[DEBUG history] submitHistory curIndex=', curIndex,
-      '栈长度=', this.historyManager.getUndoStack().length,
-      'main元素数=', _mainCount, '换行数=', _breakCount, '控件数=', _controlCount)
     const oldHeaderElementList = getSlimCloneElementList(
       this.header.getElementList()
     )

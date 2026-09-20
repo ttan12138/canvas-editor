@@ -115,10 +115,15 @@ export class Cursor {
   public focus() {
     // 移动端只读模式禁用聚焦避免唤起输入法，web端允许聚焦避免事件无法捕获
     if (isMobile && this.draw.isReadonly()) return
-    // 预输入弹窗（@ 提及等）内的输入框正在编辑时，不抢回焦点，
+    // 弹窗内输入框（@ 提及、多选/列举等控件下拉）正在编辑时，不抢回焦点，
     // 否则 render 中的 cursor.focus() 会把焦点从弹窗输入框夺走，导致无法输入
     const ae = document.activeElement as (HTMLElement | null)
-    if (ae && ae.closest && ae.closest('.ce-prefix-autocomplete')) {
+    if (
+      ae &&
+      ae.closest &&
+      (ae.closest('.ce-prefix-autocomplete') ||
+        ae.closest(`.${EDITOR_PREFIX}-select-control-popup`))
+    ) {
       return
     }
     const container = this.draw.getContainer()
@@ -184,10 +189,15 @@ export class Cursor {
         if (GlobalEvent.isActiveElementOtherEditor(container)) {
           return
         }
-        // 预输入弹窗（@ 提及等）内的输入框正在编辑时，不抢回焦点，
+        // 弹窗内输入框（@ 提及、多选/列举等控件下拉）正在编辑时，不抢回焦点，
         // 否则 render 中的 cursor.focus() 会把焦点从弹窗输入框夺走，导致无法输入
         const ae = document.activeElement as (HTMLElement | null)
-        if (ae && ae.closest && ae.closest('.ce-prefix-autocomplete')) {
+        if (
+          ae &&
+          ae.closest &&
+          (ae.closest('.ce-prefix-autocomplete') ||
+            ae.closest(`.${EDITOR_PREFIX}-select-control-popup`))
+        ) {
           return
         }
         this.focus()
@@ -216,8 +226,19 @@ export class Cursor {
     }
     // 设置光标位置
     const isReadonly = this.draw.isReadonly()
-    this.cursorDom.style.width = `${width * scale}px`
-    this.cursorDom.style.backgroundColor = color
+    // 控件模式下光标位于控件内时，使用独立的宽度/颜色（未配置则沿用全局）。
+    // 直接检查光标处元素是否带 controlId，比 positionContext.isControl 更可靠
+    // （后者仅在部分交互路径更新，键盘移动/程序化定位时可能不同步）。
+    const elementList = this.draw.getElementList()
+    const isControl = !!(
+      cursorPosition.index != null && elementList[cursorPosition.index]?.controlId
+    )
+    const cursorWidth =
+      isControl && cursor.controlWidth > 0 ? cursor.controlWidth : width
+    const cursorColor =
+      isControl && !!cursor.controlColor ? cursor.controlColor : color
+    this.cursorDom.style.width = `${cursorWidth * scale}px`
+    this.cursorDom.style.backgroundColor = cursorColor
     this.cursorDom.style.left = `${cursorLeft}px`
     this.cursorDom.style.top = `${cursorTop}px`
     this.cursorDom.style.display = isReadonly ? 'none' : 'block'
