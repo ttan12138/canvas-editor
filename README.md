@@ -5,16 +5,6 @@
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/8401" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/8401" alt="Hufe921%2Fcanvas-editor | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
-  </a>
-</p>
-
-<p align="center">
-<a href="https://www.npmjs.com/package/@hufe921/canvas-editor" target="_blank"><img src="https://img.shields.io/npm/v/@hufe921/canvas-editor.svg?sanitize=true" alt="Version"></a>
- <a href="https://github.com/hufe921/canvas-editor/actions" target="_blank">
-  <img alt="Cypress Passing" src="https://github.com/hufe921/canvas-editor/workflows/cypress/badge.svg" />
-</a>
 <a href="https://github.com/hufe921/canvas-editor/graphs/contributors" target="_blank">
   <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/hufe921/canvas-editor" />
 </a>
@@ -197,13 +187,13 @@ Contributions are what make the open-source community such an amazing place. **A
 
 > Pre-commit hooks automatically run `lint` and `type:check`. Commit messages must follow Conventional Commits format (`feat:`, `fix:`, `docs:`, `refactor:`, ...).
 
-### Contributors
+<!-- ### Contributors
 
 Thanks to all the people who have contributed to Canvas Editor!
 
 <a href="https://github.com/Hufe921/canvas-editor/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=Hufe921/canvas-editor" />
-</a>
+</a> -->
 
 ## Community & Support
 
