@@ -61,6 +61,23 @@ export function del(evt: KeyboardEvent, host: CanvasEvent) {
   if (rangeManager.getIsCollapsed()) {
     deleteHideElement(host)
   }
+  // 列表边界合并：光标在列表末项、其后紧跟非同列表内容时，
+  // 向前删除分隔符应把后续内容并入列表继续编号，而非仅删字符。
+  if (rangeManager.getIsCollapsed()) {
+    const position = draw.getPosition()
+    const cursorPosition = position.getCursorPosition()
+    const elementIndex = cursorPosition?.index
+    if (
+      elementIndex != null &&
+      draw.getListParticle().isListMergeBoundary(elementList, elementIndex + 1)
+    ) {
+      const boundaryIndex = elementIndex + 1
+      draw.getListParticle().mergeFollowingIntoList(boundaryIndex)
+      rangeManager.setRange(boundaryIndex, boundaryIndex)
+      draw.render({ curIndex: boundaryIndex })
+      return
+    }
+  }
   // 删除操作
   let curIndex: number | null
   if (isCrossRowCol) {

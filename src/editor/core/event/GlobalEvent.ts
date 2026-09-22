@@ -218,10 +218,6 @@ export class GlobalEvent {
         if (this.canvasEvent.isAllowDrag) {
           // 拖拽起始位置在已有选区内：保留源选区高亮，不在按下瞬间折叠，
           // 否则源选区会在 mousedown 时消失、拖拽过程中只剩跟随鼠标的落点光标。
-          console.log('[clearSideEffect] keep source selection (drag start)', {
-            start: range.startIndex,
-            end: range.endIndex
-          })
         } else {
           this.range.setRange(range.endIndex, range.endIndex)
           this.draw.render({

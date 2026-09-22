@@ -1,5 +1,6 @@
 import { ImageDisplay } from '../../../dataset/enum/Common'
 import { ControlComponent } from '../../../dataset/enum/Control'
+import { EditorZone } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
 import { CanvasEvent } from '../CanvasEvent'
 
@@ -77,7 +78,6 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     y: evt.offsetY
   })
   // console.log('mousemove - positionResult.index:', positionResult.index)
-  if (!~positionResult.index) return
   const {
     index,
     isTable,
@@ -86,16 +86,31 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     trIndex,
     tableId,
     trId,
-    tdId
+    tdId,
+    zone
   } = positionResult
   const {
     index: startIndex,
     isTable: startIsTable,
     tdIndex: startTdIndex,
     trIndex: startTrIndex,
-    tableId: startTableId
+    tableId: startTableId,
+    zone: startZone
   } = host.mouseDownStartPosition
-  const endIndex = isTable ? tdValueIndex! : index
+  // 拖拽选区时，指针落在页眉/页脚等无正文命中区域需就近吸附到正文首/尾，
+  // 否则从尾部拖到头部全选时锚点为 -1，导致选区失效、退格/删除被 canInput 拦截
+  let endIndex = isTable ? tdValueIndex! : index
+  if (!~endIndex) {
+    if (isTable) return
+    if (zone === EditorZone.HEADER || zone === EditorZone.FOOTER) {
+      const mainPositionList = position.getPositionList()
+      endIndex = zone === EditorZone.FOOTER
+        ? mainPositionList.length - 1
+        : 0
+    } else {
+      return
+    }
+  }
   // 判断是否是表格跨行/列
   const rangeManager = draw.getRange()
   if (
@@ -125,8 +140,14 @@ export function mousemove(evt: MouseEvent, host: CanvasEvent) {
     let end = ~endIndex ? endIndex : 0
     // 开始或结束位置存在表格，但是非相同表格则忽略选区设置
     if ((startIsTable || isTable) && startTableId !== tableId) return
-    // 开始位置
+    // 开始位置（起始锚点落在无命中区域时同样吸附到正文首/尾）
     let start = startIndex
+    if (!~start) {
+      const mainPositionList = position.getPositionList()
+      start = startZone === EditorZone.FOOTER
+        ? mainPositionList.length - 1
+        : 0
+    }
     if (start > end) {
       ;[start, end] = [end, start]
     }

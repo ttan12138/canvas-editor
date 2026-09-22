@@ -1,5 +1,5 @@
 import { ImageDisplay } from '../../../dataset/enum/Common'
-import { EditorMode } from '../../../dataset/enum/Editor'
+import { EditorMode, EditorZone } from '../../../dataset/enum/Editor'
 import { ElementType } from '../../../dataset/enum/Element'
 import { MouseEventButton } from '../../../dataset/enum/Event'
 import { MoveDirection } from '../../../dataset/enum/Observer'
@@ -12,6 +12,7 @@ import { CheckboxControl } from '../../draw/control/checkbox/CheckboxControl'
 import { RadioControl } from '../../draw/control/radio/RadioControl'
 import { CanvasEvent } from '../CanvasEvent'
 import { IElement } from '../../../interface/Element'
+import { ICurrentPosition } from '../../../interface/Position'
 import { Draw } from '../../draw/Draw'
 import { GlobalEvent } from '../GlobalEvent'
 
@@ -94,15 +95,18 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
   let isReadonly = draw.isReadonly()
   const rangeManager = draw.getRange()
   const position = draw.getPosition()
-  // 存在选区时忽略右键点击
+  // 存在选区时忽略右键点击（保留选区，不折叠、不重定位光标）
   const range = rangeManager.getRange()
-  if (
-    evt.button === MouseEventButton.RIGHT &&
-    (range.isCrossRowCol || !rangeManager.getIsCollapsed())
-  ) {
+  if (evt.button === MouseEventButton.RIGHT) {
+    // 当前存在选区则直接保留：后续正常逻辑会折叠光标（setRange 到落点），
+    // 因此这里提前返回，确保右键不会取消已选中的内容。
+    // 注意：必须在 destroyControl 之前判断——销毁控件可能触发重绘并清空选区，
+    // 否则上面的判断永远看到的是“已折叠”的假象。
+    if (!rangeManager.getIsCollapsed()) {
+      return
+    }
     // 关闭弹窗类控件，避免下拉列表与右键菜单同时显示
     draw.getControl().destroyControl({ isEmitEvent: false })
-    return
   }
   // 是否是选区拖拽
   if (!host.isAllowDrag) {
@@ -128,10 +132,33 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
   host.mouseDownClientY = evt.clientY
   // 缓存旧上下文信息
   const oldPositionContext = deepClone(position.getPositionContext())
-  const positionResult = position.adjustPositionContext({
+  let positionResult = position.adjustPositionContext({
     x: evt.offsetX,
     y: evt.offsetY
   })
+  // 落在页眉/页脚等无正文命中区域（如从文末下方拖拽全选）：
+  // 主区激活时就近吸附到正文首/尾作为选区锚点，避免无法建立选区导致退格被拦截
+  if (
+    (!positionResult || !~(positionResult?.index ?? -1)) &&
+    draw.getZone().isMainActive()
+  ) {
+    const xyResult = position.getPositionByXY({
+      x: evt.offsetX,
+      y: evt.offsetY
+    })
+    if (
+      xyResult.zone === EditorZone.FOOTER ||
+      xyResult.zone === EditorZone.HEADER
+    ) {
+      const mainPositionList = position.getPositionList()
+      const clampIndex =
+        xyResult.zone === EditorZone.FOOTER ? mainPositionList.length - 1 : 0
+      positionResult = {
+        index: clampIndex,
+        zone: xyResult.zone
+      } as ICurrentPosition
+    }
+  }
   if (!positionResult) return
   const {
     index,
@@ -183,10 +210,6 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     // 焦点交给 drawCursor 的 setTimeout 异步聚焦（在浏览器默认焦点处理之后再聚焦，
     // 否则在 mousedown 中同步 focus 会被覆盖，导致 textarea 无法真正获得焦点、无法录入）
     GlobalEvent.blurOtherEditors(draw.getContainer())
-    // 右键点击时关闭弹窗类控件，避免下拉列表与右键菜单同时显示
-    if (evt.button === MouseEventButton.RIGHT) {
-      draw.getControl().destroyControl({ isEmitEvent: false })
-    }
     // 更新只读状态
     isReadonly = draw.isReadonly()
     // 复选框
@@ -236,7 +259,7 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     }
   }
   // 标签点击事件
-    const eventBus = draw.getEventBus()
+  const eventBus = draw.getEventBus()
   if (isDirectHitLabel && eventBus.isSubscribe('labelMousedown')) {
     eventBus.emit('labelMousedown', {
       evt,
@@ -297,7 +320,10 @@ export function mousedown(evt: MouseEvent, host: CanvasEvent) {
     if (isMod(evt)) {
       hyperlinkParticle.openHyperlink(curElement)
     } else {
-      hyperlinkParticle.drawHyperlinkPopup(curElement, positionList[positionIndex])
+      hyperlinkParticle.drawHyperlinkPopup(
+        curElement,
+        positionList[positionIndex]
+      )
     }
   }
   // 日期控件

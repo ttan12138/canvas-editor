@@ -62,10 +62,6 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
   // 可输入性验证
   const rangeManager = draw.getRange()
   if (!rangeManager.getIsCanInput()) {
-    console.log('[backspace] 被 canInput 拦截，无法退格', {
-      range: rangeManager.getRange(),
-      activeControl: !!draw.getControl().getActiveControl()
-    })
     return
   }
   // 隐藏元素删除
@@ -146,6 +142,18 @@ export function backspace(evt: KeyboardEvent, host: CanvasEvent) {
     const elementList = draw.getElementList()
     const positionIndex = cursorPosition.index
     const isCollapsed = rangeManager.getIsCollapsed()
+    // 列表边界合并：退格删除列表末项后的分隔符时，把后续内容并入列表继续编号
+    if (
+      isCollapsed &&
+      positionIndex > 0 &&
+      draw.getListParticle().isListMergeBoundary(elementList, positionIndex)
+    ) {
+      const boundaryIndex = positionIndex
+      draw.getListParticle().mergeFollowingIntoList(boundaryIndex)
+      rangeManager.setRange(boundaryIndex, boundaryIndex)
+      draw.render({ curIndex: boundaryIndex })
+      return
+    }
     // 判断是否允许删除
     if (isCollapsed && positionIndex === 0) {
       const firstElement = elementList[positionIndex]

@@ -192,6 +192,50 @@ export class ListParticle {
     this.draw.render({ curIndex, isSetCursor })
   }
 
+  // 判断被删除的元素是否处于「列表末项 → 非同列表内容」的边界。
+  // deleteIndex 为本次将被删除的元素下标（del 向前删为光标后一个；backspace 退格为光标前一个）。
+  // 满足：前一个元素属于某列表，且当前元素不属于同一列表（含无 listId 的退出段落、其他列表）。
+  public isListMergeBoundary(
+    elementList: IElement[],
+    deleteIndex: number
+  ): boolean {
+    const prev = elementList[deleteIndex - 1]
+    const el = elementList[deleteIndex]
+    return !!(prev?.listId && el && el.listId !== prev.listId)
+  }
+
+  // 把列表末项之后的「非同列表内容」并入当前列表，使其继续编号。
+  // 用于：列表退出后产生的空段落、其后的文本/控件/独立列表，在删除边界分隔符时重新归队。
+  // boundaryIndex 为待合并内容的起始下标（通常为那个不带 listId 的分隔 ZERO）。
+  public mergeFollowingIntoList(boundaryIndex: number): void {
+    const elementList = this.draw.getElementList()
+    const prev = elementList[boundaryIndex - 1]
+    if (!prev?.listId) return
+    const { listId, listType, listStyle } = prev
+    // 若边界元素不是 ZERO 段落标记（如控件、独立列表直接紧跟列表），
+    // 则在其前插入一个列表项标记，确保后续内容作为列表项被编号
+    let start = boundaryIndex
+    if (elementList[start]?.value !== ZERO) {
+      elementList.splice(start, 0, {
+        value: ZERO,
+        listId,
+        listType,
+        listStyle
+      })
+      start += 1
+    }
+    let i = start
+    while (i < elementList.length) {
+      const el = elementList[i]
+      // 遇到下一个独立段落（非列表的 ZERO 段落标记）则停止，保留独立段落不被吞并
+      if (i !== start && el.value === ZERO && !el.listId) break
+      el.listId = listId
+      el.listType = listType
+      el.listStyle = listStyle
+      i++
+    }
+  }
+
   public computeListStyle(
     ctx: CanvasRenderingContext2D,
     elementList: IElement[]

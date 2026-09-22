@@ -397,6 +397,11 @@ export class RangeManager {
       return false
     }
     const elementList = this.draw.getElementList()
+    // 全选（鼠标从文首拖到文末时，起始索引可能为 -1；Ctrl+A 为 0）覆盖整篇文档，
+    // 视为可编辑，与 Ctrl+A 行为保持一致，避免“选中全部内容却无法删除/输入替换”
+    if (startIndex <= 0 && endIndex >= elementList.length - 1) {
+      return true
+    }
     const startElement = elementList[startIndex]
     if (startIndex === endIndex) {
       const result = (
