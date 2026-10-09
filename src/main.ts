@@ -67,7 +67,6 @@ window.onload = function () {
     instance.command.executeUndo()
   }
 
-
   const redoDom = document.querySelector<HTMLDivElement>('.menu-item__redo')!
   redoDom.title = `重做(${isApple ? '⌘' : 'Ctrl'}+Y)`
   redoDom.onclick = function () {
@@ -663,7 +662,7 @@ window.onload = function () {
               placeholder: '请输入默认值'
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -713,7 +712,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -754,7 +753,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const valueSets = payload.find(p => p.name === 'valueSets')?.value
             if (!valueSets) return
             const code = payload.find(p => p.name === 'code')?.value
@@ -790,7 +789,7 @@ window.onload = function () {
               placeholder: `请输入值集JSON，例：\n[{\n"value":"有",\n"code":"98175"\n}]`
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const valueSets = payload.find(p => p.name === 'valueSets')?.value
             if (!valueSets) return
             const code = payload.find(p => p.name === 'code')?.value
@@ -842,7 +841,7 @@ window.onload = function () {
               ]
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -887,7 +886,7 @@ window.onload = function () {
               placeholder: '请输入默认值'
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const placeholder = payload.find(
               p => p.name === 'placeholder'
             )?.value
@@ -1784,11 +1783,9 @@ window.onload = function () {
   instance.listener.contentChange = debounce(handleContentChange, 200)
   handleContentChange()
 
-  instance.listener.saved = function () {
-  }
+  instance.listener.saved = function () {}
 
-  instance.listener.controlRenderModeChange = function () {
-  }
+  instance.listener.controlRenderModeChange = function () {}
 
   // 9. 右键菜单注册
   instance.register.contextMenuList([
@@ -1834,32 +1831,30 @@ window.onload = function () {
             //   value
             // })
             command.executeSetValue({
-              main: [{
-                'size': 16,
-                'value': '这是一段测试文字'
-              },
-              {
-                  'value': '高密第影',
-                  'underline': true,
-                  'groupIds': [
-                      '1'
-                  ]
-              },
-              {
-                  'size': 16,
-                  'value': '，'
-              },
-              {
-                  'highlight': '#F2F27F',
-                  'value': '椎间盘突向',
-                  'groupIds': [
-                      '椎间盘突向~~椎间盘突出~~QC-S-006'
-                  ]
-              },
-              {
-                  'size': 16,
-                  'value': '测试文字'
-              }]
+              main: [
+                {
+                  size: 16,
+                  value: '这是一段测试文字'
+                },
+                {
+                  value: '高密第影',
+                  underline: true,
+                  groupIds: ['1']
+                },
+                {
+                  size: 16,
+                  value: '，'
+                },
+                {
+                  highlight: '#F2F27F',
+                  value: '椎间盘突向',
+                  groupIds: ['椎间盘突向~~椎间盘突出~~QC-S-006']
+                },
+                {
+                  size: 16,
+                  value: '测试文字'
+                }
+              ]
             })
           }
         })
@@ -1894,32 +1889,30 @@ window.onload = function () {
             //   value
             // })
             command.executeSetValue({
-              main: [{
-                'size': 16,
-                'value': '这是一段测试文字'
-              },
-              {
-                  'highlight': '#F2F27F',
-                  'value': '高密第影',
-                  'groupIds': [
-                      '1'
-                  ]
-              },
-              {
-                  'size': 16,
-                  'value': '，'
-              },
-              {
-                  'highlight': '#F2F27F',
-                  'value': '椎间盘突向',
-                  'groupIds': [
-                      '椎间盘突向~~椎间盘突出~~QC-S-006'
-                  ]
-              },
-              {
-                  'size': 16,
-                  'value': '测试文字'
-              }]
+              main: [
+                {
+                  size: 16,
+                  value: '这是一段测试文字'
+                },
+                {
+                  highlight: '#F2F27F',
+                  value: '高密第影',
+                  groupIds: ['1']
+                },
+                {
+                  size: 16,
+                  value: '，'
+                },
+                {
+                  highlight: '#F2F27F',
+                  value: '椎间盘突向',
+                  groupIds: ['椎间盘突向~~椎间盘突出~~QC-S-006']
+                },
+                {
+                  size: 16,
+                  value: '测试文字'
+                }
+              ]
             })
           }
         })
@@ -1949,7 +1942,7 @@ window.onload = function () {
               placeholder: '请输入题注内容，使用{imageNo}表示图片序号'
             }
           ],
-          onConfirm: (payload) => {
+          onConfirm: payload => {
             const value = payload.find(p => p.name === 'value')?.value
             command.executeSetImageCaption({
               ...currentCaption,
@@ -2058,60 +2051,78 @@ window.onload = function () {
   ])
 
   let isTextMode = false
-  const btnTextMode = document.querySelector<HTMLButtonElement>('#btn-text-mode')
+  const btnTextMode =
+    document.querySelector<HTMLButtonElement>('#btn-text-mode')
   if (btnTextMode) {
-    btnTextMode.onclick = function() {
+    btnTextMode.onclick = function () {
       isTextMode = !isTextMode
       const mode = isTextMode ? 'text' : 'control'
       instance.command.executeSetControlRenderMode(mode as any)
     }
   }
 
-  const btnGetValue = document.querySelector<HTMLButtonElement>('#btn-get-value')
+  const btnGetValue =
+    document.querySelector<HTMLButtonElement>('#btn-get-value')
   if (btnGetValue) {
-    btnGetValue.onclick = function() {
+    btnGetValue.onclick = function () {
       instance.command.getValue()
     }
   }
-  const btnGetInstance = document.querySelector<HTMLButtonElement>('#btn-get-instance')
+  const btnGetInstance =
+    document.querySelector<HTMLButtonElement>('#btn-get-instance')
   if (btnGetInstance) {
-    btnGetInstance.onclick = function() {
-    }
+    btnGetInstance.onclick = function () {}
   }
-    const btnGetText = document.querySelector<HTMLButtonElement>('#btn-get-TEXT')
+  const btnGetText = document.querySelector<HTMLButtonElement>('#btn-get-TEXT')
   if (btnGetText) {
-    btnGetText.onclick = function() {
-    }
+    btnGetText.onclick = function () {}
   }
 
-  const btnGetGroupTexts = document.querySelector<HTMLButtonElement>('#btn-GetGroupTexts')
+  const btnGetGroupTexts =
+    document.querySelector<HTMLButtonElement>('#btn-GetGroupTexts')
   if (btnGetGroupTexts) {
-    btnGetGroupTexts.onclick = function() {
+    btnGetGroupTexts.onclick = function () {
       instance.command.getGroupTexts()
     }
   }
-  const btnUpdateGroup1 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup1')
+  const btnUpdateGroup1 =
+    document.querySelector<HTMLButtonElement>('#btn-UpdateGroup1')
   if (btnUpdateGroup1) {
-    btnUpdateGroup1.onclick = function() {
-      instance.command.updateGroup('testGroupId-01-01', { value: '新文字1111', underline: true })
+    btnUpdateGroup1.onclick = function () {
+      instance.command.updateGroup('testGroupId-01-01', {
+        value: '新文字1111',
+        underline: true
+      })
     }
   }
-  const btnUpdateGroup2 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup2')
+  const btnUpdateGroup2 =
+    document.querySelector<HTMLButtonElement>('#btn-UpdateGroup2')
   if (btnUpdateGroup2) {
-    btnUpdateGroup2.onclick = function() {
-      instance.command.updateGroup('testGroupId-01-02', { value: '新文字2222', highlight: '#ff0' })
+    btnUpdateGroup2.onclick = function () {
+      instance.command.updateGroup('testGroupId-01-02', {
+        value: '新文字2222',
+        highlight: '#ff0'
+      })
     }
   }
-  const btnUpdateGroup3 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup3')
+  const btnUpdateGroup3 =
+    document.querySelector<HTMLButtonElement>('#btn-UpdateGroup3')
   if (btnUpdateGroup3) {
-    btnUpdateGroup3.onclick = function() {
-      instance.command.updateGroup('testGroupId-02-01', { value: '新文字1111', underline: true })
+    btnUpdateGroup3.onclick = function () {
+      instance.command.updateGroup('testGroupId-02-01', {
+        value: '新文字1111',
+        underline: true
+      })
     }
   }
-  const btnUpdateGroup4 = document.querySelector<HTMLButtonElement>('#btn-UpdateGroup4')
+  const btnUpdateGroup4 =
+    document.querySelector<HTMLButtonElement>('#btn-UpdateGroup4')
   if (btnUpdateGroup4) {
-    btnUpdateGroup4.onclick = function() {
-      instance.command.updateGroup('testGroupId-02-02', { value: '新文字2222', highlight: '#ff0' })
+    btnUpdateGroup4.onclick = function () {
+      instance.command.updateGroup('testGroupId-02-02', {
+        value: '新文字2222',
+        highlight: '#ff0'
+      })
     }
   }
 }

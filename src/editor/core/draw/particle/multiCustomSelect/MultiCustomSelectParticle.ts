@@ -81,12 +81,9 @@ export class MultiCustomSelectParticle {
       ctx.textBaseline = 'middle'
       ctx.fillText(text, centerX, centerY + 1)
     } else {
-      const arrowWidth = circleRadius * 1.1
-      const arrowHeight = circleRadius * 0.9
-      const headWidth = arrowWidth * 0.45
-      const headHeight = arrowHeight
-      const shaftWidth = arrowWidth - headWidth
-      const shaftHeight = arrowHeight * 0.4
+      const arrowWidth = circleRadius * 0.95
+      const arrowHeight = circleRadius * 0.45
+      const arrowGap = circleRadius * 0.15
 
       ctx.beginPath()
       ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
@@ -96,20 +93,38 @@ export class MultiCustomSelectParticle {
       ctx.fillStyle = this.options.selector.arrowColor
       ctx.beginPath()
 
-      const startX = centerX - arrowWidth / 2
+      const topArrowY = centerY - (arrowHeight + arrowGap) / 2
+      const bottomArrowY = centerY + (arrowHeight + arrowGap) / 2
 
-      ctx.moveTo(startX, centerY - shaftHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY - shaftHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY - headHeight / 2)
-      ctx.lineTo(startX + arrowWidth, centerY)
-      ctx.lineTo(startX + shaftWidth, centerY + headHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY + shaftHeight / 2)
-      ctx.lineTo(startX, centerY + shaftHeight / 2)
-      ctx.closePath()
+      this.addArrowPath(ctx, centerX, topArrowY, arrowWidth, arrowHeight)
+      this.addArrowPath(ctx, centerX, bottomArrowY, arrowWidth, arrowHeight)
       ctx.fill()
     }
 
     ctx.restore()
+  }
+
+  private addArrowPath(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    arrowWidth: number,
+    arrowHeight: number
+  ): void {
+    const headWidth = arrowWidth * 0.45
+    const headHeight = arrowHeight
+    const shaftWidth = arrowWidth - headWidth
+    const shaftHeight = arrowHeight * 0.4
+    const startX = centerX - arrowWidth / 2
+
+    ctx.moveTo(startX, centerY - shaftHeight / 2)
+    ctx.lineTo(startX + shaftWidth, centerY - shaftHeight / 2)
+    ctx.lineTo(startX + shaftWidth, centerY - headHeight / 2)
+    ctx.lineTo(startX + arrowWidth, centerY)
+    ctx.lineTo(startX + shaftWidth, centerY + headHeight / 2)
+    ctx.lineTo(startX + shaftWidth, centerY + shaftHeight / 2)
+    ctx.lineTo(startX, centerY + shaftHeight / 2)
+    ctx.closePath()
   }
 
   public getAssociationId(element: IElement): string | undefined {

@@ -2314,7 +2314,15 @@ export class CommandAdapt {
     this.draw.getGroup().deleteGroup(groupId)
   }
 
-  public changeGroupStyle(groupId: string, styleFlag: { underline?: boolean, highlight?: string, color?: string, all?: boolean}) {
+  public changeGroupStyle(
+    groupId: string,
+    styleFlag: {
+      underline?: boolean
+      highlight?: string
+      color?: string
+      all?: boolean
+    }
+  ) {
     this.draw.getGroup().changeGroupStyle(groupId, styleFlag)
   }
 
@@ -2431,17 +2439,15 @@ export class CommandAdapt {
   }
 
   // 将数组中相邻且同 groupId 的元素合并（文字拼接），并应用 options
-  private mergeGroupInArray<T extends {
-    value?: string
-    groupIds?: string[]
-    color?: string
-    underline?: boolean
-    highlight?: string
-  }>(
-    arr: T[],
-    groupId: string,
-    options: Partial<IElement>
-  ): T[] {
+  private mergeGroupInArray<
+    T extends {
+      value?: string
+      groupIds?: string[]
+      color?: string
+      underline?: boolean
+      highlight?: string
+    }
+  >(arr: T[], groupId: string, options: Partial<IElement>): T[] {
     const isInGroup = (el?: IElement) => !!el?.groupIds?.includes(groupId)
 
     // 样式属性不同时不应合并为同一元素
@@ -2535,11 +2541,18 @@ export class CommandAdapt {
   // 需求2：根据 groupId 更新分组，合并相邻同组元素（单选/多选 structValues 内），向上同步 value/code
   public updateGroup(groupId: string, options: Partial<IElement>): void {
     if (!groupId) return
-    const controlList = this.draw.getControl().getList()
     // 1. 处理控件 structValues（单选 / 多选）
-    for (const controlElement of controlList) {
-      const control = controlElement.control
-      if (!control) continue
+    //    注意：getControl().getList() 返回的是 zipElementList 压缩聚合后的副本，
+    //    其 .control 是 { ...element.control! } 浅拷贝；直接重赋值 .structValues 只改了副本，
+    //    源数据（this.elementList 等原始列表里的真实 .control）毫发未动，控件值永远不变。
+    //    因此必须遍历原始元素列表，定位真实的 .control 对象再修改。
+    const sourceLists = [
+      this.draw.getHeader().getElementList(),
+      this.draw.getOriginalMainElementList(),
+      this.draw.getFooter().getElementList()
+    ]
+    const updateControlStructValues = (control: IElement['control']) => {
+      if (!control) return
       if (
         control.type === ControlType.CUSTOM_SELECT &&
         control.structValues?.length
@@ -2570,8 +2583,7 @@ export class CommandAdapt {
             options
           )
           // 向上更新选项 value
-          option.value =
-            option.structValues.map(sv => sv.value).join('') || ''
+          option.value = option.structValues.map(sv => sv.value).join('') || ''
         }
         // 向上更新控件 value / code
         const newCode =
@@ -2582,6 +2594,23 @@ export class CommandAdapt {
         control.value = null
         control.code = newCode
       }
+    }
+    const walkSourceList = (list: IElement[]) => {
+      for (const el of list) {
+        if (el.type === ElementType.TABLE) {
+          for (const tr of el.trList || []) {
+            for (const td of tr.tdList) {
+              walkSourceList(td.value)
+            }
+          }
+        }
+        if (el.controlId && el.control) {
+          updateControlStructValues(el.control)
+        }
+      }
+    }
+    for (const list of sourceLists) {
+      walkSourceList(list)
     }
     // 2. 同步更新主列表（及表格单元格）中带该 groupId 的元素（含控件派生 VALUE 元素）。
     //    采用逐字符展开而非整段合并，使分组按字符自然换行（不会被当成一整块强制换行）
