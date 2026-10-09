@@ -20,8 +20,8 @@ export default {
       '@babel/plugin-transform-runtime',
       {
         corejs: false,
-        helpers: true,
-        regenerator: true
+        helpers: false,
+        regenerator: false
       }
     ]
   ]

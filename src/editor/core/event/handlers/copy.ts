@@ -20,7 +20,7 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
     if ((<IOverrideResult>overrideResult)?.preventDefault !== false) return
   }
   const rangeManager = draw.getRange()
-  // 光标闭合时复制整行
+  // 光标折叠且未选中任何内容时不复制任何内容（与未选中时剪切行为保持一致）
   let copyElementList: IElement[] | null = null
   const range = rangeManager.getRange()
   if (range.isCrossRowCol) {
@@ -60,7 +60,7 @@ export async function copy(host: CanvasEvent, options?: ICopyOption) {
     copyElementList = zipElementList([copyTableElement])
   } else {
     copyElementList = rangeManager.getIsCollapsed()
-      ? rangeManager.getRangeRowElementList()
+      ? null
       : rangeManager.getSelectionElementList()
   }
   // 粘贴单选/多选/数字等控件内容时，仅保留 VALUE 文本内容（含选项间分隔符），

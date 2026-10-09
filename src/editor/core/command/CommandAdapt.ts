@@ -2491,6 +2491,47 @@ export class CommandAdapt {
     return result
   }
 
+  // 主列表分组更新：保持"每字符一个元素 + 各自带 groupIds"的结构，
+  // 使分组在排版时按字符自然换行，而不会被当成一整块强制换到下一行。
+  // - 若 options 含 value：用新内容逐字符替换该分组连续片段（每段一个元素，均保留 groupIds）
+  // - 否则：保留原有逐字符元素，仅把样式选项（underline/highlight/color 等）套用到每个元素
+  private expandGroupInArray(
+    arr: IElement[],
+    groupId: string,
+    options: Partial<IElement>
+  ): void {
+    const isInGroup = (el?: IElement) => !!el?.groupIds?.includes(groupId)
+    const { value: newValue, ...styleOptions } = options
+    const result: IElement[] = []
+    let i = 0
+    while (i < arr.length) {
+      const el = arr[i]
+      if (isInGroup(el)) {
+        // 收集连续的同组片段
+        let j = i
+        while (j < arr.length && isInGroup(arr[j])) j++
+        if (newValue != null) {
+          // 用新内容逐字符替换整段分组（保留首个元素的样式基线与 groupIds）
+          const base = { ...el, ...styleOptions }
+          for (const ch of newValue) {
+            result.push({ ...base, value: ch } as IElement)
+          }
+        } else {
+          // 仅更新样式，逐字符保留原 value
+          for (let k = i; k < j; k++) {
+            result.push({ ...arr[k], ...styleOptions })
+          }
+        }
+        i = j
+      } else {
+        result.push(el)
+        i++
+      }
+    }
+    arr.length = 0
+    for (const el of result) arr.push(el)
+  }
+
   // 需求2：根据 groupId 更新分组，合并相邻同组元素（单选/多选 structValues 内），向上同步 value/code
   public updateGroup(groupId: string, options: Partial<IElement>): void {
     if (!groupId) return
@@ -2542,13 +2583,11 @@ export class CommandAdapt {
         control.code = newCode
       }
     }
-    // 2. 同步更新主列表（及表格单元格）中带该 groupId 的元素（含控件派生 VALUE 元素），
-    //    合并相邻同组元素，保持画布显示与数据一致
+    // 2. 同步更新主列表（及表格单元格）中带该 groupId 的元素（含控件派生 VALUE 元素）。
+    //    采用逐字符展开而非整段合并，使分组按字符自然换行（不会被当成一整块强制换行）
     const elementList = this.draw.getOriginalMainElementList()
     this.walkElementList(elementList, list => {
-      const merged = this.mergeGroupInArray(list, groupId, options)
-      list.length = 0
-      for (const el of merged) list.push(el)
+      this.expandGroupInArray(list, groupId, options)
     })
     // 3. 重新渲染，保持数据一致性
     this.draw.render({ isSetCursor: false })

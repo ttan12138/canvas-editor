@@ -304,9 +304,13 @@ export class GlobalEvent {
       this.canvasEvent.dragover(evt)
     } else {
       // [DEBUG drag] dragover 命中 pageContainer 但未命中 canvas，预览光标可能显示但 drop 不触发
-      console.log('[DEBUG drag] dragover inside-pageContainer 但 innerEditorDom=false',
-        'target=', (target as any)?.tagName,
-        'isInside=', isInsideCurrentEditor)
+      console.log(
+        '[DEBUG drag] dragover inside-pageContainer 但 innerEditorDom=false',
+        'target=',
+        (target as any)?.tagName,
+        'isInside=',
+        isInsideCurrentEditor
+      )
     }
   }
 
@@ -327,10 +331,17 @@ export class GlobalEvent {
       evt.clientX <= containerRect.right &&
       evt.clientY >= containerRect.top &&
       evt.clientY <= containerRect.bottom
-    console.log('[DEBUG drag] handleGlobalDrop innerEditorDom=', !!innerEditorDom,
-      'target=', (target as any)?.tagName,
-      'dropInsidePageContainer=', dropInsidePageContainer,
-      'clientX/Y=', evt.clientX, evt.clientY)
+    console.log(
+      '[DEBUG drag] handleGlobalDrop innerEditorDom=',
+      !!innerEditorDom,
+      'target=',
+      (target as any)?.tagName,
+      'dropInsidePageContainer=',
+      dropInsidePageContainer,
+      'clientX/Y=',
+      evt.clientX,
+      evt.clientY
+    )
     // console.log('[GLOBAL DRAG] drop, innerEditorDom found:', !!innerEditorDom, 'target:', target)
     if (innerEditorDom) {
       this.canvasEvent.drop(evt)

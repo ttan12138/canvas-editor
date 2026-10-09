@@ -107,6 +107,16 @@ export class ContextMenu {
   }
 
   private _proxyContextMenuEvent = (evt: MouseEvent) => {
+    // 右键时关闭已打开的控件弹层（单选/多选/日期/数字等），
+    // 避免"可选项下拉"与"右键菜单"同时出现
+    const activeControl = this.draw.getControl().getActiveControl()
+    if (
+      activeControl &&
+      typeof (activeControl as any).getIsPopup === 'function' &&
+      (activeControl as any).getIsPopup()
+    ) {
+      ;(activeControl as any).destroy()
+    }
     this.context = this._getContext()
     const renderList = this._filterMenuList(this.contextMenuList)
     const isRegisterContextMenu = renderList.some(menu => !menu.isDivider)

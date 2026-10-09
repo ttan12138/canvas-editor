@@ -86,9 +86,13 @@ export function left(evt: KeyboardEvent, host: CanvasEvent) {
     } else {
       anchorEndIndex = endIndex
     }
+  } else if (!isCollapsed) {
+    // 存在选区时，左移箭头应将光标折叠到选区起始（首字之前），避免再多跨一个字
+    anchorStartIndex = startIndex
+    anchorEndIndex = startIndex
   }
   // 表格单元格间跳转
-  if (!evt.shiftKey) {
+  if (!evt.shiftKey && isCollapsed) {
     const element = elementList[startIndex]
     // 之前是表格则进入最后一个单元格最后一个元素
     if (element.type === ElementType.TABLE) {
