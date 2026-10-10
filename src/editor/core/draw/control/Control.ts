@@ -1621,7 +1621,9 @@ export class Control {
         element.controlId === controlId &&
         element.controlComponent === ControlComponent.POSTFIX
       ) {
-        return i + 1 < elementList.length ? i + 1 : i
+        // 折叠 range(k, k) 表示光标位于第 k 个元素之后，
+        // 返回 POSTFIX 自身下标即可将光标置于控件末尾之后
+        return i
       }
     }
     return null

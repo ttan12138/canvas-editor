@@ -2162,9 +2162,7 @@ export class Draw {
           element.control.type === ControlType.MULTI_CUSTOM_SELECT)
       ) {
         const size = element.size || defaultSize
-        const particleSize = size * 0.8
-        const circleRadius = particleSize * 0.7
-        const elementWidth = circleRadius * 2 + size * 0.2
+        const elementWidth = size * 0.85
         element.width = elementWidth
         metrics.width = elementWidth * scale
         metrics.height = size * scale
@@ -2176,9 +2174,7 @@ export class Draw {
         element.control.type === ControlType.NUMBER_FLAG
       ) {
         const size = element.size || defaultSize
-        const headSize = size * 0.2
-        const headAngle = Math.PI / 5
-        const elementWidth = headSize * Math.sin(headAngle) * 2 + size * 0.3
+        const elementWidth = size * 0.85
         element.width = elementWidth
         metrics.width = elementWidth * scale
         metrics.height = size * scale
@@ -2801,9 +2797,8 @@ export class Draw {
           const numericValue = parseFloat(controlValue)
           if (!isNaN(numericValue)) {
             const rowMargin = this.getElementRowMargin(element)
-            const size = element.size || this.options.defaultSize
             const arrowHeight = curRow.height - 2 * rowMargin
-            const arrowX = x + size * 0.2
+            const arrowX = x + element.metrics.width / 2
             const arrowY = y + rowMargin + arrowHeight * 0.5
             this.numberFlagParticle.render({
               ctx,

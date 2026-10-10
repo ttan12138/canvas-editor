@@ -148,6 +148,22 @@ import { IRichtextOption } from '../../interface/Command'
 import { WatermarkType } from '../../dataset/enum/Watermark'
 import { Convert, IConvertToControlOption } from './Convert'
 
+// 深合并配置对象（source 优先覆盖 target），用于 updateOptions 与当前配置合并
+function deepMergeOption<T extends object>(target: T, source: object): T {
+  const record = target as Record<string, unknown>
+  Object.entries(source).forEach(([key, value]) => {
+    const targetValue = record[key]
+    const isPlainObject = (v: unknown) =>
+      v !== null && typeof v === 'object' && !Array.isArray(v)
+    if (isPlainObject(value) && isPlainObject(targetValue)) {
+      deepMergeOption(targetValue as object, value as object)
+    } else {
+      record[key] = value
+    }
+  })
+  return target
+}
+
 export class CommandAdapt {
   private draw: Draw
   private range: RangeManager
@@ -2759,11 +2775,62 @@ export class CommandAdapt {
   }
 
   public updateOptions(payload: IUpdateOption) {
-    const newOption = mergeOption(payload)
+    // 先与当前配置深合并再经 mergeOption 兜底默认值：
+    // 此前仅 mergeOption(payload)（payload 与默认配置合并），初始化或此前
+    // updateOptions 已自定义的嵌套配置（如 selector 下各类颜色）会被默认值
+    // 覆盖，导致 executeUpdateOptions 更新颜色不生效
+    const prevSelector = this.options.selector
+    const mergedOption = deepMergeOption(
+      deepClone(this.options),
+      payload
+    ) as unknown as IEditorOption
+    const newOption = mergeOption(mergedOption)
     Object.entries(newOption).forEach(([key, value]) => {
       Reflect.set(this.options, key, value)
     })
+    // 选中值文字颜色需实时生效：控件模式下该颜色已烘焙进元素 color，
+    // 仅替换“仍等于旧配置色”的项（保留选项自带 structValues 颜色）；
+    // TEXT 模式文字色由绘制层 getSelectorTextValueElement 实时读取，无需处理
+    this._refreshSelectorValueColors(prevSelector, this.options.selector)
     this.forceUpdate()
+  }
+
+  // 刷新选择器控件选中值文字颜色（CUSTOM_SELECT / MULTI_CUSTOM_SELECT 的 VALUE 元素）
+  private _refreshSelectorValueColors(
+    prevSelector: typeof this.options.selector,
+    nextSelector: typeof this.options.selector
+  ): void {
+    const walk = (elementList: IElement[]) => {
+      for (const element of elementList) {
+        if (element.type === ElementType.TABLE && element.trList) {
+          for (const tr of element.trList) {
+            for (const td of tr.tdList) {
+              if (td.value) walk(td.value)
+            }
+          }
+          continue
+        }
+        if (
+          element.controlComponent === ControlComponent.VALUE &&
+          element.control
+        ) {
+          if (element.control.type === ControlType.CUSTOM_SELECT) {
+            if (element.color === prevSelector.customSelectValueColor) {
+              element.color = nextSelector.customSelectValueColor
+            }
+          } else if (
+            element.control.type === ControlType.MULTI_CUSTOM_SELECT
+          ) {
+            if (element.color === prevSelector.multiSelectValueColor) {
+              element.color = nextSelector.multiSelectValueColor
+            }
+          }
+        }
+      }
+    }
+    walk(this.draw.getOriginalMainElementList())
+    walk(this.draw.getHeaderElementList())
+    walk(this.draw.getFooterElementList())
   }
 
   public getControlList(): IElement[] {

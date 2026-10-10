@@ -48,9 +48,8 @@ export class CustomSelectParticle {
     const scale = this.options.scale
     const svgSize = (element.size || metrics.height) * scale * 0.8
     const centerX = x + metrics.width / 2
-    // 与同行文字采用相同基线对齐：y 为元素顶边，row.ascent 是文字基线高，
-    // 图标中心置于基线向上半个图标处，与文字中心重合（控件 UI 基准是基线而非整行几何中心）
-    const centerY = y + row.ascent - svgSize / 2
+    // 底部对齐：y 为元素顶边，图标底边与行底部对齐（不再垂直居中）
+    const centerY = y + row.height - svgSize / 2
 
     this.drawSelectArrow(ctx, centerX, centerY, svgSize, hasAssociation)
   }
@@ -64,51 +63,75 @@ export class CustomSelectParticle {
   ): void {
     ctx.save()
 
-    const circleRadius = size * 0.7
-
     if (hasAssociation) {
-      const text = '联'
-      const fontSize = size * 0.85
-      const font = fontSize + 'px "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif'
-
-      ctx.beginPath()
-      ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = this.options.selector.associationBackgroundColor
-      ctx.fill()
-
-      ctx.fillStyle = this.options.selector.associationTextColor
-      ctx.font = font
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(text, centerX, centerY + 1)
+      this.drawChainLinkIcon(ctx, centerX, centerY, size)
     } else {
-      const arrowWidth = circleRadius * 1.1
-      const arrowHeight = circleRadius * 0.9
-      const headWidth = arrowWidth * 0.45
-      const headHeight = arrowHeight
-      const shaftWidth = arrowWidth - headWidth
-      const shaftHeight = arrowHeight * 0.4
-
-      ctx.beginPath()
-      ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2)
-      ctx.fillStyle = this.options.selector.arrowBackgroundColor
-      ctx.fill()
-
-      ctx.fillStyle = this.options.selector.arrowColor
-      ctx.beginPath()
-
-      const startX = centerX - arrowWidth / 2
-
-      ctx.moveTo(startX, centerY - shaftHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY - shaftHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY - headHeight / 2)
-      ctx.lineTo(startX + arrowWidth, centerY)
-      ctx.lineTo(startX + shaftWidth, centerY + headHeight / 2)
-      ctx.lineTo(startX + shaftWidth, centerY + shaftHeight / 2)
-      ctx.lineTo(startX, centerY + shaftHeight / 2)
-      ctx.closePath()
-      ctx.fill()
+      this.drawChevronIcon(ctx, centerX, centerY, size)
     }
+
+    ctx.restore()
+  }
+
+  private drawChevronIcon(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const scale = size / 24
+    const toX = (vx: number) => centerX + (vx - 12) * scale
+    const toY = (vy: number) => centerY + (vy - 12) * scale
+    const lineWidth = Math.max(1, 2 * scale)
+
+    ctx.beginPath()
+    ctx.strokeStyle = this.options.selector.arrowBackgroundColor
+    ctx.lineWidth = lineWidth
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.moveTo(toX(6), toY(9))
+    ctx.lineTo(toX(12), toY(15))
+    ctx.lineTo(toX(18), toY(9))
+    ctx.stroke()
+  }
+
+  private drawChainLinkIcon(
+    ctx: CanvasRenderingContext2D,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const scale = size / 24
+    const toX = (vx: number) => centerX + (vx - 12) * scale
+    const toY = (vy: number) => centerY + (vy - 12) * scale
+    const lineWidth = Math.max(1, 2 * scale)
+
+    ctx.save()
+    ctx.strokeStyle = this.options.selector.associationBackgroundColor
+    ctx.lineWidth = lineWidth
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    // 左链环：开口朝右的 “(” 形（对应 SVG link-2 左半弧）
+    ctx.beginPath()
+    ctx.moveTo(toX(9), toY(17))
+    ctx.lineTo(toX(7), toY(17))
+    ctx.arc(toX(7), toY(12), 5 * scale, Math.PI / 2, (3 * Math.PI) / 2, false)
+    ctx.lineTo(toX(9), toY(7))
+    ctx.stroke()
+
+    // 右链环：开口朝左的 “)” 形（对应 SVG link-2 右半弧）
+    ctx.beginPath()
+    ctx.moveTo(toX(15), toY(7))
+    ctx.lineTo(toX(17), toY(7))
+    ctx.arc(toX(17), toY(12), 5 * scale, -Math.PI / 2, Math.PI / 2, false)
+    ctx.lineTo(toX(15), toY(17))
+    ctx.stroke()
+
+    // 中间连接线（对应 SVG link-2 的 <line>）
+    ctx.beginPath()
+    ctx.moveTo(toX(8), toY(12))
+    ctx.lineTo(toX(16), toY(12))
+    ctx.stroke()
 
     ctx.restore()
   }

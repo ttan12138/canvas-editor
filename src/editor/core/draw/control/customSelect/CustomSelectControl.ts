@@ -39,6 +39,15 @@ import { detectMultiUnitPattern } from '../../../../utils/unitParser'
 import { Draw } from '../../Draw'
 import { Control } from '../Control'
 import { AssociationStateManager } from '../association/AssociationStateManager'
+import {
+  SELECT_CHECK_SVG,
+  SELECT_CLOSE_SVG,
+  SELECT_TRASH_SVG
+} from '../selectPopupIcons'
+
+// 编辑模式下的候选项工作副本（isNew 标记本次新增项，提交时重新生成 code）
+type IPendingValueSet = IValueSet & { isNew?: boolean }
+
 function hex16toRgba(hex: string, alpha: number = 1): string {
   return `rgba(${hex.slice(1, 3)}, ${hex.slice(3, 5)}, ${hex.slice(5, 7)}, ${hex.slice(7, 16)}, ${alpha})`
 }
@@ -54,6 +63,13 @@ export class CustomSelectControl implements IControlInstance {
   private DEFAULT_MULTI_SELECT_DELIMITER = ','
   private stateManager: AssociationStateManager
   private valueSetCache: Map<string, Map<string, IValueSet>> = new Map()
+  // 候选项编辑模式状态
+  private isEditMode: boolean = false
+  private pendingValueSets: IPendingValueSet[] = []
+  private pendingCodes: string[] = []
+  private editOutsideHandler: ((e: MouseEvent) => void) | null = null
+  private editTitleSpan: HTMLSpanElement | null = null
+  private modeLabel: '单选' | '多选' = '单选'
 
   constructor(element: IElement, control: Control) {
     const draw = control.getDraw()
@@ -390,7 +406,12 @@ export class CustomSelectControl implements IControlInstance {
       preIndex--
     }
     // 向右查找
-    let nextIndex = startIndex + 1
+    // 起始元素本身为 POSTFIX/POST_TEXT 时（如光标位于控件末尾），从当前元素开始查找，
+    // 使右边界落在后缀前一元素，避免清除选项时误删后缀图标
+    const isStartPostfix =
+      startElement.controlComponent === ControlComponent.POSTFIX ||
+      startElement.controlComponent === ControlComponent.POST_TEXT
+    let nextIndex = isStartPostfix ? startIndex : startIndex + 1
     while (nextIndex < elementList.length) {
       const nextElement = elementList[nextIndex]
       if (
@@ -598,8 +619,13 @@ export class CustomSelectControl implements IControlInstance {
 
   private _createSelectPopupDom() {
     const control = this.element.control!
-    const valueSets = control.valueSets
-    if (!Array.isArray(valueSets) || !valueSets.length) return
+    // 编辑模式渲染 pendingValueSets（工作副本），普通模式渲染 valueSets
+    const valueSets: IValueSet[] = this.isEditMode
+      ? this.pendingValueSets
+      : Array.isArray(control.valueSets)
+        ? control.valueSets
+        : []
+    if (!this.isEditMode && !valueSets.length) return
     const position = this.control.getPosition()
     if (!position) return
 
@@ -633,9 +659,44 @@ export class CustomSelectControl implements IControlInstance {
     const inputValues = new Map<string, string>()
     const inputElements = new Map<string, HTMLInputElement[]>()
     const isMultiSelect = control.isMultiSelect
-    const activeCodes = isMultiSelect
-      ? new Set(this.getCodes())
-      : this.getCodes()[0]
+    const currentCodes = this.isEditMode
+      ? this.pendingCodes
+      : this.getCodes() || []
+    const activeCodes = isMultiSelect ? new Set(currentCodes) : currentCodes[0]
+    this.modeLabel = isMultiSelect ? '多选' : '单选'
+
+    // 弹窗头部：模式 · N 个候选（编辑模式时附【编辑模式】及 √ / ×）
+    const header = document.createElement('div')
+    header.className = `${EDITOR_PREFIX}-select-popup-header`
+    const titleSpan = document.createElement('span')
+    titleSpan.className = `${EDITOR_PREFIX}-select-popup-title`
+    titleSpan.textContent = `${this.modeLabel} · ${valueSets.length} 个候选`
+    header.append(titleSpan)
+    if (this.isEditMode) {
+      this.editTitleSpan = titleSpan
+      const editLabel = document.createElement('span')
+      editLabel.className = `${EDITOR_PREFIX}-select-popup-edit-label`
+      editLabel.textContent = '【编辑中】'
+      const okBtn = document.createElement('span')
+      okBtn.className = `${EDITOR_PREFIX}-select-popup-edit-ok`
+      okBtn.innerHTML = SELECT_CHECK_SVG
+      okBtn.title = '完成编辑'
+      okBtn.onclick = e => {
+        e.stopPropagation()
+        this._commitEditMode(false)
+      }
+      const cancelBtn = document.createElement('span')
+      cancelBtn.className = `${EDITOR_PREFIX}-select-popup-edit-cancel`
+      cancelBtn.innerHTML = SELECT_CLOSE_SVG
+      cancelBtn.title = '退出编辑并关闭'
+      cancelBtn.onclick = e => {
+        e.stopPropagation()
+        this._commitEditMode(true)
+      }
+      header.append(editLabel, okBtn, cancelBtn)
+    } else {
+      this.editTitleSpan = null
+    }
 
     for (let v = 0; v < valueSets.length; v++) {
       const valueSet = valueSets[v]
@@ -659,6 +720,13 @@ export class CustomSelectControl implements IControlInstance {
 
       if (isSelected) {
         li.classList.add('active')
+      }
+
+      // 编辑模式：候选项渲染为 textarea + 删除图标，保留选中高亮
+      if (this.isEditMode) {
+        this._buildEditOptionLi(li, valueSet)
+        ul.append(li)
+        continue
       }
 
       const multiUnitMatch = detectMultiUnitPattern(valueSet.value)
@@ -869,16 +937,25 @@ export class CustomSelectControl implements IControlInstance {
         this.setSelectWithInputValues(newCodes, inputValues)
       }
 
-      // 选项右侧“移除”按钮：从 valueSets 删除该项
-      this._appendRemoveOptionBtn(li, valueSet!.code)
+      // 选中项右侧显示对勾图标
+      if (isSelected) {
+        const checkSpan = document.createElement('span')
+        checkSpan.className = `${EDITOR_PREFIX}-select-option-check`
+        checkSpan.innerHTML = SELECT_CHECK_SVG
+        li.append(checkSpan)
+      }
 
       ul.append(li)
     }
 
     selectPopupContainer.append(ul)
+    // 头部始终显示实际渲染的候选项数量
+    titleSpan.textContent = `${this.modeLabel} · ${ul.children.length} 个候选`
+    // 头部插入到选项列表上方
+    selectPopupContainer.insertBefore(header, ul)
 
-    // “添加选项”按钮：用于向单选/多选控件动态追加额外选项
-    this._appendAddOptionBar(selectPopupContainer)
+    // 底部操作条：非编辑模式为“管理候选项”，编辑模式为“+ 新增候选项”
+    this._appendManageBar(selectPopupContainer)
 
     selectPopupContainer.style.zIndex = '1000'
     // 统一使用 options.selector 配置的颜色（通过 CSS 变量注入，select.css 消费）
@@ -944,6 +1021,10 @@ export class CustomSelectControl implements IControlInstance {
       selectorOption.checkboxBorderColor
     )
     selectPopupContainer.style.setProperty(
+      '--ce-selector-checkbox-active-bg',
+      selectorOption.checkboxActiveBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
       '--ce-selector-checkbox-mark',
       selectorOption.checkboxMarkColor
     )
@@ -954,6 +1035,34 @@ export class CustomSelectControl implements IControlInstance {
     selectPopupContainer.style.setProperty(
       '--ce-selector-arrow-color',
       selectorOption.arrowColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-edit-textarea-border',
+      selectorOption.editTextareaBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-edit-textarea-hover-border',
+      selectorOption.editTextareaHoverBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-edit-textarea-active-border',
+      selectorOption.editTextareaActiveBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-manage-color',
+      selectorOption.manageOptionColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-manage-hover-color',
+      selectorOption.manageOptionHoverColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-manage-border',
+      selectorOption.manageOptionBorderColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-title',
+      selectorOption.popupTitleColor
     )
     selectPopupContainer.style.backgroundColor =
       'var(--ce-selector-popup-bg, #fff)'
@@ -1015,7 +1124,7 @@ export class CustomSelectControl implements IControlInstance {
       hint.style.borderTop = '1px solid #E4E7ED'
       hint.style.fontSize = '12px'
       hint.style.color = '#E6A23C'
-      hint.style.whiteSpace = 'nowrap'
+      hint.style.whiteSpace = 'wrap'
       hint.style.borderRadius = '0 0 4px 4px'
       hint.style.textWrap = 'auto'
       container.appendChild(hint)
@@ -1030,110 +1139,260 @@ export class CustomSelectControl implements IControlInstance {
     }
   }
 
-  // 在弹窗底部追加“添加选项”按钮，点击后可内联新增一项到 valueSets
-  private _appendAddOptionBar(container: HTMLDivElement): void {
-    if (!this.options.selector.showAddOption) return
-    const addBar = document.createElement('div')
-    addBar.className = `${EDITOR_PREFIX}-selector-add-bar`
-    const addBtn = document.createElement('div')
-    addBtn.className = `${EDITOR_PREFIX}-selector-add-btn`
-    addBtn.textContent = '+ 添加选项'
-    addBar.append(addBtn)
-    container.append(addBar)
-
-    const reset = () => {
-      const row = addBar.querySelector(
-        `.${EDITOR_PREFIX}-selector-add-row`
-      ) as HTMLDivElement | null
-      row?.remove()
-      addBtn.style.display = ''
-    }
-
-    addBtn.addEventListener('click', () => {
-      // 已处于编辑态则忽略
-      if (addBar.querySelector('input')) return
-      addBtn.style.display = 'none'
-      const row = document.createElement('div')
-      row.className = `${EDITOR_PREFIX}-selector-add-row`
-      const input = document.createElement('input')
-      input.type = 'text'
-      input.placeholder = '输入新选项'
-      const ok = document.createElement('span')
-      ok.className = `${EDITOR_PREFIX}-selector-add-ok`
-      ok.textContent = '确认'
-      const cancel = document.createElement('span')
-      cancel.className = `${EDITOR_PREFIX}-selector-add-cancel`
-      cancel.textContent = '取消'
-
-      const confirm = () => {
-        const value = input.value.trim()
-        if (!value) {
-          input.focus()
-          return
-        }
-        // 取一个不与现有 code 冲突的唯一 code
-        const control = this.element.control!
-        const existingCodes = new Set(
-          control.valueSets?.map(v => v.code) || []
-        )
-        let code = value
-        let i = 1
-        while (existingCodes.has(code)) {
-          code = `${value}_${i++}`
-        }
-        control.valueSets = control.valueSets || []
-        control.valueSets.push({ value, code })
-        // 新增选项后使缓存失效，确保后续可正常选中
-        this.valueSetCache.delete(this.element.controlId || '')
-        // 重建弹窗以展示新选项
-        this.destroy()
-        this._createSelectPopupDom()
-        this.isPopup = true
-      }
-
-      ok.addEventListener('click', confirm)
-      cancel.addEventListener('click', reset)
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          confirm()
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          reset()
-        }
-      })
-      row.append(input, ok, cancel)
-      addBar.append(row)
-      input.focus()
-    })
+  // 创建选项 li 的基础样式
+  private _createBaseOptionLi(): HTMLLIElement {
+    const li = document.createElement('li')
+    li.style.display = 'flex'
+    li.style.alignItems = 'flex-start'
+    li.style.padding = '0px 6px'
+    li.style.cursor = 'pointer'
+    li.style.listStyle = 'none'
+    li.style.minHeight = '28px'
+    li.style.lineHeight = '28px'
+    li.style.position = 'relative'
+    li.style.flexWrap = 'wrap'
+    li.style.wordBreak = 'break-word'
+    li.style.overflowWrap = 'break-word'
+    li.style.height = 'auto'
+    return li
   }
 
-  // 在单选项 li 右侧追加“移除”按钮，点击后从 valueSets 删除该项
-  private _appendRemoveOptionBtn(li: HTMLLIElement, code: string): void {
-    if (!this.options.selector.showRemoveOption) return
+  // 编辑模式：候选项渲染为 textarea + 删除图标（高亮由外层通过 active class 控制）
+  private _buildEditOptionLi(li: HTMLLIElement, valueSet: IValueSet): void {
+    const textarea = document.createElement('textarea')
+    textarea.className = `${EDITOR_PREFIX}-selector-edit-textarea`
+    textarea.value = valueSet.value
+    textarea.placeholder = '输入候选文字'
+    textarea.rows = 1
+    // 阻止按键冒泡至编辑器全局快捷键处理
+    textarea.addEventListener('keydown', e => e.stopPropagation())
+    textarea.addEventListener('input', () => {
+      valueSet.value = textarea.value
+      this._adjustTextareaHeight(textarea)
+    })
+    textarea.addEventListener('focus', () =>
+      this._adjustTextareaHeight(textarea)
+    )
+    li.append(textarea)
     const removeBtn = document.createElement('span')
-    removeBtn.className = `${EDITOR_PREFIX}-selector-remove-btn`
-    removeBtn.textContent = '×'
-    removeBtn.title = '移除该选项'
-    removeBtn.addEventListener('click', e => {
+    removeBtn.className = `${EDITOR_PREFIX}-selector-edit-remove`
+    removeBtn.innerHTML = SELECT_TRASH_SVG
+    removeBtn.title = '删除该候选项'
+    removeBtn.onclick = e => {
       e.stopPropagation()
-      const control = this.element.control!
-      const valueSets = control.valueSets || []
-      const idx = valueSets.findIndex(v => v.code === code)
-      if (idx < 0) return
-      valueSets.splice(idx, 1)
-      control.valueSets = valueSets
-      // 删除选项后使缓存失效
-      this.valueSetCache.delete(this.element.controlId || '')
-      // 同步清理选中值中被删除的 code
-      const currentCodes = (this.getCodes() || []).filter(c => c !== code)
-      this.setSelectWithInputValues(currentCodes, new Map())
-      // 重建弹窗以反映变化
+      const index = this.pendingValueSets.findIndex(v => v === valueSet)
+      if (~index) this.pendingValueSets.splice(index, 1)
+      this.pendingCodes = this.pendingCodes.filter(c => c !== valueSet.code)
+      li.remove()
+      this._updateEditTitle()
+    }
+    li.append(removeBtn)
+    li.onmouseenter = () => {
+      li.style.backgroundColor = 'var(--ce-selector-option-hover-bg, #EEF2FD)'
+    }
+    li.onmouseleave = () => {
+      li.style.backgroundColor = ''
+    }
+    requestAnimationFrame(() => this._adjustTextareaHeight(textarea))
+  }
+
+  // 编辑模式 textarea 高度自适应，最多显示两行（超出滚动）
+  private _adjustTextareaHeight(textarea: HTMLTextAreaElement): void {
+    textarea.style.height = 'auto'
+    const maxHeight = 44
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
+  }
+
+  // 编辑模式下同步头部候选数量（按实际渲染的候选项数量）
+  private _updateEditTitle(): void {
+    if (!this.editTitleSpan) return
+    const ul = this.selectDom?.querySelector('ul')
+    const count = ul ? ul.children.length : this.pendingValueSets.length
+    this.editTitleSpan.textContent = `${this.modeLabel} · ${count} 个候选`
+  }
+
+  // 弹窗底部操作条：非编辑模式为“管理候选项”，编辑模式为“+ 新增候选项”
+  private _appendManageBar(container: HTMLDivElement): void {
+    const { showAddOption } = this.options.selector
+    const bar = document.createElement('div')
+    bar.className = `${EDITOR_PREFIX}-selector-manage-bar`
+    if (this.isEditMode) {
+      bar.textContent = '+ 新增候选项'
+      bar.onclick = e => {
+        e.stopPropagation()
+        const code = `__new_${Date.now()}_${this.pendingValueSets.length}`
+        const item: IPendingValueSet = { code, value: '', isNew: true }
+        this.pendingValueSets.push(item)
+        const ul = container.querySelector('ul')
+        if (!ul) return
+        const li = this._createBaseOptionLi()
+        this._buildEditOptionLi(li, item)
+        ul.append(li)
+        this._updateEditTitle()
+        li.querySelector('textarea')?.focus()
+      }
+    } else {
+      // showAddOption 控制是否显示“管理候选项”入口
+      if (!showAddOption) return
+      bar.textContent = '管理候选项'
+      bar.onclick = e => {
+        e.stopPropagation()
+        this._enterEditMode()
+      }
+    }
+    container.append(bar)
+  }
+
+  // 进入候选项编辑模式
+  private _enterEditMode(): void {
+    // 刷新 element 引用：control 对象可能已被 setControlProperties 重建，避免读取过期候选项
+    const elementList = this.control.getElementList()
+    if (this.element.controlId) {
+      const liveElement = elementList.find(
+        el => el.controlId === this.element.controlId
+      )
+      if (liveElement) this.setElement(liveElement)
+    }
+    const control = this.element.control!
+    this.destroy()
+    this.pendingValueSets = (control.valueSets || []).map(v => ({ ...v }))
+    this.pendingCodes = [...(this.getCodes() || [])]
+    this.isEditMode = true
+    this._createSelectPopupDom()
+    this.isPopup = true
+    // 编辑模式下点击选项列表外区域：提交编辑并关闭选项列表
+    // （capture 阶段触发，先于全局失焦销毁逻辑执行）
+    this.editOutsideHandler = (e: MouseEvent) => {
+      const dom = this.selectDom
+      if (dom && dom.contains(e.target as Node)) return
+      if (this.isEditMode) this._commitEditMode(true)
+    }
+    document.addEventListener('mousedown', this.editOutsideHandler, true)
+  }
+
+  private _removeEditOutsideListener(): void {
+    if (this.editOutsideHandler) {
+      document.removeEventListener('mousedown', this.editOutsideHandler, true)
+      this.editOutsideHandler = null
+    }
+  }
+
+  // 退出编辑模式：移除空白候选项并提交；无有内容的候选项时直接删除控件
+  private _commitEditMode(isClose: boolean): void {
+    this._removeEditOutsideListener()
+    const kept = this.pendingValueSets
+      .filter(v => (v.value || '').trim() !== '')
+      .map(v => {
+        const item = { ...v }
+        delete item.isNew
+        return item as IValueSet
+      })
+    this.isEditMode = false
+    this.valueSetCache.delete(this.element.controlId || '')
+    if (!kept.length) {
+      this.destroy()
+      const elementList = this.control.getElementList()
+      const index = elementList.findIndex(
+        el => el.controlId === this.element.controlId
+      )
+      if (~index) {
+        const newIndex = this.control.removeControl(index)
+        if (newIndex !== null) {
+          this.draw.getRange().setRange(newIndex, newIndex)
+          this.draw.render({ curIndex: newIndex })
+        }
+      }
+      return
+    }
+    // 记录提交前的光标位置：提交过程不移动光标，避免光标漂移导致弹窗位置变化
+    const origRange = { ...this.control.getRange() }
+    // 为新增空白项生成唯一 code
+    const existingCodes = new Set<string>()
+    kept.forEach(v => {
+      if (!v.code || existingCodes.has(v.code)) {
+        let code = v.value
+        let i = 1
+        while (existingCodes.has(code)) {
+          code = `${v.value}_${i++}`
+        }
+        v.code = code
+      }
+      existingCodes.add(v.code)
+    })
+    // 将候选项写入当前元素列表中该控件的所有元素：
+    // this.element.control 可能是先前 setControlProperties 重建后的过期引用，
+    // 直接赋值会在后续属性同步时丢失新增候选项
+    const elementList = this.control.getElementList()
+    const controlIndex = this.element.controlId
+      ? elementList.findIndex(el => el.controlId === this.element.controlId)
+      : -1
+    if (~controlIndex) {
+      this.control.setControlProperties(
+        { valueSets: kept },
+        {
+          elementList,
+          range: { startIndex: controlIndex, endIndex: controlIndex }
+        }
+      )
+      // setControlProperties 会重建控件元素的 control 对象，刷新引用避免读到过期数据
+      this.setElement(elementList[controlIndex])
+    } else {
+      this.element.control!.valueSets = kept
+    }
+    // 同步选中项：保留仍存在的选中；若无则默认第一项
+    let newCodes = this.pendingCodes.filter(c => existingCodes.has(c))
+    if (!newCodes.length) {
+      newCodes = [kept[0].code]
+    }
+    this.setSelect(
+      newCodes.join(this.VALUE_DELIMITER),
+      {},
+      // 不在 setSelect 内移动光标与同步关联控件，提交后统一还原光标并手动同步
+      { isForceUpdate: true, isSyncAssociation: false }
+    )
+    // 补齐关联控件同步（isSyncAssociation=false 时 setSelect 内部跳过）
+    const associationId = this.element.control?.associationId
+    if (associationId && this.element.controlId) {
+      this.stateManager.setValue(
+        associationId,
+        newCodes.join(this.VALUE_DELIMITER),
+        ControlType.CUSTOM_SELECT,
+        this.draw,
+        this.element.controlId,
+        undefined,
+        this.element.control!.valueSets
+      )
+    }
+    // 还原提交前的光标位置并重绘
+    this._restoreCursor(origRange)
+    if (!isClose) {
+      // √：还原为普通模式并保持弹窗打开
       this.destroy()
       this._createSelectPopupDom()
       this.isPopup = true
-    })
-    li.append(removeBtn)
+    }
+  }
+
+  // 还原光标位置：直接改写 range（不走 setRange，避免触发控件重新初始化/唤醒弹窗），
+  // 并依据还原后的 range 重绘光标
+  private _restoreCursor(origRange: {
+    startIndex: number
+    endIndex: number
+  }): void {
+    const positionList = this.draw.getPosition().getPositionList()
+    let cursorIndex = origRange.startIndex
+    if (!positionList[cursorIndex]) {
+      cursorIndex = positionList.length - 1
+    }
+    if (!~cursorIndex || !positionList[cursorIndex]) return
+    const range = this.draw.getRange().getRange()
+    range.startIndex = cursorIndex
+    range.endIndex =
+      origRange.startIndex === origRange.endIndex
+        ? cursorIndex
+        : Math.min(origRange.endIndex, positionList.length - 1)
+    this.draw.getPosition().setCursorPosition(positionList[cursorIndex])
+    this.draw.getCursor().drawCursor()
   }
 
   private navigateToNextInput(
@@ -1276,5 +1535,7 @@ export class CustomSelectControl implements IControlInstance {
       this.selectDom?.remove()
       this.isPopup = false
     }
+    this._removeEditOutsideListener()
+    this.isEditMode = false
   }
 }

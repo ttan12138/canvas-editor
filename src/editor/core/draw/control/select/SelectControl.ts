@@ -551,6 +551,7 @@ export class SelectControl implements IControlInstance {
       style.setProperty('--ce-selector-checkbox-bg', selectorOption.checkboxBackgroundColor)
       style.setProperty('--ce-selector-divider', selectorOption.dividerColor)
       style.setProperty('--ce-selector-checkbox-border', selectorOption.checkboxBorderColor)
+      style.setProperty('--ce-selector-checkbox-active-bg', selectorOption.checkboxActiveBackgroundColor)
       style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
       style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
       style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)

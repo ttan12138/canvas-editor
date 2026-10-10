@@ -22,7 +22,7 @@
 
 /* 重复容器类名以提升特异性，确保压过 html.theme-pacsclient * 等全局 * 规则 */
 .ce-select-control-popup.ce-select-control-popup ul li {
-  font-size: 13px;
+  font-size: 14px;
   padding: 0 20px;
   position: relative;
   white-space: nowrap;
@@ -63,7 +63,7 @@
   border: none !important;
   border-bottom: 1px solid var(--ce-selector-input-border, #8195dd) !important;
   color: inherit !important;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .ce-select-control-popup ul li input::placeholder {
@@ -95,88 +95,145 @@
   color: var(--ce-selector-input-active-placeholder, #fff) !important;
 }
 
-/* “添加选项”按钮区：位于选项列表底部 */
-.ce-selector-add-bar {
-  padding: 4px 8px;
-  box-sizing: border-box;
-}
-
-.ce-selector-add-btn {
-  font-size: 13px;
-  height: 28px;
-  line-height: 28px;
-  text-align: center;
-  cursor: pointer;
-  border-radius: 4px;
-  color: var(--ce-selector-option-color, #666) !important;
-  border: 1px dashed var(--ce-selector-input-border, #8195dd) !important;
-  background-color: transparent !important;
-}
-
-.ce-selector-add-btn:hover {
-  color: var(--ce-selector-active-color, #5175f4) !important;
-  border-color: var(--ce-selector-active-color, #5175f4) !important;
-  background-color: var(--ce-selector-option-hover-bg, #eef2fd) !important;
-}
-
-/* 内联新增行：输入框 + 确认/取消 */
-.ce-selector-add-row {
+/* 弹窗头部：模式标题（左，占满剩余空间）+（编辑模式）编辑标识（居中）
+   + √ / ×（右，紧靠右侧排列）：× 距弹窗右缘 10px（头部 padding） */
+.ce-select-popup-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-top: 4px;
+  position: relative;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+.ce-select-popup-header * {
+  color: var(--ce-selector-popup-title, #666) !important;
 }
 
-.ce-selector-add-row input {
+.ce-select-popup-title {
+  white-space: nowrap;
+  flex: 1;
+}
+
+.ce-select-popup-edit-label {
+  white-space: nowrap;
+  position: absolute;
+  margin-left: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+}
+
+.ce-select-popup-edit-ok,
+.ce-select-popup-edit-cancel {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  color: var(--ce-selector-popup-title, #666) !important;
+  font-size: 14px;
+}
+.ce-select-popup-edit-ok svg,
+.ce-select-popup-edit-cancel svg {
+  width: 14px;
+  height: 14px;
+}
+.ce-select-popup-edit-ok *,
+.ce-select-popup-edit-cancel * {
+  color: var(--ce-selector-popup-title, #666) !important;
+}
+
+.ce-select-popup-edit-ok {
+  margin-left: 8px;
+}
+
+.ce-select-popup-edit-cancel {
+  margin-left: 8px;
+}
+
+.ce-select-popup-edit-ok:hover,
+.ce-select-popup-edit-cancel:hover {
+  opacity: 0.75;
+}
+
+/* 单选选中项右侧对勾图标：颜色跟随选项文字颜色 */
+.ce-select-option-check {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 底部操作条：管理候选项 / + 新增候选项（左对齐，距左缘 10px） */
+.ce-selector-manage-bar {
+  border-top: 1px solid var(--ce-selector-manage-border, #cdcfdc) !important;
+  color: var(--ce-selector-manage-color, #000) !important;
+  font-size: 12px;
+  height: 28px;
+  line-height: 28px;
+  text-align: left;
+  padding-left: 10px;
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  background-color: transparent !important;
+}
+
+.ce-selector-manage-bar:hover {
+  color: var(--ce-selector-manage-hover-color, #5175f4) !important;
+}
+
+/* 编辑模式候选项 textarea：文字与背景同选项颜色，最多两行超出滚动 */
+.ce-select-control-popup ul li textarea.ce-selector-edit-textarea {
   flex: 1;
   background-color: transparent !important;
-  border: none !important;
-  border-bottom: 1px solid var(--ce-selector-input-border, #8195dd) !important;
-  color: var(--ce-selector-option-color, #666) !important;
-  font-size: 13px;
+  border: 1px solid var(--ce-selector-edit-textarea-border, #cdcfdc) !important;
+  border-radius: 3px;
+  color: inherit !important;
+  font-size: 14px;
+  line-height: 20px;
+  padding: 2px 4px;
+  resize: none;
   outline: none;
-  min-width: 80px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  max-height: 44px;
+  min-width: 0;
+  font-family: inherit;
 }
 
-.ce-selector-add-row input::placeholder {
+.ce-select-control-popup ul li textarea.ce-selector-edit-textarea::placeholder {
   color: var(--ce-selector-input-placeholder, #c0c4cc) !important;
   opacity: 1 !important;
 }
 
-.ce-selector-add-ok,
-.ce-selector-add-cancel {
-  font-size: 12px;
+.ce-select-control-popup ul li textarea.ce-selector-edit-textarea:hover {
+  border-color: var(
+    --ce-selector-edit-textarea-hover-border,
+    #8195dd
+  ) !important;
+}
+
+.ce-select-control-popup ul li textarea.ce-selector-edit-textarea:focus {
+  border-color: var(
+    --ce-selector-edit-textarea-active-border,
+    #5175f4
+  ) !important;
+}
+
+/* 编辑模式候选项删除图标：颜色跟随选项文字颜色 */
+.ce-selector-edit-remove {
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
   cursor: pointer;
   user-select: none;
-  white-space: nowrap;
+  flex-shrink: 0;
+  color: inherit !important;
+  opacity: 0.7;
 }
 
-.ce-selector-add-ok {
-  color: var(--ce-selector-option-color, #666) !important;
-}
-
-.ce-selector-add-cancel {
-  color: var(--ce-selector-option-color, #666) !important;
-}
-
-.ce-selector-add-ok:hover,
-.ce-selector-add-cancel:hover {
-  opacity: 0.75;
-}
-
-/* 选项右侧“移除”按钮 */
-.ce-selector-remove-btn {
-  margin-left: auto;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0 4px;
-  color: var(--ce-selector-option-color, #666) !important;
-  opacity: 0.55;
-  user-select: none;
-}
-
-.ce-selector-remove-btn:hover {
-  color: #f56c6c !important;
+.ce-selector-edit-remove:hover {
   opacity: 1;
 }

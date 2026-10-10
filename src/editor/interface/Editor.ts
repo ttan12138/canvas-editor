@@ -131,9 +131,10 @@ export interface ISelectorOption {
   activeOptionColor: string // 选项选中时文字颜色
   activeOptionBackgroundColor: string // 选项选中时背景颜色
   // 复选框（单选/多选通用）
-  checkboxBackgroundColor: string // 选中（checked）背景颜色
-  checkboxBorderColor: string // 未选中（unchecked）边框颜色（checked 时同用此色作边框）
+  checkboxBackgroundColor: string // 未选中（unchecked）背景颜色
+  checkboxBorderColor: string // 边框颜色（未选中；选中时边框同 checkboxActiveBackgroundColor）
   checkboxMarkColor: string // 选中（checked）内容颜色（对勾）
+  checkboxActiveBackgroundColor: string // 选中（checked）背景颜色（选中时边框同用此色）
   // 数值输入框下边框（三态）
   inputBorderColor: string // 输入框下边框颜色（选项未选中态）
   inputHoverBorderColor: string // 输入框下边框颜色（选项 hover 态）
@@ -161,10 +162,46 @@ export interface ISelectorOption {
   // 联动标识（带 associationId 的控件）
   associationBackgroundColor: string // 联动标识背景颜色
   associationTextColor: string // 联动标识文字（“联”）颜色
-  // 是否显示弹窗中的“添加选项”按钮（单选/多选控件），默认 true
+  // 是否显示弹窗中的“管理候选项”入口（单选/多选控件），默认 true
   showAddOption?: boolean
-  // 是否显示每个选项右侧的“删除选项”按钮（单选/多选控件），默认 true
-  showRemoveOption?: boolean
+  // 编辑模式候选项 textarea 边框颜色
+  editTextareaBorderColor: string
+  // 编辑模式候选项 textarea 边框颜色（悬浮时）
+  editTextareaHoverBorderColor: string
+  // 编辑模式候选项 textarea 边框颜色（聚焦时）
+  editTextareaActiveBorderColor: string
+  // “管理候选项/新增候选项”文字颜色
+  manageOptionColor: string
+  // “管理候选项/新增候选项”文字颜色（hover|active）
+  manageOptionHoverColor: string
+  // “管理候选项/新增候选项”上边框颜色
+  manageOptionBorderColor: string
+  // 弹窗头部标题（单选/多选 · N 个候选）及 √ / × 图标颜色
+  popupTitleColor: string
+  // 多选弹窗“分割符逻辑”区（分割符标签与按钮）文字颜色
+  delimiterColor: string
+  // 多选弹窗“分割符逻辑”区按钮背景色
+  delimiterBackgroundColor: string
+  // 多选弹窗“分割符逻辑”区选中按钮文字颜色
+  delimiterActiveColor: string
+  // 多选弹窗“分割符逻辑”区选中按钮背景色
+  delimiterActiveBackgroundColor: string
+  // 多选弹窗“分割符逻辑”区按钮边框颜色
+  delimiterBorderColor: string
+  // 多选弹窗“分割符逻辑”区选中按钮边框颜色
+  delimiterBorderActiveColor: string
+  // 多选弹窗“应用多选”按钮文字色
+  applyButtonColor: string
+  // 多选弹窗“应用多选”按钮背景色
+  applyButtonBackgroundColor: string
+  // 多选弹窗“应用多选”按钮 active（hover）文字色
+  applyButtonActiveColor: string
+  // 多选弹窗“应用多选”按钮 active（hover）背景色
+  applyButtonActiveBackgroundColor: string
+  // 多选弹窗“应用多选”按钮边框颜色
+  applyButtonBorderColor: string
+  // 多选弹窗“应用多选”按钮 active（hover）边框颜色
+  applyButtonBorderActiveColor: string
 }
 
 export interface IEditorResult {
