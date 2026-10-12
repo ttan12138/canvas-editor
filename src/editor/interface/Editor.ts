@@ -178,6 +178,12 @@ export interface ISelectorOption {
   manageOptionBorderColor: string
   // 弹窗头部标题（单选/多选 · N 个候选）及 √ / × 图标颜色
   popupTitleColor: string
+  // 弹窗头部（ce-select-popup-header）背景颜色
+  popupHeaderBackgroundColor: string
+  // 弹窗头部 √ / × 符号颜色（编辑模式确认/取消）
+  popupTitleOptionsColor: string
+  // 弹窗头部 √ / × 符号颜色（hover 时）
+  popupTitleOptionsHoverColor: string
   // 多选弹窗“分割符逻辑”区（分割符标签与按钮）文字颜色
   delimiterColor: string
   // 多选弹窗“分割符逻辑”区按钮背景色

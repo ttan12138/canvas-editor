@@ -101,9 +101,10 @@
   display: flex;
   align-items: center;
   position: relative;
-  padding: 6px 10px;
+  padding: 8px 9.14px 8px 11.5px;
   box-sizing: border-box;
-  font-size: 12px;
+  font-size: 14px;
+  background-color: var(--ce-selector-popup-header-bg, transparent);
 }
 .ce-select-popup-header * {
   color: var(--ce-selector-popup-title, #666) !important;
@@ -129,7 +130,7 @@
   align-items: center;
   cursor: pointer;
   user-select: none;
-  color: var(--ce-selector-popup-title, #666) !important;
+  color: var(--ce-selector-popup-title-options, #666) !important;
   font-size: 14px;
 }
 .ce-select-popup-edit-ok svg,
@@ -139,7 +140,7 @@
 }
 .ce-select-popup-edit-ok *,
 .ce-select-popup-edit-cancel * {
-  color: var(--ce-selector-popup-title, #666) !important;
+  color: var(--ce-selector-popup-title-options, #666) !important;
 }
 
 .ce-select-popup-edit-ok {
@@ -152,6 +153,12 @@
 
 .ce-select-popup-edit-ok:hover,
 .ce-select-popup-edit-cancel:hover {
+  color: var(--ce-selector-popup-title-options-hover, #666) !important;
+  opacity: 0.75;
+}
+.ce-select-popup-edit-ok:hover *,
+.ce-select-popup-edit-cancel:hover * {
+  color: var(--ce-selector-popup-title-options-hover, #666) !important;
   opacity: 0.75;
 }
 
@@ -168,7 +175,7 @@
 .ce-selector-manage-bar {
   border-top: 1px solid var(--ce-selector-manage-border, #cdcfdc) !important;
   color: var(--ce-selector-manage-color, #000) !important;
-  font-size: 12px;
+  font-size: 13px;
   height: 28px;
   line-height: 28px;
   text-align: left;
@@ -192,7 +199,7 @@
   color: inherit !important;
   font-size: 14px;
   line-height: 20px;
-  padding: 2px 4px;
+  padding: 4px;
   resize: none;
   outline: none;
   box-sizing: border-box;

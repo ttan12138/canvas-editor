@@ -703,7 +703,7 @@ export class CustomSelectControl implements IControlInstance {
       const li = document.createElement('li')
       li.style.display = 'flex'
       li.style.alignItems = 'flex-start'
-      li.style.padding = '0px 6px'
+      li.style.padding = '0px 12px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
       li.style.minHeight = '28px'
@@ -1064,6 +1064,18 @@ export class CustomSelectControl implements IControlInstance {
       '--ce-selector-popup-title',
       selectorOption.popupTitleColor
     )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-header-bg',
+      selectorOption.popupHeaderBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-title-options',
+      selectorOption.popupTitleOptionsColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-title-options-hover',
+      selectorOption.popupTitleOptionsHoverColor
+    )
     selectPopupContainer.style.backgroundColor =
       'var(--ce-selector-popup-bg, #fff)'
     selectPopupContainer.style.border =
@@ -1119,7 +1131,7 @@ export class CustomSelectControl implements IControlInstance {
       hint.className = 'select-hint'
       hint.textContent =
         '按 Tab 键切换到下一个输入框，按 Enter 键确认选择，按 Esc 键退出'
-      hint.style.padding = '0px 6px'
+      hint.style.padding = '0px 12px'
       hint.style.backgroundColor = '#FFFBE6'
       hint.style.borderTop = '1px solid #E4E7ED'
       hint.style.fontSize = '12px'
@@ -1144,7 +1156,7 @@ export class CustomSelectControl implements IControlInstance {
     const li = document.createElement('li')
     li.style.display = 'flex'
     li.style.alignItems = 'flex-start'
-    li.style.padding = '0px 6px'
+    li.style.padding = '0px 12px'
     li.style.cursor = 'pointer'
     li.style.listStyle = 'none'
     li.style.minHeight = '28px'

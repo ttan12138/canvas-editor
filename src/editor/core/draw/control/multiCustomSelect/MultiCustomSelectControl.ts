@@ -806,7 +806,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       const li = document.createElement('li')
       li.style.display = 'flex'
       li.style.alignItems = 'flex-start'
-      li.style.padding = '0px 6px'
+      li.style.padding = '0px 12px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
       li.style.minHeight = '28px'
@@ -1392,6 +1392,18 @@ export class MultiCustomSelectControl implements IControlInstance {
       selectorOption.popupTitleColor
     )
     selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-header-bg',
+      selectorOption.popupHeaderBackgroundColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-title-options',
+      selectorOption.popupTitleOptionsColor
+    )
+    selectPopupContainer.style.setProperty(
+      '--ce-selector-popup-title-options-hover',
+      selectorOption.popupTitleOptionsHoverColor
+    )
+    selectPopupContainer.style.setProperty(
       '--ce-selector-delimiter-color',
       selectorOption.delimiterColor
     )
@@ -1645,7 +1657,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     const li = document.createElement('li')
     li.style.display = 'flex'
     li.style.alignItems = 'flex-start'
-    li.style.padding = '0px 6px'
+    li.style.padding = '0px 12px'
     li.style.cursor = 'pointer'
     li.style.listStyle = 'none'
     li.style.minHeight = '28px'
