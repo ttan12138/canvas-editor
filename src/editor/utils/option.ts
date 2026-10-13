@@ -226,7 +226,8 @@ export function mergeOption(
     // 新增可选字段：确保合并后始终为 string，兼容 DeepRequired 返回类型
     hintColor: options.selector?.hintColor ?? defaultSelectorOption.hintColor,
     hintBackgroundColor:
-      options.selector?.hintBackgroundColor ?? defaultSelectorOption.hintBackgroundColor
+      options.selector?.hintBackgroundColor ??
+      defaultSelectorOption.hintBackgroundColor
   }
   const modeRuleOption: DeepRequired<IModeRule> = {
     print: {
@@ -254,6 +255,7 @@ export function mergeOption(
     maxSize: 72,
     defaultRowMargin: 1,
     defaultBasicRowMarginHeight: 8,
+    defaultLineHeightMultiple: options.defaultLineHeightMultiple ?? null,
     defaultTabWidth: 32,
     width: 794,
     height: 1123,
@@ -321,6 +323,6 @@ export function mergeOption(
     imgCaption: imgCaptionOptions,
     list: listOptions,
     magnifier: magnifierOptions,
-    isPlainText: options.isPlainText ?? false,
+    isPlainText: options.isPlainText ?? false
   }
 }

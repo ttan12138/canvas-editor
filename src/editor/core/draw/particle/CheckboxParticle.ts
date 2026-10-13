@@ -88,9 +88,12 @@ export class CheckboxParticle {
       }
     }
     // left top 四舍五入避免1像素问题
-    const left = Math.round(x + gap * scale)
+    // 图标左侧额外留白约半个图标宽度（与 Draw.computeRow 中 extraLeft 对应），
+    // 从绘制宽度中扣回该留白，保证图标本体尺寸不变
+    const extraLeft = metrics.height / 2
+    const left = Math.round(x + gap * scale + extraLeft)
     const top = Math.round(y - metrics.height + lineWidth)
-    const width = metrics.width - gap * 2 * scale
+    const width = metrics.width - gap * 2 * scale - extraLeft
     const height = metrics.height
     ctx.save()
     ctx.beginPath()

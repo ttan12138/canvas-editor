@@ -1038,6 +1038,16 @@ export class CommandAdapt {
     this.draw.render({ curIndex, isSetCursor })
   }
 
+  // 设置全局视觉行间距倍数（通过 options 配置影响整篇渲染）。
+  // multiple = 上一行底部到当前行底部的高度 / 字体高度（字形高度）
+  public lineHeight(payload: number) {
+    const isReadonly = this.draw.isReadonly()
+    if (isReadonly) return
+    const multiple = payload < 1 ? 1 : payload
+    // 写入全局配置，由 Draw 在渲染时统一应用，作用于整篇文档
+    this.draw.setLineHeightMultiple(multiple)
+  }
+
   public insertTable(row: number, col: number) {
     const isDisabled = this.draw.isReadonly() || this.draw.isDisabled()
     if (isDisabled) return

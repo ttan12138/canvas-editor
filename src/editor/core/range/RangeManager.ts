@@ -540,6 +540,7 @@ export class RangeManager {
     const highlight = curElement.highlight || null
     const rowFlex = curElement.rowFlex || null
     const rowMargin = curElement.rowMargin ?? this.options.defaultRowMargin
+    const lineHeightMultiple = this.draw.getElementLineHeightMultiple(curElement)
     const dashArray = curElement.dashArray || []
     const level = curElement.level || null
     const listType = curElement.listType || null
@@ -568,6 +569,7 @@ export class RangeManager {
       highlight,
       rowFlex,
       rowMargin,
+      lineHeightMultiple,
       dashArray,
       level,
       listType,
@@ -595,6 +597,13 @@ export class RangeManager {
     const painter = !!this.draw.getPainterStyle()
     const undo = this.historyManager.isCanUndo()
     const redo = this.historyManager.isCanRedo()
+    // 默认样式的视觉行间距倍数
+    const lineHeightMultiple = this.draw.getElementLineHeightMultiple({
+      value: ZERO,
+      font,
+      size,
+      rowMargin
+    } as IElement)
     const rangeStyle: IRangeStyle = {
       type: null,
       undo,
@@ -610,6 +619,7 @@ export class RangeManager {
       highlight: null,
       rowFlex: null,
       rowMargin,
+      lineHeightMultiple,
       dashArray: [],
       level: null,
       listType: null,

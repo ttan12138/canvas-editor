@@ -170,6 +170,8 @@ export class Draw {
   private laTexParticle: LaTexParticle
   private textParticle: TextParticle
   private tableParticle: TableParticle
+  // 字形高度缓存（按 font 字符串），供全局视觉行间距倍数反解行距时复用，避免高频创建 canvas
+  private glyphHeightCache: Map<string, number> = new Map()
   private tableTool: TableTool
   private tableOperate: TableOperate
   private pageNumber: PageNumber
@@ -1718,8 +1720,48 @@ export class Draw {
       defaultSize,
       defaultBasicRowMarginHeight,
       defaultRowMargin,
-      scale
+      scale,
+      defaultLineHeightMultiple
     } = this.options
+    // 全局视觉行间距倍数：直接定义真实倍数（行高/字形高度），
+    // 优先级高于元素自身 rowMargin 与默认行距，作用于整篇文本渲染
+    if (defaultLineHeightMultiple != null) {
+      const type = el.type
+      // 仅对文本类元素生效：表格/分隔符等用 rowMargin 做负向特殊处理，
+      // 不应被全局倍数覆盖，以免破坏其默认行距；控件图标（RADIO/CHECKBOX）
+      // 跟随文字行高，以便其底边与文字下边缘对齐
+      const isTextLike =
+        !type ||
+        type === ElementType.TEXT ||
+        type === ElementType.SUPERSCRIPT ||
+        type === ElementType.SUBSCRIPT ||
+        type === ElementType.CHECKBOX ||
+        type === ElementType.RADIO ||
+        el.controlComponent === ControlComponent.CHECKBOX ||
+        el.controlComponent === ControlComponent.RADIO
+      if (isTextLike) {
+        const font = this.getElementFont(el)
+        // 缓存键包含 scale：字形高度随缩放变化，避免页面缩放后读到旧值
+        const key = `${font}@${scale}`
+        let glyphHeight = this.glyphHeightCache.get(key)
+        if (glyphHeight == null) {
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+          ctx.font = font
+          const basis = this.textParticle.measureBasisWord(ctx, font)
+          glyphHeight =
+            (basis.actualBoundingBoxAscent + basis.actualBoundingBoxDescent) *
+            scale
+          this.glyphHeightCache.set(key, glyphHeight)
+        }
+        if (glyphHeight > 0) {
+          const multiple = Math.max(defaultLineHeightMultiple, 1)
+          // 行高 = 2*rowMargin_px + glyphHeight = glyphHeight * multiple
+          // → rowMargin_px = glyphHeight * (multiple - 1) / 2
+          return Math.max(0, (multiple - 1) * glyphHeight / 2)
+        }
+      }
+    }
     // 行间距随字号等比缩放：以默认字号为基准（基准字号时 ratio=1），
     // 缩小字号时行距同步缩小，放大字号时行距同步放大（类似 Word 单倍行距）
     const fontSize = el.size || defaultSize
@@ -1730,6 +1772,43 @@ export class Draw {
       (el.rowMargin ?? defaultRowMargin) *
       scale
     )
+  }
+
+  // 获取元素当前的视觉行间距倍数（真实倍数）。
+  // 真实倍数 = (2*rowMargin_px + glyphHeight) / glyphHeight
+  // 即上一行底部到当前行底部的高度 / 字形高度
+  public getElementLineHeightMultiple(el: IElement): number {
+    const { scale } = this.options
+    // 与渲染时一致：字形高度采用字体基准度量（measureBasisWord）并乘 scale
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    ctx.font = this.getElementFont(el)
+    const basis = this.textParticle.measureBasisWord(ctx, ctx.font)
+    const glyphHeight =
+      (basis.actualBoundingBoxAscent + basis.actualBoundingBoxDescent) * scale
+    if (glyphHeight <= 0) return 1
+    const rowMarginPx = this.getElementRowMargin(el)
+    return (2 * rowMarginPx + glyphHeight) / glyphHeight
+  }
+
+  // 设置全局视觉行间距倍数（通过 options.defaultLineHeightMultiple 影响整篇渲染）
+  public setLineHeightMultiple(multiple: number) {
+    const value = multiple < 1 ? 1 : multiple
+    this.options.defaultLineHeightMultiple = value
+    // 重新计算行高并渲染
+    this.render()
+  }
+
+  // 文字基线到字形下边缘的距离（descent），用于控件后缀图标/下划线与文字下边缘对齐。
+  // 文字下边缘 = 行基线(y + row.ascent) + descent，与基线绑定，
+  // 行间距变化时基线与文字同步移动，因此对齐关系稳定固定。
+  public getElementTextDescent(el: IElement): number {
+    const { scale } = this.options
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D
+    ctx.font = this.getElementFont(el)
+    const basis = this.textParticle.measureBasisWord(ctx, ctx.font)
+    return basis.actualBoundingBoxDescent * scale
   }
 
   public computeRowList(payload: IComputeRowListPayload) {
@@ -2111,8 +2190,15 @@ export class Draw {
         const { gap } = this.options.radio
         // 图标高度随字号缩放，避免固定像素撑大整行行高
         const boxSize = (element.size || defaultSize) * scale
-        const elementWidth = boxSize + gap * 2 * scale
-        element.width = boxSize + gap * 2
+        // 图标占满自身 boundingBox：ascent=图标高度、descent=0，
+        // 使图标底边（= boundingBoxAscent + rowMargin）与同行文字下边缘对齐，
+        // 而非被行尾（底部）额外行距推偏
+        metrics.boundingBoxAscent = boxSize
+        metrics.boundingBoxDescent = 0
+        // 左侧额外留白：约半个图标宽度，拉开图标与相邻内容的间距
+        const extraLeft = boxSize / 2
+        const elementWidth = boxSize + gap * 2 * scale + extraLeft
+        element.width = boxSize + gap * 2 + extraLeft / scale
         metrics.width = elementWidth * scale
         metrics.height = boxSize
       } else if (
@@ -2122,8 +2208,11 @@ export class Draw {
         const { gap } = this.options.checkbox
         // 图标高度随字号缩放，避免固定像素撑大整行行高
         const boxSize = (element.size || defaultSize) * scale
-        const elementWidth = boxSize + gap * 2 * scale
-        element.width = boxSize + gap * 2
+        metrics.boundingBoxAscent = boxSize
+        metrics.boundingBoxDescent = 0
+        const extraLeft = boxSize / 2
+        const elementWidth = boxSize + gap * 2 * scale + extraLeft
+        element.width = boxSize + gap * 2 + extraLeft / scale
         metrics.width = elementWidth * scale
         metrics.height = boxSize
       } else if (element.type === ElementType.TAB) {
@@ -2972,7 +3061,6 @@ export class Draw {
         ) {
           const minWidthPx =
             element.minWidthActualWidth ?? element.control.minWidth * scale
-          const rowMargin = this.getElementRowMargin(element)
           let offsetY = 0
           if (element.type === ElementType.SUBSCRIPT) {
             offsetY = this.subscriptParticle.getOffsetY(element)
@@ -2983,7 +3071,7 @@ export class Draw {
           this.underline.recordFillInfo(
             ctx,
             controlStartX,
-            y + curRow.height - rowMargin + offsetY,
+            y + curRow.ascent + this.getElementTextDescent(element) + offsetY,
             minWidthPx,
             0,
             nfColor,

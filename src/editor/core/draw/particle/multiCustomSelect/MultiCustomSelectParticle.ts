@@ -47,9 +47,16 @@ export class MultiCustomSelectParticle {
     const metrics = element.metrics
     const scale = this.options.scale
     const svgSize = (element.size || metrics.height) * scale * 0.8
-    const centerX = x + metrics.width / 2
-    // 底部对齐：y 为元素顶边，图标底边与行底部对齐（不再垂直居中）
-    const centerY = y + row.height - svgSize / 2
+    // 图标左边缘距左侧文字 0.7 个图标宽度
+    const centerX = x + svgSize * 0.1 + svgSize / 2
+    // 图标下边缘与文字下边缘对齐：文字基线 = y + row.ascent（与文字绘制基线一致），
+    // 文字下边缘 = 基线 + descent。随行距变化基线与文字同步移动，对齐关系稳定固定。
+    // 图标 SVG 在 24x24 视窗内上下有留白，整体再向下偏移一点，
+    // 使箭头视觉上更贴近文字下边缘（比例可按需调整）
+    const baselineY = y + row.ascent
+    const descent = this.draw.getElementTextDescent(element)
+    const iconOffsetY = svgSize * 0.2
+    const centerY = baselineY + descent - svgSize / 2 + iconOffsetY
     this.drawSelectArrow(ctx, centerX, centerY, svgSize, hasAssociation)
   }
 
