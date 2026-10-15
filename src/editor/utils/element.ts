@@ -46,7 +46,11 @@ import { RowFlex } from '../dataset/enum/Row'
 import { TableBorder, TdBorder } from '../dataset/enum/table/Table'
 import { VerticalAlign } from '../dataset/enum/VerticalAlign'
 import { DeepRequired } from '../interface/Common'
-import { IControlSelect, IControlSelectValue, IValueSet } from '../interface/Control'
+import {
+  IControlSelect,
+  IControlSelectValue,
+  IValueSet
+} from '../interface/Control'
 import { IEditorOption } from '../interface/Editor'
 import { IElement } from '../interface/Element'
 import { IRowElement } from '../interface/Row'
@@ -82,8 +86,8 @@ export function inferMultiSelectDelimiter(
 ): string {
   // 1. 优先使用显式指定的分隔符
   if (explicitDelimiter) return explicitDelimiter
-  // 2. 没有 code 或 valueSets 时使用默认逗号
-  if (!code || !valueSets?.length) return ','
+  // 2. 没有 code 或 valueSets 时使用默认顿号（、）
+  if (!code || !valueSets?.length) return '、'
   // 3. 尝试常见分隔符，找到能让所有拆分部分都匹配 valueSets 的分隔符
   const codeSet = new Set(valueSets.map(v => v.code))
   const tryMatch = (delimiter: string): boolean => {
@@ -102,8 +106,8 @@ export function inferMultiSelectDelimiter(
   for (const delimiter of MULTI_SELECT_DELIMITER_CANDIDATES) {
     if (tryMatch(delimiter)) return delimiter
   }
-  // 4. 未找到匹配的分隔符，使用默认逗号
-  return ','
+  // 4. 未找到匹配的分隔符，使用默认顿号（、）
+  return '、'
 }
 
 export function unzipElementList(elementList: IElement[]): IElement[] {
@@ -462,7 +466,8 @@ export function formatElementList(
           : null
       // 对于 CUSTOM_SELECT 和 MULTI_CUSTOM_SELECT：当 value 或 code 为 null 时，自动选择第一个选项
       const shouldAutoSelectFirst =
-        (type === ControlType.CUSTOM_SELECT || type === ControlType.MULTI_CUSTOM_SELECT) &&
+        (type === ControlType.CUSTOM_SELECT ||
+          type === ControlType.MULTI_CUSTOM_SELECT) &&
         !singleStructValues &&
         !multiSelectValues &&
         (value == null || code == null) &&
@@ -481,7 +486,9 @@ export function formatElementList(
         type === ControlType.CHECKBOX ||
         type === ControlType.RADIO ||
         (type === ControlType.SELECT && code && (!value || !value.length)) ||
-        (type === ControlType.CUSTOM_SELECT && code && (!value || !value.length)) ||
+        (type === ControlType.CUSTOM_SELECT &&
+          code &&
+          (!value || !value.length)) ||
         isMultiCustomSelectWithCode ||
         shouldAutoSelectFirst
       ) {
@@ -498,7 +505,8 @@ export function formatElementList(
         } else if (multiSelectValues) {
           // 多选控件：渲染 values 中的每个选项（选项优先渲染 structValues）
           // 分隔符优先从 code 推断，并回写到 control 以保证后续一致性
-          const multiSelectValueColor = editorOptions.selector.multiSelectValueColor
+          const multiSelectValueColor =
+            editorOptions.selector.multiSelectValueColor
           const delimiter = inferMultiSelectDelimiter(
             el.control.code,
             el.control.valueSets,
@@ -1256,7 +1264,9 @@ export function applyTextDiffToStructSegments<T extends { value: string }>(
   segments.forEach((segment, i) => {
     const { keepLeft, keepRight } = parts[i]
     const newValue =
-      i === insertIndex ? keepLeft + insertText + keepRight : keepLeft + keepRight
+      i === insertIndex
+        ? keepLeft + insertText + keepRight
+        : keepLeft + keepRight
     if (newValue) {
       result.push({ ...segment, value: newValue })
     }
@@ -2216,9 +2226,11 @@ export function getNonHideElementIndex(
 
   // 在文本模式下，检查当前元素是否是 PREFIX 或 POSTFIX
   // 如果是，需要跳到前一个或后一个元素
-  if (isTextMode &&
+  if (
+    isTextMode &&
     (element?.controlComponent === ControlComponent.PREFIX ||
-      element?.controlComponent === ControlComponent.POSTFIX)) {
+      element?.controlComponent === ControlComponent.POSTFIX)
+  ) {
     let i = index
     if (position === LocationPosition.BEFORE) {
       // 向前查找：找到前一个非 PREFIX/POSTFIX 元素

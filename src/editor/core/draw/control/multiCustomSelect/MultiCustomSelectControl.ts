@@ -60,7 +60,7 @@ export class MultiCustomSelectControl implements IControlInstance {
   private isPopup: boolean
   private selectDom: HTMLDivElement | null
   private options: DeepRequired<IEditorOption>
-  private DEFAULT_MULTI_SELECT_DELIMITER = ','
+  private DEFAULT_MULTI_SELECT_DELIMITER = '、'
   private stateManager: AssociationStateManager
   private valueSetCache: Map<string, Map<string, IValueSet>> = new Map()
   // 候选项编辑模式状态

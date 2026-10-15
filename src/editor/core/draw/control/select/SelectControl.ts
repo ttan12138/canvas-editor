@@ -38,8 +38,8 @@ export class SelectControl implements IControlInstance {
   private isPopup: boolean
   private selectDom: HTMLDivElement | null
   private options: DeepRequired<IEditorOption>
-  private VALUE_DELIMITER = ','
-  private DEFAULT_MULTI_SELECT_DELIMITER = ','
+  private VALUE_DELIMITER = '、'
+  private DEFAULT_MULTI_SELECT_DELIMITER = '、'
 
   constructor(element: IElement, control: Control) {
     const draw = control.getDraw()
@@ -501,10 +501,10 @@ export class SelectControl implements IControlInstance {
     selectPopupContainer.classList.add(`${EDITOR_PREFIX}-select-control-popup`)
     selectPopupContainer.setAttribute(EDITOR_COMPONENT, EditorComponent.POPUP)
     // 阻止 mousedown/click 冒泡至 document，避免编辑器全局失焦逻辑/宿主页面的全局点击处理销毁弹窗
-    selectPopupContainer.addEventListener('mousedown', (e) => {
+    selectPopupContainer.addEventListener('mousedown', e => {
       e.stopPropagation()
     })
-    selectPopupContainer.addEventListener('click', (e) => {
+    selectPopupContainer.addEventListener('click', e => {
       e.stopPropagation()
     })
     const ul = document.createElement('ul')
@@ -542,18 +542,51 @@ export class SelectControl implements IControlInstance {
     const selectorOption = this.control.getOptions().selector
     if (selectorOption) {
       const style = selectPopupContainer.style
-      style.setProperty('--ce-selector-popup-bg', selectorOption.popupBackgroundColor)
-      style.setProperty('--ce-selector-option-color', selectorOption.optionColor)
-      style.setProperty('--ce-selector-option-hover-bg', selectorOption.optionHoverBackgroundColor)
-      style.setProperty('--ce-selector-option-hover-color', selectorOption.optionHoverColor)
-      style.setProperty('--ce-selector-active-color', selectorOption.activeOptionColor)
-      style.setProperty('--ce-selector-active-bg', selectorOption.activeOptionBackgroundColor)
-      style.setProperty('--ce-selector-checkbox-bg', selectorOption.checkboxBackgroundColor)
+      style.setProperty(
+        '--ce-selector-popup-bg',
+        selectorOption.popupBackgroundColor
+      )
+      style.setProperty(
+        '--ce-selector-option-color',
+        selectorOption.optionColor
+      )
+      style.setProperty(
+        '--ce-selector-option-hover-bg',
+        selectorOption.optionHoverBackgroundColor
+      )
+      style.setProperty(
+        '--ce-selector-option-hover-color',
+        selectorOption.optionHoverColor
+      )
+      style.setProperty(
+        '--ce-selector-active-color',
+        selectorOption.activeOptionColor
+      )
+      style.setProperty(
+        '--ce-selector-active-bg',
+        selectorOption.activeOptionBackgroundColor
+      )
+      style.setProperty(
+        '--ce-selector-checkbox-bg',
+        selectorOption.checkboxBackgroundColor
+      )
       style.setProperty('--ce-selector-divider', selectorOption.dividerColor)
-      style.setProperty('--ce-selector-checkbox-border', selectorOption.checkboxBorderColor)
-      style.setProperty('--ce-selector-checkbox-active-bg', selectorOption.checkboxActiveBackgroundColor)
-      style.setProperty('--ce-selector-checkbox-mark', selectorOption.checkboxMarkColor)
-      style.setProperty('--ce-selector-arrow-bg', selectorOption.arrowBackgroundColor)
+      style.setProperty(
+        '--ce-selector-checkbox-border',
+        selectorOption.checkboxBorderColor
+      )
+      style.setProperty(
+        '--ce-selector-checkbox-active-bg',
+        selectorOption.checkboxActiveBackgroundColor
+      )
+      style.setProperty(
+        '--ce-selector-checkbox-mark',
+        selectorOption.checkboxMarkColor
+      )
+      style.setProperty(
+        '--ce-selector-arrow-bg',
+        selectorOption.arrowBackgroundColor
+      )
       style.setProperty('--ce-selector-arrow-color', selectorOption.arrowColor)
     }
     // 定位
