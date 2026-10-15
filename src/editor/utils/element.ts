@@ -77,7 +77,8 @@ const MULTI_SELECT_DELIMITER_CANDIDATES = [
 export function inferMultiSelectDelimiter(
   code: string | null | undefined,
   valueSets: IValueSet[] | undefined,
-  explicitDelimiter?: string
+  explicitDelimiter?: string,
+  preferredDelimiters?: string[]
 ): string {
   // 1. 优先使用显式指定的分隔符
   if (explicitDelimiter) return explicitDelimiter
@@ -85,14 +86,21 @@ export function inferMultiSelectDelimiter(
   if (!code || !valueSets?.length) return ','
   // 3. 尝试常见分隔符，找到能让所有拆分部分都匹配 valueSets 的分隔符
   const codeSet = new Set(valueSets.map(v => v.code))
-  for (const delimiter of MULTI_SELECT_DELIMITER_CANDIDATES) {
+  const tryMatch = (delimiter: string): boolean => {
     // code 中不包含该分隔符则跳过
-    if (!code.includes(delimiter)) continue
+    if (!code.includes(delimiter)) return false
     const parts = code.split(delimiter).map(p => p.trim())
     // 所有部分都必须匹配 valueSets 中的 code，且至少有两个部分
-    if (parts.length > 1 && parts.every(p => codeSet.has(p))) {
-      return delimiter
+    return parts.length > 1 && parts.every(p => codeSet.has(p))
+  }
+  // 3.1 优先在 UI 可选分隔符中匹配，确保解析（默认选中）与界面高亮一致
+  if (preferredDelimiters) {
+    for (const delimiter of preferredDelimiters) {
+      if (tryMatch(delimiter)) return delimiter
     }
+  }
+  for (const delimiter of MULTI_SELECT_DELIMITER_CANDIDATES) {
+    if (tryMatch(delimiter)) return delimiter
   }
   // 4. 未找到匹配的分隔符，使用默认逗号
   return ','

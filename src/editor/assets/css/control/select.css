@@ -18,6 +18,7 @@
   padding: 3px 0;
   margin: 0;
   box-sizing: border-box;
+  overflow-y: hidden;
 }
 
 /* 重复容器类名以提升特异性，确保压过 html.theme-pacsclient * 等全局 * 规则 */
@@ -190,7 +191,7 @@
   color: var(--ce-selector-manage-hover-color, #5175f4) !important;
 }
 
-/* 编辑模式候选项 textarea：文字与背景同选项颜色，最多两行超出滚动 */
+/* 编辑模式候选项 textarea：文字与背景同选项颜色，最多三行超出滚动 */
 .ce-select-control-popup ul li textarea.ce-selector-edit-textarea {
   flex: 1;
   background-color: transparent !important;
@@ -204,7 +205,7 @@
   outline: none;
   box-sizing: border-box;
   overflow-y: auto;
-  max-height: 44px;
+  max-height: 70px;
   min-width: 0;
   font-family: inherit;
 }

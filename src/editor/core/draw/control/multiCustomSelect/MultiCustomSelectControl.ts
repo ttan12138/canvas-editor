@@ -69,6 +69,9 @@ export class MultiCustomSelectControl implements IControlInstance {
   private pendingCodes: string[] = []
   private editOutsideHandler: ((e: MouseEvent) => void) | null = null
   private editTitleSpan: HTMLSpanElement | null = null
+  // 多选分隔符可选项（界面可切换）。修改此处即可调整可选分隔符，
+  // 解析（默认选中）与界面高亮均以此为准
+  private delimiterOptions: string[] = ['、', '；', '，']
 
   constructor(element: IElement, control: Control) {
     const draw = control.getDraw()
@@ -122,7 +125,8 @@ export class MultiCustomSelectControl implements IControlInstance {
     const delimiter = inferMultiSelectDelimiter(
       control.code,
       control.valueSets,
-      control.multiSelectDelimiter
+      control.multiSelectDelimiter,
+      this.delimiterOptions
     )
     // 回写以保证后续取值一致性
     if (control.multiSelectDelimiter !== delimiter) {
@@ -768,18 +772,18 @@ export class MultiCustomSelectControl implements IControlInstance {
     const inputValues = new Map<string, string>()
     const inputElements = new Map<string, HTMLInputElement[]>()
 
-    // 弹窗头部：多选 · N 个候选（编辑模式时附【编辑模式】及 √ / ×）
+    // 弹窗头部：标题按当前模式显示对应标签（编辑模式附 √ / ×）
     const header = document.createElement('div')
     header.className = `${EDITOR_PREFIX}-select-popup-header`
     const titleSpan = document.createElement('span')
     titleSpan.className = `${EDITOR_PREFIX}-select-popup-title`
-    titleSpan.textContent = `多选 · ${valueSets.length} 个候选`
+    titleSpan.textContent = `${this._getTitleLabel()}`
     header.append(titleSpan)
     if (this.isEditMode) {
       this.editTitleSpan = titleSpan
       const editLabel = document.createElement('span')
       editLabel.className = `${EDITOR_PREFIX}-select-popup-edit-label`
-      editLabel.textContent = '【编辑中】'
+      editLabel.textContent = ''
       const okBtn = document.createElement('span')
       okBtn.className = `${EDITOR_PREFIX}-select-popup-edit-ok`
       okBtn.innerHTML = SELECT_CHECK_SVG
@@ -806,7 +810,7 @@ export class MultiCustomSelectControl implements IControlInstance {
       const li = document.createElement('li')
       li.style.display = 'flex'
       li.style.alignItems = 'flex-start'
-      li.style.padding = '0px 12px'
+      li.style.padding = '2px 12px 4px'
       li.style.cursor = 'pointer'
       li.style.listStyle = 'none'
       li.style.minHeight = '28px'
@@ -1058,7 +1062,8 @@ export class MultiCustomSelectControl implements IControlInstance {
         const textSpan = document.createElement('span')
         textSpan.textContent = valueSet.value
         textSpan.style.flex = '1'
-        textSpan.style.lineHeight = '1.8'
+        textSpan.style.lineHeight = '1'
+        textSpan.style.padding = '4px'
         textSpan.style.wordBreak = 'break-word'
         textSpan.style.whiteSpace = 'pre-wrap'
         li.appendChild(textSpan)
@@ -1130,8 +1135,8 @@ export class MultiCustomSelectControl implements IControlInstance {
       ul.append(li)
     }
     selectPopupContainer.append(ul)
-    // 头部始终显示实际渲染的候选项数量
-    titleSpan.textContent = `多选 · ${ul.children.length} 个候选`
+    // 头部标题按当前模式显示对应标签
+    titleSpan.textContent = `${this._getTitleLabel()}`
     // 头部插入到选项列表上方
     selectPopupContainer.insertBefore(header, ul)
 
@@ -1159,7 +1164,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     delimiterLabel.style.color = 'var(--ce-selector-delimiter-color, #606266)'
     delimiterContainer.appendChild(delimiterLabel)
 
-    const delimiters = [',', ';', '，']
+    const delimiters = this.delimiterOptions
     const currentDelimiter = this.getEffectiveDelimiter()
     delimiters.forEach(delim => {
       const delimBtn = document.createElement('button')
@@ -1657,7 +1662,7 @@ export class MultiCustomSelectControl implements IControlInstance {
     const li = document.createElement('li')
     li.style.display = 'flex'
     li.style.alignItems = 'flex-start'
-    li.style.padding = '0px 12px'
+    li.style.padding = '2px 12px 4px'
     li.style.cursor = 'pointer'
     li.style.listStyle = 'none'
     li.style.minHeight = '28px'
@@ -1709,19 +1714,35 @@ export class MultiCustomSelectControl implements IControlInstance {
     requestAnimationFrame(() => this._adjustTextareaHeight(textarea))
   }
 
-  // 编辑模式 textarea 高度自适应，最多显示两行（超出滚动）
+  // 编辑模式 textarea 高度自适应，最多显示三行（超出滚动）
   private _adjustTextareaHeight(textarea: HTMLTextAreaElement): void {
+    const cs = getComputedStyle(textarea)
+    const lineHeight = parseFloat(cs.lineHeight) || 20
+    const paddingV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)
+    const borderV =
+      parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth)
+    const maxLines = 3
+    const maxHeight = lineHeight * maxLines + paddingV + borderV
     textarea.style.height = 'auto'
-    const maxHeight = 44
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`
+    // scrollHeight 不含边框，补上 borderV 得到 border-box 总高，
+    // 保证正好三行完整显示、第四行起才出现滚动条
+    const target = Math.min(textarea.scrollHeight + borderV, maxHeight)
+    textarea.style.height = `${target}px`
   }
 
-  // 编辑模式下同步头部候选数量（按实际渲染的候选项数量）
+  // 弹窗标题标签：编辑模式为【管理候选项】；普通模式按类型显示
+  // 【多选】，可联动元素显示【关联选择】
+  private _getTitleLabel(): string {
+    if (this.isEditMode) return '管理候选项'
+    const control = this.element.control
+    if (control?.associationId) return '关联选择'
+    return '多选'
+  }
+
+  // 编辑模式下同步头部标题（按当前模式显示对应标签）
   private _updateEditTitle(): void {
     if (!this.editTitleSpan) return
-    const ul = this.selectDom?.querySelector('ul')
-    const count = ul ? ul.children.length : this.pendingValueSets.length
-    this.editTitleSpan.textContent = `多选 · ${count} 个候选`
+    this.editTitleSpan.textContent = `${this._getTitleLabel()}`
   }
 
   // 弹窗底部操作条：非编辑模式为“管理候选项”，编辑模式为“+ 新增候选项”
