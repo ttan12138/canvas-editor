@@ -18,7 +18,6 @@
   padding: 3px 0;
   margin: 0;
   box-sizing: border-box;
-  overflow-y: hidden;
 }
 
 /* 重复容器类名以提升特异性，确保压过 html.theme-pacsclient * 等全局 * 规则 */

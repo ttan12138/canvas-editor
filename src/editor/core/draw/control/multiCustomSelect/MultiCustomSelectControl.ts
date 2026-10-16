@@ -1458,8 +1458,9 @@ export class MultiCustomSelectControl implements IControlInstance {
     )
     selectPopupContainer.style.backgroundColor =
       'var(--ce-selector-popup-bg, #fff)'
-    selectPopupContainer.style.border =
-      '1px solid var(--ce-selector-active-bg, #e2e6ed)'
+    // selectPopupContainer.style.border =
+    //   '1px solid var(--ce-selector-active-bg, #e2e6ed)'
+    selectPopupContainer.style.overflowY = 'hidden'
     selectPopupContainer.style.borderRadius = '4px'
     selectPopupContainer.style.boxShadow = '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
 
