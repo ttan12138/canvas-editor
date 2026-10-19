@@ -168,11 +168,11 @@ export class ListParticle {
 
   // 规范化编号内容末尾为“。”：
   // - 末尾已是“。”→ 不动（already）
-  // - 末尾是中英文文字（汉字/字母）→ 需插入独立句号元素（appended，needInsert=true），
+  // - 末尾是中英文文字或数字（汉字/字母/数字）→ 需插入独立句号元素（appended，needInsert=true），
   //   不拼接以免变成“多字符元素”导致句号无法单独删除
-  // - 末尾是其他符号（非中英文文字）→ 替换为“。”（replaced，单字符元素，可单独删除）
+  // - 末尾是其他符号（非中英文文字且非数字）→ 替换为“。”（replaced，单字符元素，可单独删除）
   // - 末尾为空（无文本/无符号）→ 设为单字符“。”（appended-empty，可单独删除）
-  // 中英文文字 = 汉字 + 英文字母；其余（数字、标点、空格、其他语种字符等）均视为“符号”
+  // 中英文文字及数字 = 汉字 + 英文字母 + 数字；其余（标点、空格、其他语种字符等）均视为“符号”
   private _normalizeTrailingPeriod(el: IElement): {
     action: string
     needInsert: boolean
@@ -186,8 +186,8 @@ export class ListParticle {
     }
     const lastChar = v[v.length - 1]
     if (lastChar === PERIOD) return { action: 'already', needInsert: false }
-    if (/[a-zA-Z\u3400-\u9FFF\uF900-\uFAFF]/.test(lastChar)) {
-      // 末尾是中英文文字：保留原值，改为插入独立的句号元素，保证句号可单独删除
+    if (/[0-9a-zA-Z\u3400-\u9FFF\uF900-\uFAFF]/.test(lastChar)) {
+      // 末尾是中英文文字或数字：保留原值，改为插入独立的句号元素，保证句号可单独删除
       return { action: 'appended', needInsert: true }
     }
     // 末尾是其他符号：直接替换为句号（单字符元素 → 单字符元素，可单独删除）
