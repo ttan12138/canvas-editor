@@ -160,6 +160,7 @@ export interface IImgCaptionOption {
 
 export interface IListOption {
   inheritStyle?: boolean // 是否让列表序号继承文字样式
+  trailingPeriod?: string // 有序列表项末尾补全的标点符号，默认 '。'
 }
 
 export interface IImageBasic {

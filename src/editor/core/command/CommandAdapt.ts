@@ -1944,6 +1944,13 @@ export class CommandAdapt {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
     this.draw.appendElementList(deepClone(elementList), options)
+    // 补齐当前内容中有序列表项内容末尾的句号“。”
+    const mainList = this.draw.getOriginalMainElementList()
+    console.log('[CommandAdapt.appendElementList] 调用补句号', {
+      mainLen: mainList.length
+    })
+    this.draw.getListParticle().ensureListTrailingPeriod(mainList)
+    this.draw.render({})
   }
 
   public updateElementById(payload: IUpdateElementByIdOption) {
@@ -2118,6 +2125,13 @@ export class CommandAdapt {
 
   public setValue(payload: Partial<IEditorData>, options?: ISetValueOption) {
     this.draw.setValue(payload, options)
+    // 补齐当前内容中有序列表项内容末尾的句号“。”
+    const mainList = this.draw.getOriginalMainElementList()
+    console.log('[CommandAdapt.setValue] 调用补句号', {
+      mainLen: mainList.length
+    })
+    this.draw.getListParticle().ensureListTrailingPeriod(mainList)
+    this.draw.render({})
   }
 
   public removeControl(payload?: IRemoveControlOption) {

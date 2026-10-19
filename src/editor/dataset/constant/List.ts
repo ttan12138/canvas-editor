@@ -2,7 +2,8 @@ import { ListStyle, ListType, UlStyle } from '../enum/List'
 import { IListOption } from '../../interface/Element'
 
 export const defaultListOption: Readonly<Required<IListOption>> = {
-  inheritStyle: false
+  inheritStyle: false,
+  trailingPeriod: '。'
 }
 
 export const ulStyleMapping: Record<UlStyle, string> = {

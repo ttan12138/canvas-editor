@@ -30,6 +30,11 @@ export class ListParticle {
     this.options = draw.getOptions()
   }
 
+  // 有序列表项末尾补全的标点符号，默认 '。'，可由 options.list.trailingPeriod 配置
+  private get trailingPeriod(): string {
+    return this.options.list?.trailingPeriod || '。'
+  }
+
   public setList(listType: ListType | null, listStyle?: ListStyle) {
     const isReadonly = this.draw.isReadonly()
     if (isReadonly) return
@@ -48,15 +53,26 @@ export class ListParticle {
     }
     // 有序列表：去除行首手动编号前缀（如 "1、"、"2."），避免与自动序号重复显示
     if (listType === ListType.OL) {
+      console.log('[ListParticle.setList] 进入 OL 分支', {
+        listType,
+        changeLen: changeElementList.length
+      })
       this.stripLeadingManualNumber(changeElementList)
     }
-    // 设置值
+    // 设置值（赋予 listId / listType / listStyle）
     const listId = getUUID()
     changeElementList.forEach(el => {
       el.listId = listId
       el.listType = listType
       el.listStyle = listStyle
     })
+    // 有序列表：在赋予 listId 之后，为每个列表项内容末尾补中文句号“。”。
+    // 必须放在 listId 赋值之后：否则插入的独立句号元素无法继承 listId，
+    // 会被 Draw 行排版判定为“listId 变化”（preElement.listId !== element.listId）
+    // 而强制换行，导致句号独占一行/产生多余空行。
+    if (listType === ListType.OL) {
+      this.ensureTrailingPeriod(changeElementList)
+    }
     // 光标定位
     const isSetCursor = startIndex === endIndex
     const curIndex = isSetCursor ? endIndex : startIndex
@@ -148,6 +164,163 @@ export class ListParticle {
   private stripLeadingManualNumberInText(value: string): string {
     const len = this.leadingManualNumberLength(value)
     return len > 0 ? value.slice(len) : value
+  }
+
+  // 规范化编号内容末尾为“。”：
+  // - 末尾已是“。”→ 不动（already）
+  // - 末尾是中英文文字（汉字/字母）→ 需插入独立句号元素（appended，needInsert=true），
+  //   不拼接以免变成“多字符元素”导致句号无法单独删除
+  // - 末尾是其他符号（非中英文文字）→ 替换为“。”（replaced，单字符元素，可单独删除）
+  // - 末尾为空（无文本/无符号）→ 设为单字符“。”（appended-empty，可单独删除）
+  // 中英文文字 = 汉字 + 英文字母；其余（数字、标点、空格、其他语种字符等）均视为“符号”
+  private _normalizeTrailingPeriod(el: IElement): {
+    action: string
+    needInsert: boolean
+  } {
+    const PERIOD = this.trailingPeriod
+    const v = el.value
+    if (typeof v !== 'string' || v.length === 0) {
+      // 末尾为空文本元素：直接设为单字符句号（可单独删除）
+      el.value = PERIOD
+      return { action: 'appended-empty', needInsert: false }
+    }
+    const lastChar = v[v.length - 1]
+    if (lastChar === PERIOD) return { action: 'already', needInsert: false }
+    if (/[a-zA-Z\u3400-\u9FFF\uF900-\uFAFF]/.test(lastChar)) {
+      // 末尾是中英文文字：保留原值，改为插入独立的句号元素，保证句号可单独删除
+      return { action: 'appended', needInsert: true }
+    }
+    // 末尾是其他符号：直接替换为句号（单字符元素 → 单字符元素，可单独删除）
+    el.value = v.slice(0, -1) + PERIOD
+    return { action: 'replaced', needInsert: false }
+  }
+
+  // 在末尾文本元素之后插入一个独立的中文句号元素（复制列表属性），
+  // 使其作为独立字符可被单独删除，同时归属于同一列表项
+  private _insertPeriodAfter(el: IElement): void {
+    const mainList = this.draw.getOriginalMainElementList()
+    const idx = mainList.indexOf(el)
+    if (!~idx) return
+    const periodEl: IElement = { value: this.trailingPeriod }
+    if (el.listId) periodEl.listId = el.listId
+    if (el.listType) periodEl.listType = el.listType
+    if (el.listStyle) periodEl.listStyle = el.listStyle
+    mainList.splice(idx + 1, 0, periodEl)
+  }
+
+  // 为每个有序列表项（以 ZERO 换行分隔的段落）内容末尾补中文句号“。”：
+  // 若段落最后一个文本元素不以“。”结尾，则在其后追加。控件/图片等非文本结尾不补。
+  private ensureTrailingPeriod(changeElementList: IElement[]): void {
+    let lastTextEl: IElement | null = null
+    let listItemCount = 0
+    let appendedCount = 0
+    const pendingInserts: IElement[] = []
+    const flush = () => {
+      if (lastTextEl) {
+        const v = lastTextEl.value
+        console.log('[ListParticle.ensureTrailingPeriod] 段落末尾', {
+          valueTail: typeof v === 'string' ? v.slice(-8) : v,
+          lastChar: typeof v === 'string' && v.length ? v[v.length - 1] : 'n/a'
+        })
+        const { action, needInsert } = this._normalizeTrailingPeriod(lastTextEl)
+        console.log('[ListParticle.ensureTrailingPeriod] 处理', { action, needInsert })
+        if (needInsert) pendingInserts.push(lastTextEl)
+        if (action !== 'already') appendedCount++
+        listItemCount++
+      }
+      lastTextEl = null
+    }
+    for (let i = 0; i < changeElementList.length; i++) {
+      const el = changeElementList[i]
+      if (!el) continue
+      // 段落结束（换行标记）：在换行前的最后一个文本元素上补句号
+      if (el.value === ZERO || el.value === '\n' || el.value === '\r') {
+        flush()
+        continue
+      }
+      // canvas-editor 普通文本元素 type 为 undefined；控件/图片等特殊元素才有 type。
+      // 故“是文本”判定为 type 不存在或等于 TEXT，否则视为非文本结尾（不补句号）
+      if (el.type === undefined || el.type === ElementType.TEXT) {
+        // 记录连续文本中的最后一个文本元素（即段落末尾文本）
+        lastTextEl = el
+      } else {
+        // 非文本元素（控件/图片等）结尾时，不补句号
+        lastTextEl = null
+      }
+    }
+    // 处理最后一个段落（末尾无换行标记）
+    flush()
+    // 延迟插入独立句号元素（避免遍历中改动主列表导致索引错位），保证句号可单独删除
+    for (const el of pendingInserts) this._insertPeriodAfter(el)
+    console.log('[ListParticle.ensureTrailingPeriod] done', {
+      listItemCount,
+      appendedCount
+    })
+  }
+
+  // 遍历整个元素列表，仅为有序列表（listType === OL）的每个列表项
+  // （以 ZERO 换行分隔的段落）内容末尾补中文句号“。”。
+  // 非列表内容、已以“。”结尾的段落、或以控件/图片等非文本结尾的段落不补。
+  public ensureListTrailingPeriod(elementList: IElement[]): void {
+    const olTotal = elementList.filter(el => el && el.listType === ListType.OL).length
+    console.log('[ListParticle.ensureListTrailingPeriod] start', {
+      total: elementList.length,
+      olElems: olTotal,
+      sampleListTypes: [...new Set(elementList.filter(Boolean).map(e => e.listType))].slice(0, 20)
+    })
+    let inList = false
+    let lastTextEl: IElement | null = null
+    let listItemCount = 0
+    let appendedCount = 0
+    const pendingInserts: IElement[] = []
+    const flush = () => {
+      if (inList && lastTextEl) {
+        const v = lastTextEl.value
+        console.log('[ListParticle.ensureListTrailingPeriod] 列表项段落末尾', {
+          valueTail: typeof v === 'string' ? v.slice(-8) : v,
+          lastChar: typeof v === 'string' && v.length ? v[v.length - 1] : 'n/a'
+        })
+        const { action, needInsert } = this._normalizeTrailingPeriod(lastTextEl)
+        console.log('[ListParticle.ensureListTrailingPeriod] 处理', { action, needInsert })
+        if (needInsert) pendingInserts.push(lastTextEl)
+        if (action !== 'already') appendedCount++
+        listItemCount++
+      }
+      lastTextEl = null
+    }
+    for (let i = 0; i < elementList.length; i++) {
+      const el = elementList[i]
+      if (!el) continue
+      // 段落结束（换行标记）：当前列表项段落结束，补句号并退出列表态
+      if (el.value === ZERO || el.value === '\n' || el.value === '\r') {
+        flush()
+        inList = false
+        continue
+      }
+      // 仅处理有序列表项
+      if (el.listType !== ListType.OL) {
+        flush()
+        inList = false
+        continue
+      }
+      inList = true
+      // canvas-editor 普通文本元素 type 为 undefined；控件/图片等特殊元素才有 type。
+      // 故“是文本”判定为 type 不存在或等于 TEXT，否则视为非文本结尾（不补句号）
+      if (el.type === undefined || el.type === ElementType.TEXT) {
+        lastTextEl = el
+      } else {
+        // 非文本元素（控件/图片等）结尾时不补句号
+        lastTextEl = null
+      }
+    }
+    // 处理最后一个段落（末尾无换行标记）
+    flush()
+    // 延迟插入独立句号元素（避免遍历主列表时改动索引导致错位），保证句号可单独删除
+    for (const el of pendingInserts) this._insertPeriodAfter(el)
+    console.log('[ListParticle.ensureListTrailingPeriod] done', {
+      listItemCount,
+      appendedCount
+    })
   }
 
   public unsetList() {
@@ -408,10 +581,11 @@ export class ListParticle {
     if (!count) return 0
     ctx.save()
     ctx.font = this.getListFontStyle(listElementList, scale)
-    // 以递增样式最大宽度为准
-    const text = `${this.MEASURE_BASE_TEXT.repeat(String(count).length - 1 || 1)}${
-      KeyMap.PERIOD
-    }`
+    // 以递增样式最大宽度为准：用最大序号（列表项数量）的位数测量，
+    // 避免两位数/多位数序号（如 10. 11.）因宽度不足与正文重叠
+    const maxIndex = count + 1
+    const digits = String(maxIndex).length
+    const text = `${this.MEASURE_BASE_TEXT.repeat(digits)}${KeyMap.PERIOD}`
     const textMetrics = ctx.measureText(text)
     ctx.restore()
     return Math.ceil((textMetrics.width + this.LIST_GAP) * scale)
