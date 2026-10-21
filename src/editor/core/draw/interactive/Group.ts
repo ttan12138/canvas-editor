@@ -87,44 +87,55 @@ export class Group {
     return groupElementList
   }
 
-  public changeGroupStyle(groupId: string, styleFlag: {
-    underline?: boolean,
-    highlight?: string,
-    color?: string,
-    underlineColor?: string,
-    size?: number,
-    all?: boolean
-  }){
+  public changeGroupStyle(
+    groupId: string,
+    styleFlag: {
+      underline?: boolean
+      highlight?: string
+      color?: string
+      underlineColor?: string
+      size?: number
+      all?: boolean
+    }
+  ) {
     // 仅主体内容可以成组
     const elementList = this.draw.getOriginalMainElementList()
-    const groupElementList = this.getElementListByGroupId(elementList, groupId, true)
+    const groupElementList = this.getElementListByGroupId(
+      elementList,
+      groupId,
+      true
+    )
     if (!groupElementList.length) return
     for (let e = 0; e < groupElementList.length; e++) {
       const element = groupElementList[e]
-      if(styleFlag?.all){
-        ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
+      if (styleFlag?.all) {
+        typeof styleFlag?.underline === 'boolean' &&
+          (element.underline = styleFlag.underline || false)
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
-        styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
+        styleFlag?.underlineColor &&
+          (element.underlineColor = styleFlag.underlineColor)
         styleFlag?.size && (element.size = styleFlag.size)
-      }else{
+      } else {
         delete element.highlight
         delete element.underline
-        if(!this.isControlRenderColor(element?.color)){
+        if (!this.isControlRenderColor(element?.color)) {
           delete element.color
         }
-        ;(typeof styleFlag?.underline === 'boolean') && (element.underline = styleFlag.underline || false)
+        typeof styleFlag?.underline === 'boolean' &&
+          (element.underline = styleFlag.underline || false)
         styleFlag?.highlight && (element.highlight = styleFlag.highlight)
         styleFlag?.color && (element.color = styleFlag.color)
-        styleFlag?.underlineColor && (element.underlineColor = styleFlag.underlineColor)
+        styleFlag?.underlineColor &&
+          (element.underlineColor = styleFlag.underlineColor)
         styleFlag?.size && (element.size = styleFlag.size)
       }
     }
     elementList.forEach(el => {
-      if(!el?.groupIds){
+      if (!el?.groupIds) {
         delete el.highlight
         delete el.underline
-        if(!this.isControlRenderColor(el?.color)){
+        if (!this.isControlRenderColor(el?.color)) {
           delete el.color
         }
       }
@@ -132,15 +143,18 @@ export class Group {
       // if(!el?.underline && !el?.highlight && !el?.color){
       //   delete el.groupIds
       // }
-      if(el.groupIds?.includes(groupId)){
-        const targetValue = groupId?.split('~~')[0]
-        if(targetValue && !targetValue.includes(el.value)){
+      if (el.groupIds?.includes(groupId)) {
+        const targetValue =
+          groupId == null || groupId.indexOf('MULTISEG') === 0
+            ? undefined
+            : groupId.split('~~')[0]
+        if (targetValue && !targetValue.includes(el.value)) {
           delete el.highlight
           delete el.underline
-          if(
-            el?.color != this.options.control.selectValueColor
-            && el?.color != this.options.control.defaultValueColor
-          ){
+          if (
+            el?.color != this.options.control.selectValueColor &&
+            el?.color != this.options.control.defaultValueColor
+          ) {
             delete el.color
           }
           delete el.groupIds
