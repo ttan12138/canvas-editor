@@ -4,6 +4,7 @@ import { EditorComponent } from '../../dataset/enum/Editor'
 import { DeepRequired } from '../../interface/Common'
 import { IEditorOption } from '../../interface/Editor'
 import { IElement } from '../../interface/Element'
+import { IRange } from '../../interface/Range'
 import {
   IContextMenuContext,
   IRegisterContextMenu
@@ -183,6 +184,11 @@ export class ContextMenu {
     const endElement = elementList[endIndex] || null
     // 当前区域
     const zone = this.draw.getZone().getZone()
+    // 捕获当前选区与选中文本：此时右键菜单刚打开，选区尚未被菜单点击折叠，
+    // 用于插入控件时精确替换选中内容，避免弹窗交互过程中选区被篡改导致误删后续内容。
+    // 注意：此处需克隆一份，因为 this.range.getRange() 返回的是实时对象引用，后续会被折叠/替换改写。
+    const range: IRange = { ...this.range.getRange() }
+    const selectedText = this.command.getRangeText() || ''
     return {
       startElement,
       endElement,
@@ -195,7 +201,9 @@ export class ContextMenu {
       trIndex: trIndex ?? null,
       tdIndex: tdIndex ?? null,
       tableElement,
-      options: this.options
+      options: this.options,
+      range,
+      selectedText
     }
   }
 

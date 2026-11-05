@@ -30,6 +30,9 @@ export interface IAddControlOption {
   max?: number // 数值输入框最大值
   underline?: boolean // 控件下划线
   minWidth?: number // 控件最小宽度
+  // 显式指定要替换的选区（startIndex/endIndex）。用于在右键菜单等场景下，
+  // 弹窗交互过程中选区可能被折叠/篡改时，仍能精确替换最初选中的内容，避免误删后续内容
+  range?: IRange
 }
 
 // 选择类控件结构化值（保留 groupIds、underline、highlight 等属性）

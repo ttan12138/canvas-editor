@@ -3,6 +3,7 @@ import { EditorZone } from '../../dataset/enum/Editor'
 import { DeepRequired } from '../Common'
 import { IEditorOption } from '../Editor'
 import { IElement } from '../Element'
+import { IRange } from '../Range'
 
 export interface IContextMenuContext {
   startElement: IElement | null
@@ -17,6 +18,9 @@ export interface IContextMenuContext {
   tdIndex: number | null
   tableElement: IElement | null
   options: DeepRequired<IEditorOption>
+  // 右键菜单打开时（选区尚未被点击折叠）捕获的选区与选中文本，用于插入控件时精确替换，避免弹窗交互过程中选区被篡改导致误删后续内容
+  range: IRange
+  selectedText: string
 }
 
 export interface IRegisterContextMenu {

@@ -2975,12 +2975,13 @@ export class CommandAdapt {
     }
   }
 
-  public insertControl(payload: IElement) {
+  public insertControl(payload: IElement, range?: IRange) {
     const isDisabled = this.draw.isReadonly() || this.draw.isDisabled()
     if (isDisabled) return
     const cloneElement = deepClone(payload)
-    // 格式化上下文信息
-    const { startIndex } = this.range.getRange()
+    // 格式化上下文信息：若显式传入 range，则以传入的选区为准，
+    // 避免右键菜单弹窗交互过程中选区被折叠/篡改导致误删后续内容
+    const { startIndex } = range ?? this.range.getRange()
     const elementList = this.draw.getElementList()
     const copyElement = getAnchorElement(elementList, startIndex)
     if (!copyElement) return
@@ -2991,6 +2992,10 @@ export class CommandAdapt {
       ...AREA_CONTEXT_ATTR
     ]
     cloneProperty<IElement>(cloneAttr, copyElement, cloneElement)
+    // 使用显式选区（如有），确保精确替换最初选中的内容
+    if (range) {
+      this.range.setRange(range.startIndex, range.endIndex)
+    }
     // 插入控件
     this.draw.insertElementList([cloneElement])
     // 插入控件视为一次文档内容变更：insertElementList 内部 render 的 isSubmitHistory 为 false
@@ -3002,13 +3007,13 @@ export class CommandAdapt {
   }
 
   // 编程式插入控件（单选 / 多选 / 数值输入框）
-  private _insertControlElement(control: IControl) {
+  private _insertControlElement(control: IControl, range?: IRange) {
     const element: IElement = {
       type: ElementType.CONTROL,
       value: '',
       control
     }
-    this.insertControl(element)
+    this.insertControl(element, range)
   }
 
   // 新增单选控件（下拉单选，可带自定义选项）
@@ -3021,7 +3026,7 @@ export class CommandAdapt {
       conceptId: payload.conceptId,
       prefix: payload.prefix,
       postfix: payload.postfix
-    })
+    }, payload.range)
   }
 
   // 新增多选控件（下拉多选，可带自定义选项）
@@ -3035,7 +3040,7 @@ export class CommandAdapt {
       conceptId: payload.conceptId,
       prefix: payload.prefix,
       postfix: payload.postfix
-    })
+    }, payload.range)
   }
 
   // 新增数值输入框控件
@@ -3054,7 +3059,7 @@ export class CommandAdapt {
       underline: payload.underline,
       minWidth: payload.minWidth,
       numberExclusiveOptions
-    })
+    }, payload.range)
   }
 
   // 新增带标记（NUMBER_FLAG）的数值输入框控件
@@ -3073,7 +3078,7 @@ export class CommandAdapt {
       underline: payload.underline,
       minWidth: payload.minWidth,
       numberExclusiveOptions
-    })
+    }, payload.range)
   }
 
   public jumpControl(payload?: { direction?: MoveDirection }) {
